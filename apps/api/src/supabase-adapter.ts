@@ -1,6 +1,7 @@
 import type { AuthProvider, AuthSession, AuthUser } from "../../../modules/identity/src/index.ts";
 import type { TenantRepository, TenantSummary } from "../../../modules/tenant/src/index.ts";
 import type { OrgUnit, OrganizationRepository } from "../../../modules/organization/src/index.ts";
+import type { MasterKind, MasterRecord, MastersRepository } from "../../../modules/masters/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -112,6 +113,7 @@ export function createSupabaseAdapter(
   tenants: TenantRepository;
   organization: OrganizationRepository;
   rbac: RbacRepository;
+  masters: MastersRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -330,5 +332,70 @@ export function createSupabaseAdapter(
     },
   };
 
-  return { auth, tenants, organization, rbac };
+  const masterTables: Record<MasterKind, string> = {
+    employees: "employees",
+    doctors: "doctors",
+    products: "products",
+    chemists: "chemists",
+    stockists: "stockists",
+    samples: "samples",
+    gifts: "gifts",
+  };
+
+  const toCamel = (row: Record<string, unknown>): MasterRecord => {
+    const mapped: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      mapped[key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())] = value;
+    }
+    return mapped as MasterRecord;
+  };
+
+  const toSnake = (input: Record<string, unknown>) => Object.fromEntries(
+    Object.entries(input).map(([key, value]) => [
+      key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`),
+      value,
+    ]),
+  );
+
+  const masters: MastersRepository = {
+    async list(kind, tenantId, accessToken) {
+      const query = new URLSearchParams({
+        select: "*",
+        tenant_id: `eq.${tenantId}`,
+        status: "eq.active",
+      });
+      const response = await expectOk(await fetcher(`${base}/rest/v1/${masterTables[kind]}?${query}`, {
+        headers: authHeaders(config, accessToken),
+      }));
+      return (await response.json() as Array<Record<string, unknown>>).map(toCamel);
+    },
+
+    async get(kind, tenantId, id, accessToken) {
+      const query = new URLSearchParams({
+        select: "*",
+        tenant_id: `eq.${tenantId}`,
+        id: `eq.${id}`,
+        status: "eq.active",
+        limit: "1",
+      });
+      const response = await expectOk(await fetcher(`${base}/rest/v1/${masterTables[kind]}?${query}`, {
+        headers: authHeaders(config, accessToken),
+      }));
+      const rows = await response.json() as Array<Record<string, unknown>>;
+      return rows[0] ? toCamel(rows[0]) : null;
+    },
+
+    async create(kind, tenantId, input) {
+      const response = await expectOk(await fetcher(`${base}/rest/v1/${masterTables[kind]}`, {
+        method: "POST",
+        headers: adminHeaders(config, "return=representation"),
+        body: JSON.stringify({ tenant_id: tenantId, ...toSnake(input) }),
+      }));
+      const rows = await response.json() as Array<Record<string, unknown>>;
+      if (!rows[0]) throw new ProviderError("Provider returned no master record", 502);
+      return toCamel(rows[0]);
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters };
 }

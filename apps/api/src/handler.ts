@@ -2,6 +2,7 @@ import { AuthInputError, createIdentityService, readBearerToken } from "../../..
 import { createTenantService, TenantAccessError } from "../../../modules/tenant/src/index.ts";
 import { createOrganizationService, OrganizationInputError } from "../../../modules/organization/src/index.ts";
 import { AuthorizationError, createRbacService, RbacInputError } from "../../../modules/rbac/src/index.ts";
+import { createMastersService, MASTER_KINDS, MasterInputError, type MasterKind } from "../../../modules/masters/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 
 export type ApiEnv = {
@@ -66,7 +67,7 @@ function mapError(error: unknown): Response {
     return json(status, { error: error.message });
   }
   if (error instanceof AuthorizationError) return json(403, { error: "Permission denied" });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError) {
     return json(400, { error: error.message });
   }
   if (error instanceof ProviderError) {
@@ -83,6 +84,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const tenants = createTenantService(adapter.tenants);
   const rbac = createRbacService(adapter.rbac);
   const organization = createOrganizationService(adapter.organization, rbac);
+  const masters = createMastersService(adapter.masters, adapter.organization, rbac);
 
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -160,6 +162,24 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         return json(200, {
           context: await rbac.accessContext(context.tenantId, user.id, accessToken),
         });
+      }
+
+      const masterMatch = /^\/v1\/masters\/([^/]+)$/.exec(path);
+      if (masterMatch && MASTER_KINDS.includes(masterMatch[1] as MasterKind)) {
+        const kind = masterMatch[1] as MasterKind;
+        const { accessToken, context } = await resolveTenantRequest(request);
+        if (request.method === "GET") {
+          return json(200, { items: await masters.list(kind, context.tenantId, accessToken) });
+        }
+        if (request.method === "POST") {
+          const item = await masters.create(
+            kind,
+            context.tenantId,
+            accessToken,
+            await readJsonObject(request),
+          );
+          return json(201, { item });
+        }
       }
 
       if (request.method === "POST" && path === "/v1/role-assignments") {
