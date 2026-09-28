@@ -66,6 +66,17 @@ function positiveInteger(value: unknown, field: string, fallback: number): numbe
   return value as number;
 }
 
+async function requireActiveOrgUnit(
+  organization: OrganizationRepository,
+  tenantId: string,
+  orgUnitId: string,
+  accessToken: string,
+) {
+  const unit = await organization.getUnit(tenantId, orgUnitId, accessToken);
+  if (!unit) throw new MasterInputError("Organization unit must be active and accessible");
+  return unit;
+}
+
 async function requireScopeType(
   organization: OrganizationRepository,
   tenantId: string,
@@ -73,10 +84,8 @@ async function requireScopeType(
   accessToken: string,
   expected: OrgUnitType,
 ) {
-  const unit = await organization.getUnit(tenantId, orgUnitId, accessToken);
-  if (!unit || unit.type !== expected) {
-    throw new MasterInputError(`Scope must be an active ${expected}`);
-  }
+  const unit = await requireActiveOrgUnit(organization, tenantId, orgUnitId, accessToken);
+  if (unit.type !== expected) throw new MasterInputError(`Scope must be an active ${expected}`);
 }
 
 export function createMastersService(
@@ -102,7 +111,7 @@ export function createMastersService(
       switch (kind) {
         case "employees": {
           scopeOrgUnitId = uuid(value.orgUnitId, "orgUnitId")!;
-          await requireScopeType(organization, tenantId, scopeOrgUnitId, accessToken, value.orgUnitType === "territory" ? "territory" : "territory");
+          await requireActiveOrgUnit(organization, tenantId, scopeOrgUnitId, accessToken);
           input = {
             ...common,
             designation: text(value.designation, "designation", 100)!,

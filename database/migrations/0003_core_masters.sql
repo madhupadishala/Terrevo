@@ -54,13 +54,13 @@ create table public.employees (
   unique (tenant_id, user_id),
   foreign key (tenant_id, user_id)
     references public.tenant_memberships(tenant_id, user_id)
-    on delete set null,
+    on delete restrict,
   foreign key (tenant_id, org_unit_id)
     references public.organization_units(tenant_id, id)
     on delete restrict,
   foreign key (tenant_id, reporting_manager_employee_id)
     references public.employees(tenant_id, id)
-    on delete set null
+    on delete restrict
 );
 
 create or replace function public.validate_employee_manager()
