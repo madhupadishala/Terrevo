@@ -2,6 +2,7 @@ import type { AuthProvider, AuthSession, AuthUser } from "../../../modules/ident
 import type { TenantRepository, TenantSummary } from "../../../modules/tenant/src/index.ts";
 import type { OrgUnit, OrganizationRepository } from "../../../modules/organization/src/index.ts";
 import type { MasterKind, MasterRecord, MastersRepository } from "../../../modules/masters/src/index.ts";
+import type { TourPlan, TourPlanningRepository, TourPlanStop, TourPlanSummary } from "../../../modules/tour-planning/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -114,6 +115,7 @@ export function createSupabaseAdapter(
   organization: OrganizationRepository;
   rbac: RbacRepository;
   masters: MastersRepository;
+  tourPlanning: TourPlanningRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -397,5 +399,135 @@ export function createSupabaseAdapter(
     },
   };
 
-  return { auth, tenants, organization, rbac, masters };
+  type TourPlanRow = {
+    id: string;
+    week_start: string;
+    status: "DRAFT" | "SUBMITTED";
+    submitted_at: string | null;
+  };
+  type TourDayRow = {
+    id: string;
+    plan_date: string;
+    territory_id: string;
+    remarks: string | null;
+  };
+  type TourStopRow = {
+    tour_plan_day_id: string;
+    sequence_no: number;
+    stop_type: TourPlanStop["type"];
+    doctor_id: string | null;
+    chemist_id: string | null;
+    stockist_id: string | null;
+    remarks: string | null;
+  };
+
+  const mapStop = (row: TourStopRow): TourPlanStop => ({
+    sequence: row.sequence_no,
+    type: row.stop_type,
+    targetId: row.doctor_id ?? row.chemist_id ?? row.stockist_id ?? "",
+    remarks: row.remarks,
+  });
+
+  const tourPlanning: TourPlanningRepository = {
+    async listOwn(tenantId, _userId, accessToken): Promise<TourPlanSummary[]> {
+      const query = new URLSearchParams({
+        select: "id,week_start,status,submitted_at",
+        tenant_id: `eq.${tenantId}`,
+        order: "week_start.desc",
+      });
+      const response = await expectOk(await fetcher(`${base}/rest/v1/tour_plans?${query}`, {
+        headers: authHeaders(config, accessToken),
+      }));
+      return (await response.json() as TourPlanRow[]).map((row) => ({
+        id: row.id,
+        weekStart: row.week_start,
+        status: row.status,
+        submittedAt: row.submitted_at,
+      }));
+    },
+
+    async getOwn(tenantId, _userId, planId, accessToken): Promise<TourPlan | null> {
+      const planQuery = new URLSearchParams({
+        select: "id,week_start,status,submitted_at",
+        tenant_id: `eq.${tenantId}`,
+        id: `eq.${planId}`,
+        limit: "1",
+      });
+      const planResponse = await expectOk(await fetcher(`${base}/rest/v1/tour_plans?${planQuery}`, {
+        headers: authHeaders(config, accessToken),
+      }));
+      const planRows = await planResponse.json() as TourPlanRow[];
+      const plan = planRows[0];
+      if (!plan) return null;
+
+      const dayQuery = new URLSearchParams({
+        select: "id,plan_date,territory_id,remarks",
+        tenant_id: `eq.${tenantId}`,
+        tour_plan_id: `eq.${planId}`,
+        order: "plan_date.asc",
+      });
+      const dayResponse = await expectOk(await fetcher(`${base}/rest/v1/tour_plan_days?${dayQuery}`, {
+        headers: authHeaders(config, accessToken),
+      }));
+      const dayRows = await dayResponse.json() as TourDayRow[];
+
+      let stopRows: TourStopRow[] = [];
+      if (dayRows.length > 0) {
+        const stopQuery = new URLSearchParams({
+          select: "tour_plan_day_id,sequence_no,stop_type,doctor_id,chemist_id,stockist_id,remarks",
+          tenant_id: `eq.${tenantId}`,
+          tour_plan_day_id: `in.(${dayRows.map((day) => day.id).join(",")})`,
+          order: "sequence_no.asc",
+        });
+        const stopResponse = await expectOk(await fetcher(`${base}/rest/v1/tour_plan_stops?${stopQuery}`, {
+          headers: authHeaders(config, accessToken),
+        }));
+        stopRows = await stopResponse.json() as TourStopRow[];
+      }
+
+      return {
+        id: plan.id,
+        weekStart: plan.week_start,
+        status: plan.status,
+        submittedAt: plan.submitted_at,
+        days: dayRows.map((day) => ({
+          date: day.plan_date,
+          territoryId: day.territory_id,
+          remarks: day.remarks,
+          stops: stopRows
+            .filter((stop) => stop.tour_plan_day_id === day.id)
+            .map(mapStop),
+        })),
+      };
+    },
+
+    async save(tenantId, userId, planId, weekStart, days) {
+      const response = await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_save_tour_plan`, {
+        method: "POST",
+        headers: adminHeaders(config),
+        body: JSON.stringify({
+          p_tenant_id: tenantId,
+          p_user_id: userId,
+          p_plan_id: planId,
+          p_week_start: weekStart,
+          p_days: days,
+        }),
+      }));
+      return await response.json() as string;
+    },
+
+    async submit(tenantId, userId, planId) {
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_submit_tour_plan`, {
+        method: "POST",
+        headers: adminHeaders(config),
+        body: JSON.stringify({
+          p_tenant_id: tenantId,
+          p_user_id: userId,
+          p_plan_id: planId,
+        }),
+      }));
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters, tourPlanning };
 }

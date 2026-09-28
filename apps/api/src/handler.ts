@@ -3,6 +3,7 @@ import { createTenantService, TenantAccessError } from "../../../modules/tenant/
 import { createOrganizationService, OrganizationInputError } from "../../../modules/organization/src/index.ts";
 import { AuthorizationError, createRbacService, RbacInputError } from "../../../modules/rbac/src/index.ts";
 import { createMastersService, MASTER_KINDS, MasterInputError, type MasterKind } from "../../../modules/masters/src/index.ts";
+import { createTourPlanningService, TourPlanConflictError, TourPlanInputError, TourPlanNotFoundError } from "../../../modules/tour-planning/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 
 export type ApiEnv = {
@@ -31,9 +32,9 @@ function json(status: number, body: unknown): Response {
   });
 }
 
-async function readJsonObject(request: Request): Promise<Record<string, unknown>> {
+async function readJsonObject(request: Request, maxBytes = 8_192): Promise<Record<string, unknown>> {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
-  if (Number.isFinite(contentLength) && contentLength > 8_192) {
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
     throw new ApiError(413, "Request body too large");
   }
   try {
@@ -67,9 +68,11 @@ function mapError(error: unknown): Response {
     return json(status, { error: error.message });
   }
   if (error instanceof AuthorizationError) return json(403, { error: "Permission denied" });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError) {
     return json(400, { error: error.message });
   }
+  if (error instanceof TourPlanNotFoundError) return json(404, { error: error.message });
+  if (error instanceof TourPlanConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
     if (error.status === 409) return json(409, { error: "Conflict" });
@@ -85,6 +88,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const rbac = createRbacService(adapter.rbac);
   const organization = createOrganizationService(adapter.organization, rbac);
   const masters = createMastersService(adapter.masters, adapter.organization, rbac);
+  const tourPlanning = createTourPlanningService(adapter.tourPlanning, rbac);
 
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -162,6 +166,52 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         return json(200, {
           context: await rbac.accessContext(context.tenantId, user.id, accessToken),
         });
+      }
+
+      if (request.method === "GET" && path === "/v1/tour-plans") {
+        const { accessToken, user, context } = await resolveTenantRequest(request);
+        return json(200, {
+          plans: await tourPlanning.list(context.tenantId, user.id, accessToken),
+        });
+      }
+
+      if (request.method === "POST" && path === "/v1/tour-plans") {
+        const { accessToken, user, context } = await resolveTenantRequest(request);
+        const plan = await tourPlanning.save(
+          context.tenantId,
+          user.id,
+          null,
+          accessToken,
+          await readJsonObject(request, 65_536),
+        );
+        return json(201, { plan });
+      }
+
+      const submitMatch = /^\/v1\/tour-plans\/([^/]+)\/submit$/.exec(path);
+      if (request.method === "POST" && submitMatch) {
+        const { accessToken, user, context } = await resolveTenantRequest(request);
+        await tourPlanning.submit(context.tenantId, user.id, submitMatch[1], accessToken);
+        return new Response(null, { status: 204 });
+      }
+
+      const planMatch = /^\/v1\/tour-plans\/([^/]+)$/.exec(path);
+      if (planMatch) {
+        const { accessToken, user, context } = await resolveTenantRequest(request);
+        if (request.method === "GET") {
+          return json(200, {
+            plan: await tourPlanning.get(context.tenantId, user.id, planMatch[1], accessToken),
+          });
+        }
+        if (request.method === "PUT") {
+          const plan = await tourPlanning.save(
+            context.tenantId,
+            user.id,
+            planMatch[1],
+            accessToken,
+            await readJsonObject(request, 65_536),
+          );
+          return json(200, { plan });
+        }
       }
 
       const masterMatch = /^\/v1\/masters\/([^/]+)$/.exec(path);
