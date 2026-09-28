@@ -7,6 +7,7 @@ knowledge_base:
     filePatterns:
       - "AGENTS.md"
       - "skills/karpathy-guidelines/SKILL.md"
+      - "skills/warpath/SKILL.md"
 reviews:
   profile: "chill"
   request_changes_workflow: true
@@ -27,7 +28,7 @@ reviews:
   path_instructions:
     - path: "**"
       instructions: |
-        Enforce AGENTS.md and the Karpathy guidelines. Flag silent assumptions, unnecessary complexity,
+        Enforce AGENTS.md, the Karpathy guidelines, and Terrevo Warpath safety concerns. Flag silent assumptions, unnecessary complexity,
         unrelated refactors, hidden scope expansion, breaking contracts, tenant-boundary failures,
         non-idempotent writes, missing validation, weakened tests, and UI changes unrelated to the PR.
         Every changed line should trace to the stated requirement.
