@@ -6,7 +6,7 @@
 | 1 | Identity + Tenant | CLOSED |
 | 2 | Organisation Hierarchy + RBAC | CLOSED |
 | 3 | Core Masters | CLOSED |
-| 4 | Tour Planning | ACTIVE |
+| 4 | Tour Planning | CLOSED |
 | 5 | Tour Approval | PLANNED |
 | 6 | Start My Tour | PLANNED |
 | 7 | Show My Tour | PLANNED |
@@ -29,4 +29,4 @@
 | 24 | Regression + UAT + Closure | PLANNED |
 | 25 | Pilot Release | PLANNED |
 
-Current baseline before Sprint 4: `6e4d8b35278b818eea1b9aaff7c02693e4a1bd63`
+Completed through Sprint 4. Next planned sprint: 5 — Tour Approval.
