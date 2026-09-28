@@ -20,7 +20,7 @@ export type TourPlanDay = {
 export type TourPlan = {
   id: string;
   weekStart: string;
-  status: "DRAFT" | "SUBMITTED";
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "RETURNED";
   submittedAt: string | null;
   days: TourPlanDay[];
 };
@@ -184,7 +184,7 @@ export function createTourPlanningService(repository: TourPlanningRepository, rb
       if (planId) {
         const existing = await repository.getOwn(tenantId, userId, planId, accessToken);
         if (!existing) throw new TourPlanNotFoundError("Tour plan not found");
-        if (existing.status !== "DRAFT") throw new TourPlanConflictError("Submitted tour plan cannot be edited");
+        if (existing.status !== "DRAFT" && existing.status !== "RETURNED") throw new TourPlanConflictError("Tour plan is not editable");
       }
 
       const weekStart = parseWeekStart(value.weekStart);
@@ -206,7 +206,7 @@ export function createTourPlanningService(repository: TourPlanningRepository, rb
       const planId = uuid(planIdValue, "planId");
       const plan = await repository.getOwn(tenantId, userId, planId, accessToken);
       if (!plan) throw new TourPlanNotFoundError("Tour plan not found");
-      if (plan.status !== "DRAFT") throw new TourPlanConflictError("Tour plan is already submitted");
+      if (plan.status !== "DRAFT" && plan.status !== "RETURNED") throw new TourPlanConflictError("Tour plan cannot be submitted from its current status");
       if (!plan.days.some((day) => day.stops.length > 0)) {
         throw new TourPlanConflictError("Tour plan must contain at least one stop before submission");
       }

@@ -7,7 +7,7 @@
 | 2 | Organisation Hierarchy + RBAC | CLOSED |
 | 3 | Core Masters | CLOSED |
 | 4 | Tour Planning | CLOSED |
-| 5 | Tour Approval | PLANNED |
+| 5 | Tour Approval | CLOSED |
 | 6 | Start My Tour | PLANNED |
 | 7 | Show My Tour | PLANNED |
 | 8 | GPS Check-in / Check-out | PLANNED |
@@ -29,4 +29,4 @@
 | 24 | Regression + UAT + Closure | PLANNED |
 | 25 | Pilot Release | PLANNED |
 
-Completed through Sprint 4. Next planned sprint: 5 — Tour Approval.
+Completed through Sprint 5. Next planned sprint: 6 — Start My Tour.

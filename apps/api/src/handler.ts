@@ -4,6 +4,7 @@ import { createOrganizationService, OrganizationInputError } from "../../../modu
 import { AuthorizationError, createRbacService, RbacInputError } from "../../../modules/rbac/src/index.ts";
 import { createMastersService, MASTER_KINDS, MasterInputError, type MasterKind } from "../../../modules/masters/src/index.ts";
 import { createTourPlanningService, TourPlanConflictError, TourPlanInputError, TourPlanNotFoundError } from "../../../modules/tour-planning/src/index.ts";
+import { createTourApprovalService, TourApprovalConflictError, TourApprovalInputError, TourApprovalNotFoundError } from "../../../modules/tour-approval/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 
 export type ApiEnv = {
@@ -68,11 +69,11 @@ function mapError(error: unknown): Response {
     return json(status, { error: error.message });
   }
   if (error instanceof AuthorizationError) return json(403, { error: "Permission denied" });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError) {
     return json(400, { error: error.message });
   }
-  if (error instanceof TourPlanNotFoundError) return json(404, { error: error.message });
-  if (error instanceof TourPlanConflictError) return json(409, { error: error.message });
+  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError) return json(404, { error: error.message });
+  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
     if (error.status === 409) return json(409, { error: "Conflict" });
@@ -89,6 +90,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const organization = createOrganizationService(adapter.organization, rbac);
   const masters = createMastersService(adapter.masters, adapter.organization, rbac);
   const tourPlanning = createTourPlanningService(adapter.tourPlanning, rbac);
+  const tourApproval = createTourApprovalService(adapter.tourApproval, rbac);
 
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -166,6 +168,26 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         return json(200, {
           context: await rbac.accessContext(context.tenantId, user.id, accessToken),
         });
+      }
+
+      if (request.method === "GET" && path === "/v1/tour-approvals") {
+        const { accessToken, context }=await resolveTenantRequest(request);
+        return json(200,{plans:await tourApproval.listPending(context.tenantId,accessToken)});
+      }
+
+      const approvalDecision=/^\/v1\/tour-approvals\/([^/]+)\/decision$/.exec(path);
+      if (request.method === "POST" && approvalDecision) {
+        const { accessToken,user,context }=await resolveTenantRequest(request);
+        await tourApproval.decide(
+          context.tenantId,user.id,approvalDecision[1],accessToken,await readJsonObject(request)
+        );
+        return new Response(null,{status:204});
+      }
+
+      const approvalPlan=/^\/v1\/tour-approvals\/([^/]+)$/.exec(path);
+      if (request.method === "GET" && approvalPlan) {
+        const { accessToken,context }=await resolveTenantRequest(request);
+        return json(200,{plan:await tourApproval.get(context.tenantId,approvalPlan[1],accessToken)});
       }
 
       if (request.method === "GET" && path === "/v1/tour-plans") {
