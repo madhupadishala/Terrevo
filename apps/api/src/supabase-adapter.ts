@@ -8,6 +8,7 @@ import type { StartTourOption, TourExecution, TourExecutionRepository } from "..
 import type { TourProgress, TourProgressRepository } from "../../../modules/tour-progress/src/index.ts";
 import type { FieldSettings, Visit, VisitRepository } from "../../../modules/visit-execution/src/index.ts";
 import type { Dcr, DcrSummary, DoctorCall, DoctorCallRepository } from "../../../modules/doctor-call/src/index.ts";
+import type { InventoryBalance, InventoryRepository, VisitDistribution } from "../../../modules/inventory/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -126,6 +127,7 @@ export function createSupabaseAdapter(
   tourProgress: TourProgressRepository;
   visits: VisitRepository;
   doctorCalls: DoctorCallRepository;
+  inventory: InventoryRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -724,12 +726,74 @@ export function createSupabaseAdapter(
       if(!rows[0])return null;
       const pq=new URLSearchParams({select:"sequence_no,product_id,product_code,product_name,detail_notes",tenant_id:`eq.${tenantId}`,dcr_id:`eq.${dcrId}`,order:"sequence_no.asc"});
       const pr=await expectOk(await fetcher(`${base}/rest/v1/dcr_products?${pq}`,{headers:authHeaders(config,accessToken)}));
-      return {...mapDcrSummary(rows[0]),products:(await pr.json() as Array<Record<string,any>>).map((item)=>({
-        sequence:item.sequence_no,productId:item.product_id,productCode:item.product_code,
-        productName:item.product_name,detailNotes:item.detail_notes,
-      }))} as Dcr;
+      const distributionsQuery=new URLSearchParams({
+        select:"item_type,sample_id,gift_id,item_code,item_name,quantity",
+        tenant_id:`eq.${tenantId}`,dcr_id:`eq.${dcrId}`,order:"id.asc",
+      });
+      const distributionsResponse=await expectOk(await fetcher(`${base}/rest/v1/dcr_distributions?${distributionsQuery}`,{
+        headers:authHeaders(config,accessToken),
+      }));
+      return {
+        ...mapDcrSummary(rows[0]),
+        products:(await pr.json() as Array<Record<string,any>>).map((item)=>({
+          sequence:item.sequence_no,productId:item.product_id,productCode:item.product_code,
+          productName:item.product_name,detailNotes:item.detail_notes,
+        })),
+        distributions:(await distributionsResponse.json() as Array<Record<string,any>>).map((item)=>({
+          itemType:item.item_type,itemId:item.sample_id??item.gift_id,itemCode:item.item_code,
+          itemName:item.item_name,quantity:item.quantity,
+        })),
+      } as Dcr;
     },
   };
 
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls };
+  const mapBalance=(row:Record<string,any>):InventoryBalance=>({
+    id:row.id,employeeId:row.employee_id,itemType:row.item_type,
+    itemId:row.sample_id??row.gift_id,quantity:row.quantity,
+  });
+  const mapDistribution=(row:Record<string,any>):VisitDistribution=>({
+    id:row.id,visitId:row.visit_id,itemType:row.sample_id?"sample":"gift",
+    itemId:row.sample_id??row.gift_id,quantity:row.quantity,createdAt:row.created_at,
+  });
+  const inventory:InventoryRepository={
+    async listBalances(tenantId,accessToken){
+      const q=new URLSearchParams({select:"id,employee_id,item_type,sample_id,gift_id,quantity",tenant_id:`eq.${tenantId}`,order:"employee_id.asc"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/inventory_balances?${q}`,{headers:authHeaders(config,accessToken)}));
+      return (await r.json() as Array<Record<string,any>>).map(mapBalance);
+    },
+    async issue(tenantId,actorUserId,input){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_issue_inventory`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_actor_user_id:actorUserId,p_operation_id:input.operationId,
+          p_employee_id:input.employeeId,p_item_type:input.itemType,p_item_id:input.itemId,p_quantity:input.quantity,
+        }),
+      }));
+    },
+    async returnOwn(tenantId,userId,input){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_return_inventory`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_user_id:userId,p_operation_id:input.operationId,
+          p_item_type:input.itemType,p_item_id:input.itemId,p_quantity:input.quantity,
+        }),
+      }));
+    },
+    async distribute(tenantId,userId,visitId,input){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_distribute_visit_inventory`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_user_id:userId,p_visit_id:visitId,p_operation_id:input.operationId,
+          p_items:input.items,
+        }),
+      }));
+    },
+    async listVisitDistributions(tenantId,visitId,accessToken){
+      const q=new URLSearchParams({
+        select:"id,visit_id,sample_id,gift_id,quantity,created_at",
+        tenant_id:`eq.${tenantId}`,visit_id:`eq.${visitId}`,order:"created_at.asc",
+      });
+      const r=await expectOk(await fetcher(`${base}/rest/v1/visit_distributions?${q}`,{headers:authHeaders(config,accessToken)}));
+      return (await r.json() as Array<Record<string,any>>).map(mapDistribution);
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory };
 }

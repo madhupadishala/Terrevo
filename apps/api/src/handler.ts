@@ -9,6 +9,7 @@ import { createTourExecutionService, TourExecutionConflictError, TourExecutionIn
 import { createTourProgressService } from "../../../modules/tour-progress/src/index.ts";
 import { createVisitService, VisitConflictError, VisitInputError, VisitNotFoundError } from "../../../modules/visit-execution/src/index.ts";
 import { createDoctorCallService, DoctorCallConflictError, DoctorCallInputError, DoctorCallNotFoundError } from "../../../modules/doctor-call/src/index.ts";
+import { createInventoryService, InventoryInputError, InventoryNotFoundError } from "../../../modules/inventory/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 
 export type ApiEnv = {
@@ -73,10 +74,10 @@ function mapError(error: unknown): Response {
     return json(status, { error: error.message });
   }
   if (error instanceof AuthorizationError) return json(403, { error: "Permission denied" });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError) {
     return json(400, { error: error.message });
   }
-  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError) return json(404, { error: error.message });
+  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError) return json(404, { error: error.message });
   if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
@@ -101,6 +102,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const tourProgress = createTourProgressService(adapter.tourProgress);
   const visits = createVisitService(adapter.visits, rbac);
   const doctorCalls = createDoctorCallService(adapter.doctorCalls);
+  const inventory = createInventoryService(adapter.inventory, adapter.masters, rbac);
 
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -178,6 +180,33 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         return json(200, {
           context: await rbac.accessContext(context.tenantId, user.id, accessToken),
         });
+      }
+
+      if(request.method==="GET"&&path==="/v1/inventory"){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{balances:await inventory.listBalances(context.tenantId,accessToken)});
+      }
+      if(request.method==="POST"&&path==="/v1/inventory/issues"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        await inventory.issue(context.tenantId,user.id,accessToken,await readJsonObject(request));
+        return new Response(null,{status:204});
+      }
+      if(request.method==="POST"&&path==="/v1/inventory/returns"){
+        const {user,context}=await resolveTenantRequest(request);
+        await inventory.returnOwn(context.tenantId,user.id,await readJsonObject(request));
+        return new Response(null,{status:204});
+      }
+      const distributions=/^\/v1\/visits\/([^/]+)\/distributions$/.exec(path);
+      if(distributions){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        if(request.method==="GET"){
+          return json(200,{distributions:await inventory.listVisitDistributions(context.tenantId,accessToken,distributions[1])});
+        }
+        if(request.method==="POST"){
+          return json(200,{distributions:await inventory.distribute(
+            context.tenantId,user.id,accessToken,distributions[1],await readJsonObject(request,32_768)
+          )});
+        }
       }
 
       if(request.method==="GET"&&path==="/v1/dcrs"){

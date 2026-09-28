@@ -23,6 +23,14 @@ export type DcrProduct = {
   detailNotes: string | null;
 };
 
+export type DcrDistribution = {
+  itemType: "sample" | "gift";
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  quantity: number;
+};
+
 export type Dcr = {
   id: string;
   visitId: string;
@@ -40,9 +48,10 @@ export type Dcr = {
   gpsVerification: string;
   gpsExceptionStatus: string;
   products: DcrProduct[];
+  distributions: DcrDistribution[];
 };
 
-export type DcrSummary = Omit<Dcr, "products">;
+export type DcrSummary = Omit<Dcr, "products" | "distributions">;
 
 export type DoctorCallRepository = {
   save(
