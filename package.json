@@ -1,0 +1,13 @@
+{
+  "name": "terrevo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Terrevo field-force automation platform",
+  "type": "module",
+  "scripts": {
+    "verify:foundation": "node scripts/verify-foundation.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
