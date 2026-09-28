@@ -11,7 +11,7 @@
 | 6 | Start My Tour | CLOSED |
 | 7 | Show My Tour | CLOSED |
 | 8 | GPS Check-in / Check-out | CLOSED |
-| 9 | Doctor Call + DCR | PLANNED |
+| 9 | Doctor Call + DCR | CLOSED |
 | 10 | Samples + Gifts | PLANNED |
 | 11 | Submit Tour | PLANNED |
 | 12 | Daily Timesheet | PLANNED |
@@ -29,4 +29,4 @@
 | 24 | Regression + UAT + Closure | PLANNED |
 | 25 | Pilot Release | PLANNED |
 
-Completed through Sprint 8. Next planned sprint: 9 — Doctor Call + DCR.
+Completed through Sprint 9. Next planned sprint: 10 — Samples + Gifts.

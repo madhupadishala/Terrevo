@@ -8,6 +8,7 @@ import { createTourApprovalService, TourApprovalConflictError, TourApprovalInput
 import { createTourExecutionService, TourExecutionConflictError, TourExecutionInputError, TourExecutionNotFoundError } from "../../../modules/tour-execution/src/index.ts";
 import { createTourProgressService } from "../../../modules/tour-progress/src/index.ts";
 import { createVisitService, VisitConflictError, VisitInputError, VisitNotFoundError } from "../../../modules/visit-execution/src/index.ts";
+import { createDoctorCallService, DoctorCallConflictError, DoctorCallInputError, DoctorCallNotFoundError } from "../../../modules/doctor-call/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 
 export type ApiEnv = {
@@ -72,11 +73,11 @@ function mapError(error: unknown): Response {
     return json(status, { error: error.message });
   }
   if (error instanceof AuthorizationError) return json(403, { error: "Permission denied" });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError) {
     return json(400, { error: error.message });
   }
-  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError) return json(404, { error: error.message });
-  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError) return json(409, { error: error.message });
+  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError) return json(404, { error: error.message });
+  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
     if (error.status === 400) return json(400, { error: "Provider rejected request" });
@@ -99,6 +100,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const tourExecution = createTourExecutionService(adapter.tourExecution, rbac);
   const tourProgress = createTourProgressService(adapter.tourProgress);
   const visits = createVisitService(adapter.visits, rbac);
+  const doctorCalls = createDoctorCallService(adapter.doctorCalls);
 
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -176,6 +178,28 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         return json(200, {
           context: await rbac.accessContext(context.tenantId, user.id, accessToken),
         });
+      }
+
+      if(request.method==="GET"&&path==="/v1/dcrs"){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{dcrs:await doctorCalls.listDcrs(context.tenantId,accessToken)});
+      }
+      const dcrMatch=/^\/v1\/dcrs\/([^/]+)$/.exec(path);
+      if(request.method==="GET"&&dcrMatch){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{dcr:await doctorCalls.getDcr(context.tenantId,accessToken,dcrMatch[1])});
+      }
+      const doctorCallMatch=/^\/v1\/visits\/([^/]+)\/doctor-call$/.exec(path);
+      if(doctorCallMatch){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        if(request.method==="GET"){
+          return json(200,{doctorCall:await doctorCalls.getByVisit(context.tenantId,accessToken,doctorCallMatch[1])});
+        }
+        if(request.method==="PUT"){
+          return json(200,{doctorCall:await doctorCalls.save(
+            context.tenantId,user.id,accessToken,doctorCallMatch[1],await readJsonObject(request,32_768)
+          )});
+        }
       }
 
       if (request.method === "GET" && path === "/v1/field-settings") {
