@@ -5,6 +5,7 @@ import type { MasterKind, MasterRecord, MastersRepository } from "../../../modul
 import type { TourPlan, TourPlanningRepository, TourPlanStop, TourPlanSummary } from "../../../modules/tour-planning/src/index.ts";
 import type { TourApprovalRepository } from "../../../modules/tour-approval/src/index.ts";
 import type { StartTourOption, TourExecution, TourExecutionRepository } from "../../../modules/tour-execution/src/index.ts";
+import type { TourProgress, TourProgressRepository } from "../../../modules/tour-progress/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -120,6 +121,7 @@ export function createSupabaseAdapter(
   tourPlanning: TourPlanningRepository;
   tourApproval: TourApprovalRepository;
   tourExecution: TourExecutionRepository;
+  tourProgress: TourProgressRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -599,5 +601,14 @@ export function createSupabaseAdapter(
     },
   };
 
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution };
+  const tourProgress:TourProgressRepository={
+    async getCurrent(tenantId,accessToken){
+      const response=await expectOk(await fetcher(`${base}/rest/v1/rpc/my_active_tour_progress`,{
+        method:"POST",headers:authHeaders(config,accessToken),body:JSON.stringify({p_tenant_id:tenantId}),
+      }));
+      return await response.json() as TourProgress|null;
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress };
 }

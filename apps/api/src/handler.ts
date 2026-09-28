@@ -6,6 +6,7 @@ import { createMastersService, MASTER_KINDS, MasterInputError, type MasterKind }
 import { createTourPlanningService, TourPlanConflictError, TourPlanInputError, TourPlanNotFoundError } from "../../../modules/tour-planning/src/index.ts";
 import { createTourApprovalService, TourApprovalConflictError, TourApprovalInputError, TourApprovalNotFoundError } from "../../../modules/tour-approval/src/index.ts";
 import { createTourExecutionService, TourExecutionConflictError, TourExecutionInputError, TourExecutionNotFoundError } from "../../../modules/tour-execution/src/index.ts";
+import { createTourProgressService } from "../../../modules/tour-progress/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 
 export type ApiEnv = {
@@ -93,6 +94,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const tourPlanning = createTourPlanningService(adapter.tourPlanning, rbac);
   const tourApproval = createTourApprovalService(adapter.tourApproval, rbac);
   const tourExecution = createTourExecutionService(adapter.tourExecution, rbac);
+  const tourProgress = createTourProgressService(adapter.tourProgress);
 
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -170,6 +172,11 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         return json(200, {
           context: await rbac.accessContext(context.tenantId, user.id, accessToken),
         });
+      }
+
+      if (request.method === "GET" && path === "/v1/tour-executions/progress") {
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{progress:await tourProgress.getCurrent(context.tenantId,accessToken)});
       }
 
       if (request.method === "GET" && path === "/v1/tour-executions/start-options") {
