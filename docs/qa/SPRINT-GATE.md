@@ -10,7 +10,7 @@ Required:
 - Tenant/security checks when applicable
 - Visual regression when UI is involved
 - Ponytail PASS
-- Warpath GO
+- Karpathy guidelines verified: think-first, simplicity, surgical change, goal-driven verification
 - CodeRabbit completed when available
 - No release-blocking defect
 - Rollback considered

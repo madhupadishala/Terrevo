@@ -12,5 +12,7 @@ Source: https://github.com/coderabbitai/skills
 License: MIT  
 Vendored skills: code-review and autofix, including their companion reference files.
 
-## Warpath
-Warpath is a Terrevo-local adversarial merge/release gate authored for this repository. It is not represented as a third-party package.
+## Karpathy Guidelines
+Source: https://github.com/multica-ai/andrej-karpathy-skills  
+License: MIT (as declared by the upstream skill/repository)  
+Vendored skill: karpathy-guidelines. The guidelines are derived from Andrej Karpathy's observations on common LLM coding failure modes.

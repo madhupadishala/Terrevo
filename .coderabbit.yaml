@@ -6,6 +6,7 @@ knowledge_base:
     enabled: true
     filePatterns:
       - "AGENTS.md"
+      - "skills/karpathy-guidelines/SKILL.md"
 reviews:
   profile: "chill"
   request_changes_workflow: true
@@ -26,9 +27,10 @@ reviews:
   path_instructions:
     - path: "**"
       instructions: |
-        Enforce AGENTS.md. Flag unrelated refactors, hidden scope expansion, breaking contracts,
-        tenant-boundary failures, non-idempotent writes, missing validation, weakened tests,
-        and UI changes unrelated to the PR.
+        Enforce AGENTS.md and the Karpathy guidelines. Flag silent assumptions, unnecessary complexity,
+        unrelated refactors, hidden scope expansion, breaking contracts, tenant-boundary failures,
+        non-idempotent writes, missing validation, weakened tests, and UI changes unrelated to the PR.
+        Every changed line should trace to the stated requirement.
     - path: "apps/mobile/**"
       instructions: |
         Focus on offline-first behavior, idempotent sync, GPS/time integrity, permissions,

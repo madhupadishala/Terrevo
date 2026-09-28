@@ -51,14 +51,14 @@ Run affected tests before changes when they exist. After changes run typecheck, 
 Repository-local skills are authoritative:
 - `skills/ponytail/SKILL.md` is the default simplicity discipline.
 - `skills/ponytail-review/SKILL.md` reviews over-engineering before merge.
-- `skills/warpath/SKILL.md` is the adversarial blast-radius/release gate.
+- `skills/karpathy-guidelines/SKILL.md` enforces think-first, simplicity, surgical changes and goal-driven verification.
 - `skills/code-review/SKILL.md` and `skills/autofix/SKILL.md` are the official vendored CodeRabbit skills.
 
-Before merge: Ponytail review -> Warpath gate -> CodeRabbit when available -> resolve blocking findings -> rerun tests.
+Before merge: Karpathy guidelines -> Ponytail review -> CodeRabbit when available -> resolve blocking findings -> rerun tests.
 Do not claim a manual review came from CodeRabbit.
 
 ## Deployment
-No deployment from an unreviewed feature branch. Deployment requires CI PASS, Warpath GO, rollback plan, migrations verified and environment smoke tests.
+No deployment from an unreviewed feature branch. Deployment requires CI PASS, Karpathy goal/scope verification, rollback plan, migrations verified and environment smoke tests.
 
 ## Completion report
 Report files changed/why, tests, UI/DB/API changes, security/offline impact, known risks, and unrelated changes.
