@@ -26,7 +26,7 @@
 - [ ] Relevant E2E
 - [ ] Visual regression if UI affected
 - [ ] Ponytail review
-- [ ] Warpath gate = GO
+- [ ] Karpathy guidelines verified: assumptions/scope/simplicity/success criteria
 - [ ] CodeRabbit review requested/completed when available
 
 ## Change discipline

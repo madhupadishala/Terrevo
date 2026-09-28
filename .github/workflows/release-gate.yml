@@ -20,4 +20,4 @@ jobs:
       - run: npm run verify:foundation
       - run: |
           echo "Deployment intentionally disabled in Sprint 0."
-          echo "Future deploy jobs require recorded Warpath GO and smoke-test result."
+          echo "Future deploy jobs require Karpathy scope/goal verification and smoke-test result."
