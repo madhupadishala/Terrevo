@@ -16,6 +16,7 @@
     "modules/tenant/src/**/*.ts",
     "modules/organization/src/**/*.ts",
     "modules/rbac/src/**/*.ts",
-    "modules/masters/src/**/*.ts"
+    "modules/masters/src/**/*.ts",
+    "modules/tour-planning/src/**/*.ts"
   ]
 }
