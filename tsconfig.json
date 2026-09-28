@@ -13,6 +13,8 @@
   "include": [
     "apps/api/src/**/*.ts",
     "modules/identity/src/**/*.ts",
-    "modules/tenant/src/**/*.ts"
+    "modules/tenant/src/**/*.ts",
+    "modules/organization/src/**/*.ts",
+    "modules/rbac/src/**/*.ts"
   ]
 }

@@ -1,10 +1,13 @@
 import { AuthInputError, createIdentityService, readBearerToken } from "../../../modules/identity/src/index.ts";
 import { createTenantService, TenantAccessError } from "../../../modules/tenant/src/index.ts";
+import { createOrganizationService, OrganizationInputError } from "../../../modules/organization/src/index.ts";
+import { AuthorizationError, createRbacService, RbacInputError } from "../../../modules/rbac/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 
 export type ApiEnv = {
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
 };
 
 type Deps = {
@@ -34,9 +37,7 @@ async function readJsonObject(request: Request): Promise<Record<string, unknown>
   }
   try {
     const value = await request.json();
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      throw new Error("not object");
-    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("not object");
     return value as Record<string, unknown>;
   } catch {
     throw new ApiError(400, "Invalid JSON body");
@@ -47,7 +48,11 @@ function requireConfig(env: ApiEnv): SupabaseConfig {
   if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
     throw new ApiError(500, "Identity provider is not configured");
   }
-  return { url: env.SUPABASE_URL, anonKey: env.SUPABASE_ANON_KEY };
+  return {
+    url: env.SUPABASE_URL,
+    anonKey: env.SUPABASE_ANON_KEY,
+    serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+  };
 }
 
 function mapError(error: unknown): Response {
@@ -60,9 +65,14 @@ function mapError(error: unknown): Response {
     const status = error.message.includes("access denied") ? 403 : 400;
     return json(status, { error: error.message });
   }
+  if (error instanceof AuthorizationError) return json(403, { error: "Permission denied" });
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError) {
+    return json(400, { error: error.message });
+  }
   if (error instanceof ProviderError) {
-    const status = error.status === 401 || error.status === 403 ? 401 : 502;
-    return json(status, { error: status === 401 ? "Authentication failed" : "Identity provider unavailable" });
+    if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
+    if (error.status === 409) return json(409, { error: "Conflict" });
+    return json(502, { error: "Provider request failed" });
   }
   return json(500, { error: "Internal server error" });
 }
@@ -71,26 +81,34 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const adapter = createSupabaseAdapter(requireConfig(env), deps.fetcher);
   const identity = createIdentityService(adapter.auth);
   const tenants = createTenantService(adapter.tenants);
+  const rbac = createRbacService(adapter.rbac);
+  const organization = createOrganizationService(adapter.organization, rbac);
+
+  async function resolveTenantRequest(request: Request) {
+    const accessToken = readBearerToken(request.headers.get("authorization"));
+    const user = await identity.authenticate(request.headers.get("authorization"));
+    const context = await tenants.resolveContext(
+      user.id,
+      request.headers.get("x-tenant-id"),
+      accessToken,
+    );
+    return { accessToken, user, context };
+  }
 
   return async function handle(request: Request): Promise<Response> {
     try {
-      const url = new URL(request.url);
-      const path = url.pathname;
+      const path = new URL(request.url).pathname;
 
-      if (request.method === "GET" && path === "/health") {
-        return json(200, { status: "ok" });
-      }
+      if (request.method === "GET" && path === "/health") return json(200, { status: "ok" });
 
       if (request.method === "POST" && path === "/v1/auth/login") {
         const body = await readJsonObject(request);
-        const session = await identity.signIn(body.email, body.password);
-        return json(200, session);
+        return json(200, await identity.signIn(body.email, body.password));
       }
 
       if (request.method === "POST" && path === "/v1/auth/refresh") {
         const body = await readJsonObject(request);
-        const session = await identity.refreshSession(body.refreshToken);
-        return json(200, session);
+        return json(200, await identity.refreshSession(body.refreshToken));
       }
 
       if (request.method === "POST" && path === "/v1/auth/password-reset") {
@@ -105,26 +123,49 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
       }
 
       if (request.method === "GET" && path === "/v1/me") {
-        const user = await identity.authenticate(request.headers.get("authorization"));
-        return json(200, { user });
+        return json(200, { user: await identity.authenticate(request.headers.get("authorization")) });
       }
 
       if (request.method === "GET" && path === "/v1/tenants") {
         const accessToken = readBearerToken(request.headers.get("authorization"));
         await identity.authenticate(request.headers.get("authorization"));
-        const memberships = await tenants.listAccessible(accessToken);
-        return json(200, { tenants: memberships });
+        return json(200, { tenants: await tenants.listAccessible(accessToken) });
       }
 
       if (request.method === "GET" && path === "/v1/tenant-context") {
-        const accessToken = readBearerToken(request.headers.get("authorization"));
-        const user = await identity.authenticate(request.headers.get("authorization"));
-        const context = await tenants.resolveContext(
-          user.id,
-          request.headers.get("x-tenant-id"),
-          accessToken,
-        );
+        const { context } = await resolveTenantRequest(request);
         return json(200, { context });
+      }
+
+      if (request.method === "GET" && path === "/v1/org-units") {
+        const { accessToken, context } = await resolveTenantRequest(request);
+        return json(200, { units: await organization.listUnits(context.tenantId, accessToken) });
+      }
+
+      if (request.method === "POST" && path === "/v1/org-units") {
+        const { accessToken, context } = await resolveTenantRequest(request);
+        const body = await readJsonObject(request);
+        const unit = await organization.createUnit(context.tenantId, accessToken, body);
+        return json(201, { unit });
+      }
+
+      if (request.method === "POST" && path === "/v1/org-assignments") {
+        const { accessToken, context } = await resolveTenantRequest(request);
+        await organization.assignUser(context.tenantId, accessToken, await readJsonObject(request));
+        return new Response(null, { status: 204 });
+      }
+
+      if (request.method === "GET" && path === "/v1/access-context") {
+        const { accessToken, user, context } = await resolveTenantRequest(request);
+        return json(200, {
+          context: await rbac.accessContext(context.tenantId, user.id, accessToken),
+        });
+      }
+
+      if (request.method === "POST" && path === "/v1/role-assignments") {
+        const { accessToken, context } = await resolveTenantRequest(request);
+        await rbac.assignRole(context.tenantId, accessToken, await readJsonObject(request));
+        return new Response(null, { status: 204 });
       }
 
       return json(404, { error: "Not found" });
