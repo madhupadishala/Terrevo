@@ -48,6 +48,12 @@ Each mobile mutation needs an operation ID, local state, retry policy, conflict 
 Run affected tests before changes when they exist. After changes run typecheck, lint, unit, integration, relevant E2E and visual regression when UI is involved. Never delete/skip/weaken tests merely to make CI green.
 
 ## Reviews
+Repository-local skills are authoritative:
+- `skills/ponytail/SKILL.md` is the default simplicity discipline.
+- `skills/ponytail-review/SKILL.md` reviews over-engineering before merge.
+- `skills/warpath/SKILL.md` is the adversarial blast-radius/release gate.
+- `skills/code-review/SKILL.md` and `skills/autofix/SKILL.md` are the official vendored CodeRabbit skills.
+
 Before merge: Ponytail review -> Warpath gate -> CodeRabbit when available -> resolve blocking findings -> rerun tests.
 Do not claim a manual review came from CodeRabbit.
 
