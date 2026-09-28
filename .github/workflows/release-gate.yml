@@ -1,0 +1,23 @@
+name: Release Gate
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options: [dev, qa, uat, pilot]
+permissions:
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm run verify:foundation
+      - run: |
+          echo "Deployment intentionally disabled in Sprint 0."
+          echo "Future deploy jobs require recorded Warpath GO and smoke-test result."
