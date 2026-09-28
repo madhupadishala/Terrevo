@@ -19,6 +19,7 @@
     "modules/masters/src/**/*.ts",
     "modules/tour-planning/src/**/*.ts",
     "modules/tour-approval/src/**/*.ts",
-    "modules/tour-execution/src/**/*.ts"
+    "modules/tour-execution/src/**/*.ts",
+    "modules/tour-progress/src/**/*.ts"
   ]
 }
