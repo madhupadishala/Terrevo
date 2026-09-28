@@ -27,6 +27,7 @@
 - [ ] Visual regression if UI affected
 - [ ] Ponytail review
 - [ ] Karpathy guidelines verified: assumptions/scope/simplicity/success criteria
+- [ ] Warpath gate = GO
 - [ ] CodeRabbit review requested/completed when available
 
 ## Change discipline

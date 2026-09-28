@@ -11,6 +11,7 @@ Required:
 - Visual regression when UI is involved
 - Ponytail PASS
 - Karpathy guidelines verified: think-first, simplicity, surgical change, goal-driven verification
+- Warpath GO: blast radius, data integrity, tenant security, offline/sync, compatibility and rollback reviewed
 - CodeRabbit completed when available
 - No release-blocking defect
 - Rollback considered

@@ -12,6 +12,7 @@ const required = [
   "skills/ponytail-gain/SKILL.md",
   "skills/ponytail-help/SKILL.md",
   "skills/karpathy-guidelines/SKILL.md",
+  "skills/warpath/SKILL.md",
   "skills/code-review/SKILL.md",
   "skills/code-review/references/auth-recovery.md",
   "skills/code-review/references/cli-workflows.md",
