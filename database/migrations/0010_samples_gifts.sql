@@ -121,7 +121,11 @@ create table public.inventory_operations(
   unique(tenant_id,actor_user_id,operation_id),
   foreign key(tenant_id,employee_id) references public.employees(tenant_id,id) on delete restrict,
   foreign key(tenant_id,actor_user_id) references public.tenant_memberships(tenant_id,user_id) on delete restrict,
-  foreign key(tenant_id,visit_id) references public.field_visits(tenant_id,id) on delete restrict
+  foreign key(tenant_id,visit_id) references public.field_visits(tenant_id,id) on delete restrict,
+  check(
+    (operation_type='DISTRIBUTE' and visit_id is not null)
+    or (operation_type in('ISSUE','RETURN') and visit_id is null)
+  )
 );
 
 create table public.inventory_ledger(
@@ -507,14 +511,14 @@ begin
     select p_tenant_id,v_dcr_id,
       case when distribution.sample_id is not null then 'sample' else 'gift' end,
       distribution.sample_id,distribution.gift_id,
-      coalesce(sample.code,gift.code),coalesce(sample.name,gift.name),distribution.quantity
+      coalesce(sample.code,gift.code),coalesce(sample.name,gift.name),sum(distribution.quantity)::integer
       from public.visit_distributions distribution
       left join public.samples sample
         on sample.tenant_id=distribution.tenant_id and sample.id=distribution.sample_id
       left join public.gifts gift
         on gift.tenant_id=distribution.tenant_id and gift.id=distribution.gift_id
      where distribution.tenant_id=p_tenant_id and distribution.visit_id=p_visit_id
-     order by distribution.created_at,distribution.id;
+     group by distribution.sample_id,distribution.gift_id,sample.code,sample.name,gift.code,gift.name;
   end if;
 end;
 $$;

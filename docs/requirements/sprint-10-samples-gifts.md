@@ -11,7 +11,7 @@ Status: CLOSED
 - **TRV-INV-007** — Inventory operations are idempotent; reusing an operation UUID with a different payload is rejected.
 - **TRV-INV-008** — Insufficient balance blocks distribution/return and no balance may become negative.
 - **TRV-INV-009** — Every issue, return and distribution writes an immutable ledger entry with resulting balance.
-- **TRV-INV-010** — DCR checkout snapshots sample/gift distributions with item code/name and quantity.
+- **TRV-INV-010** — DCR checkout snapshots sample/gift distributions with item code/name and total quantity, aggregating repeated same-item distributions without losing ledger events.
 - **TRV-INV-011** — MRs see their own inventory; managers see team inventory according to INVENTORY_VIEW_TEAM scope.
 
 ## API
