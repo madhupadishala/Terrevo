@@ -12,10 +12,10 @@ create or replace function public.geo_distance_meters(
 returns double precision
 language sql immutable parallel safe
 as $$
-  select 6371000 * 2 * asin(sqrt(
+  select 6371000 * 2 * asin(least(1.0, sqrt(
     power(sin(radians(p_lat2-p_lat1)/2),2) +
     cos(radians(p_lat1))*cos(radians(p_lat2))*power(sin(radians(p_lon2-p_lon1)/2),2)
-  ));
+  )));
 $$;
 
 create table public.field_visits(
@@ -233,7 +233,7 @@ returns jsonb
 language plpgsql security definer set search_path=''
 as $$
 declare v_execution public.tour_executions%rowtype; v_now timestamptz:=clock_timestamp();
-  v_stops jsonb; v_planned integer; v_completed integer; v_elapsed integer;
+  v_stops jsonb; v_planned integer; v_completed integer; v_in_progress integer; v_elapsed integer;
 begin
   select execution.* into v_execution from public.tour_executions execution
   join public.employees employee on employee.tenant_id=execution.tenant_id and employee.id=execution.employee_id
@@ -249,8 +249,9 @@ begin
     'status',case when visit.status='CHECKED_OUT' then 'COMPLETED' when visit.status='CHECKED_IN' then 'IN_PROGRESS' else 'PENDING' end
   ) order by stop.sequence_no),'[]'::jsonb),
   count(*)::integer,
-  count(*) filter(where visit.status='CHECKED_OUT')::integer
-  into v_stops,v_planned,v_completed
+  count(*) filter(where visit.status='CHECKED_OUT')::integer,
+  count(*) filter(where visit.status='CHECKED_IN')::integer
+  into v_stops,v_planned,v_completed,v_in_progress
   from public.tour_plan_stops stop
   left join public.doctors doctor on doctor.tenant_id=stop.tenant_id and doctor.id=stop.doctor_id
   left join public.chemists chemist on chemist.tenant_id=stop.tenant_id and chemist.id=stop.chemist_id
@@ -264,7 +265,9 @@ begin
     'startedAt',v_execution.started_at,'serverNow',v_now,'requiredMinutes',v_execution.required_minutes,
     'elapsedMinutes',v_elapsed,'remainingMinutes',greatest(0,v_execution.required_minutes-v_elapsed),
     'plannedCount',coalesce(v_planned,0),'completedCount',coalesce(v_completed,0),
-    'pendingCount',coalesce(v_planned,0)-coalesce(v_completed,0),'stops',v_stops
+    'inProgressCount',coalesce(v_in_progress,0),
+    'pendingCount',coalesce(v_planned,0)-coalesce(v_completed,0)-coalesce(v_in_progress,0),
+    'stops',v_stops
   );
 end;
 $$;

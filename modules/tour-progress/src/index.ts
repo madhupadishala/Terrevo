@@ -3,7 +3,7 @@ export type TourProgressStop = {
   type: "doctor" | "chemist" | "stockist";
   targetId: string;
   targetName: string;
-  status: "PENDING";
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED";
 };
 
 export type TourProgress = {
@@ -17,6 +17,7 @@ export type TourProgress = {
   remainingMinutes: number;
   plannedCount: number;
   completedCount: number;
+  inProgressCount: number;
   pendingCount: number;
   stops: TourProgressStop[];
 };

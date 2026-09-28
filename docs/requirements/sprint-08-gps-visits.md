@@ -10,4 +10,4 @@ Status: CLOSED
 - **TRV-VIS-006** — Only one visit may be CHECKED_IN at a time per active execution.
 - **TRV-VIS-007** — Check-in and check-out are idempotent by operation UUID.
 - **TRV-VIS-008** — Managers with TOUR_APPROVE may approve/reject GPS exceptions; self-review is blocked.
-- **TRV-VIS-009** — Show My Tour derives pending/in-progress/completed stop state from visit records.
+- **TRV-VIS-009** — Show My Tour derives separate pending, in-progress and completed stop state/counts from visit records.
