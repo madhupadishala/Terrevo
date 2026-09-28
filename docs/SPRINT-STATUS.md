@@ -8,7 +8,7 @@
 | 3 | Core Masters | CLOSED |
 | 4 | Tour Planning | CLOSED |
 | 5 | Tour Approval | CLOSED |
-| 6 | Start My Tour | PLANNED |
+| 6 | Start My Tour | CLOSED |
 | 7 | Show My Tour | PLANNED |
 | 8 | GPS Check-in / Check-out | PLANNED |
 | 9 | Doctor Call + DCR | PLANNED |
@@ -29,4 +29,4 @@
 | 24 | Regression + UAT + Closure | PLANNED |
 | 25 | Pilot Release | PLANNED |
 
-Completed through Sprint 5. Next planned sprint: 6 — Start My Tour.
+Completed through Sprint 6. Next planned sprint: 7 — Show My Tour.

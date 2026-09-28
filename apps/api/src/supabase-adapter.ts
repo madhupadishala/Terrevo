@@ -4,6 +4,7 @@ import type { OrgUnit, OrganizationRepository } from "../../../modules/organizat
 import type { MasterKind, MasterRecord, MastersRepository } from "../../../modules/masters/src/index.ts";
 import type { TourPlan, TourPlanningRepository, TourPlanStop, TourPlanSummary } from "../../../modules/tour-planning/src/index.ts";
 import type { TourApprovalRepository } from "../../../modules/tour-approval/src/index.ts";
+import type { StartTourOption, TourExecution, TourExecutionRepository } from "../../../modules/tour-execution/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -118,6 +119,7 @@ export function createSupabaseAdapter(
   masters: MastersRepository;
   tourPlanning: TourPlanningRepository;
   tourApproval: TourApprovalRepository;
+  tourExecution: TourExecutionRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -561,5 +563,41 @@ export function createSupabaseAdapter(
     },
   };
 
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval };
+  const mapExecution=(row:Record<string,any>):TourExecution=>({
+    id:row.id,operationId:row.operation_id,planId:row.tour_plan_id,planDayId:row.tour_plan_day_id,
+    workDate:row.work_date,territoryId:row.territory_id,status:row.status,startedAt:row.started_at,
+    deviceStartedAt:row.device_started_at,requiredMinutes:row.required_minutes,
+    startLatitude:row.start_latitude,startLongitude:row.start_longitude,startAccuracyMeters:row.start_accuracy_meters,
+    deviceId:row.device_id,networkType:row.network_type,appVersion:row.app_version,
+  });
+
+  const tourExecution:TourExecutionRepository={
+    async listStartOptions(tenantId,accessToken){
+      const response=await expectOk(await fetcher(`${base}/rest/v1/rpc/my_start_tour_options`,{
+        method:"POST",headers:authHeaders(config,accessToken),body:JSON.stringify({p_tenant_id:tenantId}),
+      }));
+      return (await response.json() as Array<Record<string,any>>).map((row):StartTourOption=>({
+        planId:row.plan_id,planDayId:row.plan_day_id,workDate:row.work_date,territoryId:row.territory_id,
+      }));
+    },
+    async getActive(tenantId,accessToken){
+      const query=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,status:"eq.ACTIVE",limit:"1"});
+      const response=await expectOk(await fetcher(`${base}/rest/v1/tour_executions?${query}`,{headers:authHeaders(config,accessToken)}));
+      const rows=await response.json() as Array<Record<string,any>>;
+      return rows[0]?mapExecution(rows[0]):null;
+    },
+    async start(tenantId,userId,command){
+      const response=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_start_tour`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_user_id:userId,p_operation_id:command.operationId,p_plan_day_id:command.planDayId,
+          p_device_started_at:command.deviceStartedAt,p_latitude:command.latitude,p_longitude:command.longitude,
+          p_accuracy_meters:command.accuracyMeters,p_device_id:command.deviceId,p_network_type:command.networkType,
+          p_app_version:command.appVersion,
+        }),
+      }));
+      return await response.json() as string;
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution };
 }

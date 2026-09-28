@@ -5,6 +5,7 @@ import { AuthorizationError, createRbacService, RbacInputError } from "../../../
 import { createMastersService, MASTER_KINDS, MasterInputError, type MasterKind } from "../../../modules/masters/src/index.ts";
 import { createTourPlanningService, TourPlanConflictError, TourPlanInputError, TourPlanNotFoundError } from "../../../modules/tour-planning/src/index.ts";
 import { createTourApprovalService, TourApprovalConflictError, TourApprovalInputError, TourApprovalNotFoundError } from "../../../modules/tour-approval/src/index.ts";
+import { createTourExecutionService, TourExecutionConflictError, TourExecutionInputError, TourExecutionNotFoundError } from "../../../modules/tour-execution/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 
 export type ApiEnv = {
@@ -69,11 +70,11 @@ function mapError(error: unknown): Response {
     return json(status, { error: error.message });
   }
   if (error instanceof AuthorizationError) return json(403, { error: "Permission denied" });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError) {
     return json(400, { error: error.message });
   }
-  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError) return json(404, { error: error.message });
-  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError) return json(409, { error: error.message });
+  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError) return json(404, { error: error.message });
+  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
     if (error.status === 409) return json(409, { error: "Conflict" });
@@ -91,6 +92,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const masters = createMastersService(adapter.masters, adapter.organization, rbac);
   const tourPlanning = createTourPlanningService(adapter.tourPlanning, rbac);
   const tourApproval = createTourApprovalService(adapter.tourApproval, rbac);
+  const tourExecution = createTourExecutionService(adapter.tourExecution, rbac);
 
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -168,6 +170,19 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         return json(200, {
           context: await rbac.accessContext(context.tenantId, user.id, accessToken),
         });
+      }
+
+      if (request.method === "GET" && path === "/v1/tour-executions/start-options") {
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{options:await tourExecution.listStartOptions(context.tenantId,accessToken)});
+      }
+      if (request.method === "GET" && path === "/v1/tour-executions/active") {
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{execution:await tourExecution.getActive(context.tenantId,accessToken)});
+      }
+      if (request.method === "POST" && path === "/v1/tour-executions/start") {
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(201,{execution:await tourExecution.start(context.tenantId,user.id,accessToken,await readJsonObject(request))});
       }
 
       if (request.method === "GET" && path === "/v1/tour-approvals") {
