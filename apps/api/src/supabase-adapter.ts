@@ -3,6 +3,7 @@ import type { TenantRepository, TenantSummary } from "../../../modules/tenant/sr
 import type { OrgUnit, OrganizationRepository } from "../../../modules/organization/src/index.ts";
 import type { MasterKind, MasterRecord, MastersRepository } from "../../../modules/masters/src/index.ts";
 import type { TourPlan, TourPlanningRepository, TourPlanStop, TourPlanSummary } from "../../../modules/tour-planning/src/index.ts";
+import type { TourApprovalRepository } from "../../../modules/tour-approval/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -116,6 +117,7 @@ export function createSupabaseAdapter(
   rbac: RbacRepository;
   masters: MastersRepository;
   tourPlanning: TourPlanningRepository;
+  tourApproval: TourApprovalRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -402,7 +404,7 @@ export function createSupabaseAdapter(
   type TourPlanRow = {
     id: string;
     week_start: string;
-    status: "DRAFT" | "SUBMITTED";
+    status: TourPlan["status"];
     submitted_at: string | null;
   };
   type TourDayRow = {
@@ -529,5 +531,35 @@ export function createSupabaseAdapter(
     },
   };
 
-  return { auth, tenants, organization, rbac, masters, tourPlanning };
+  const tourApproval: TourApprovalRepository = {
+    async listPending(tenantId, accessToken) {
+      const query=new URLSearchParams({
+        select:"id,week_start,status,submitted_at",
+        tenant_id:`eq.${tenantId}`,
+        status:"eq.SUBMITTED",
+        order:"submitted_at.asc",
+      });
+      const response=await expectOk(await fetcher(`${base}/rest/v1/tour_plans?${query}`,{
+        headers:authHeaders(config,accessToken),
+      }));
+      return (await response.json() as TourPlanRow[]).map((row)=>({
+        id:row.id,weekStart:row.week_start,status:row.status,submittedAt:row.submitted_at,
+      }));
+    },
+    async getForReview(tenantId, planId, accessToken) {
+      return tourPlanning.getOwn(tenantId,"",planId,accessToken);
+    },
+    async decide(tenantId,actorUserId,planId,decision,comment) {
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_decide_tour_plan`,{
+        method:"POST",
+        headers:adminHeaders(config),
+        body:JSON.stringify({
+          p_tenant_id:tenantId,p_actor_user_id:actorUserId,p_plan_id:planId,
+          p_decision:decision,p_comment:comment,
+        }),
+      }));
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval };
 }
