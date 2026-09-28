@@ -6,6 +6,7 @@ import type { TourPlan, TourPlanningRepository, TourPlanStop, TourPlanSummary } 
 import type { TourApprovalRepository } from "../../../modules/tour-approval/src/index.ts";
 import type { StartTourOption, TourExecution, TourExecutionRepository } from "../../../modules/tour-execution/src/index.ts";
 import type { TourProgress, TourProgressRepository } from "../../../modules/tour-progress/src/index.ts";
+import type { FieldSettings, Visit, VisitRepository } from "../../../modules/visit-execution/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -122,6 +123,7 @@ export function createSupabaseAdapter(
   tourApproval: TourApprovalRepository;
   tourExecution: TourExecutionRepository;
   tourProgress: TourProgressRepository;
+  visits: VisitRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -610,5 +612,69 @@ export function createSupabaseAdapter(
     },
   };
 
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress };
+  const mapVisit=(row:Record<string,any>):Visit=>({
+    id:row.id,executionId:row.execution_id,planStopId:row.plan_stop_id,territoryId:row.territory_id,
+    status:row.status,verification:row.verification,exceptionStatus:row.exception_status,
+    distanceMeters:row.distance_meters,geofenceRadiusMeters:row.geofence_radius_meters,
+    checkinAt:row.checkin_at,checkoutAt:row.checkout_at,
+  });
+
+  const visits:VisitRepository={
+    async getSettings(tenantId,accessToken){
+      const query=new URLSearchParams({select:"geofence_radius_meters,max_gps_accuracy_meters",id:`eq.${tenantId}`,limit:"1"});
+      const response=await expectOk(await fetcher(`${base}/rest/v1/tenants?${query}`,{headers:authHeaders(config,accessToken)}));
+      const row=(await response.json() as Array<Record<string,any>>)[0];
+      if(!row)throw new ProviderError("Tenant settings unavailable",404);
+      return {geofenceRadiusMeters:row.geofence_radius_meters,maxGpsAccuracyMeters:row.max_gps_accuracy_meters} as FieldSettings;
+    },
+    async updateSettings(tenantId,settings){
+      await expectOk(await fetcher(`${base}/rest/v1/tenants?id=eq.${tenantId}`,{
+        method:"PATCH",headers:adminHeaders(config),body:JSON.stringify({
+          geofence_radius_meters:settings.geofenceRadiusMeters,max_gps_accuracy_meters:settings.maxGpsAccuracyMeters,
+        }),
+      }));
+    },
+    async checkIn(tenantId,userId,input){
+      const response=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_checkin_visit`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_user_id:userId,p_operation_id:input.operationId,p_plan_stop_id:input.planStopId,
+          p_latitude:input.latitude,p_longitude:input.longitude,p_accuracy_meters:input.accuracyMeters,
+          p_exception_reason:input.exceptionReason,
+        }),
+      }));
+      return await response.json() as string;
+    },
+    async getOpen(tenantId,accessToken){
+      const q=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,status:"eq.CHECKED_IN",limit:"1"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/field_visits?${q}`,{headers:authHeaders(config,accessToken)}));
+      const rows=await r.json() as Array<Record<string,any>>;return rows[0]?mapVisit(rows[0]):null;
+    },
+    async getById(tenantId,visitId,accessToken){
+      const q=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,id:`eq.${visitId}`,limit:"1"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/field_visits?${q}`,{headers:authHeaders(config,accessToken)}));
+      const rows=await r.json() as Array<Record<string,any>>;return rows[0]?mapVisit(rows[0]):null;
+    },
+    async checkOut(tenantId,userId,visitId,input){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_checkout_visit`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_user_id:userId,p_visit_id:visitId,p_operation_id:input.operationId,
+          p_latitude:input.latitude,p_longitude:input.longitude,p_accuracy_meters:input.accuracyMeters,
+        }),
+      }));
+    },
+    async listPendingExceptions(tenantId,accessToken){
+      const q=new URLSearchParams({select:"*,tour_executions!inner(tour_plan_id)",tenant_id:`eq.${tenantId}`,exception_status:"eq.PENDING"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/field_visits?${q}`,{headers:authHeaders(config,accessToken)}));
+      return (await r.json() as Array<Record<string,any>>).map((row)=>({...mapVisit(row),planId:(row.tour_executions as any)?.tour_plan_id}));
+    },
+    async decideException(tenantId,actorUserId,visitId,decision,comment){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_review_visit_exception`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_actor_user_id:actorUserId,p_visit_id:visitId,p_decision:decision,p_comment:comment,
+        }),
+      }));
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits };
 }

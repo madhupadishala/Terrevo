@@ -7,6 +7,7 @@ import { createTourPlanningService, TourPlanConflictError, TourPlanInputError, T
 import { createTourApprovalService, TourApprovalConflictError, TourApprovalInputError, TourApprovalNotFoundError } from "../../../modules/tour-approval/src/index.ts";
 import { createTourExecutionService, TourExecutionConflictError, TourExecutionInputError, TourExecutionNotFoundError } from "../../../modules/tour-execution/src/index.ts";
 import { createTourProgressService } from "../../../modules/tour-progress/src/index.ts";
+import { createVisitService, VisitConflictError, VisitInputError, VisitNotFoundError } from "../../../modules/visit-execution/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 
 export type ApiEnv = {
@@ -71,13 +72,15 @@ function mapError(error: unknown): Response {
     return json(status, { error: error.message });
   }
   if (error instanceof AuthorizationError) return json(403, { error: "Permission denied" });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError) {
     return json(400, { error: error.message });
   }
-  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError) return json(404, { error: error.message });
-  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError) return json(409, { error: error.message });
+  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError) return json(404, { error: error.message });
+  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
+    if (error.status === 400) return json(400, { error: "Provider rejected request" });
+    if (error.status === 404) return json(404, { error: "Not found" });
     if (error.status === 409) return json(409, { error: "Conflict" });
     return json(502, { error: "Provider request failed" });
   }
@@ -95,6 +98,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const tourApproval = createTourApprovalService(adapter.tourApproval, rbac);
   const tourExecution = createTourExecutionService(adapter.tourExecution, rbac);
   const tourProgress = createTourProgressService(adapter.tourProgress);
+  const visits = createVisitService(adapter.visits, rbac);
 
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -172,6 +176,38 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         return json(200, {
           context: await rbac.accessContext(context.tenantId, user.id, accessToken),
         });
+      }
+
+      if (request.method === "GET" && path === "/v1/field-settings") {
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{settings:await visits.getSettings(context.tenantId,accessToken)});
+      }
+      if (request.method === "PUT" && path === "/v1/field-settings") {
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{settings:await visits.updateSettings(context.tenantId,accessToken,await readJsonObject(request))});
+      }
+      if (request.method === "GET" && path === "/v1/visits/open") {
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{visit:await visits.getOpen(context.tenantId,accessToken)});
+      }
+      if (request.method === "POST" && path === "/v1/visits/check-in") {
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(201,{visit:await visits.checkIn(context.tenantId,user.id,accessToken,await readJsonObject(request))});
+      }
+      const checkout=/^\/v1\/visits\/([^/]+)\/check-out$/.exec(path);
+      if(request.method==="POST"&&checkout){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(200,{visit:await visits.checkOut(context.tenantId,user.id,accessToken,checkout[1],await readJsonObject(request))});
+      }
+      if(request.method==="GET"&&path==="/v1/visit-exceptions"){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{exceptions:await visits.listPendingExceptions(context.tenantId,accessToken)});
+      }
+      const exceptionDecision=/^\/v1\/visit-exceptions\/([^/]+)\/decision$/.exec(path);
+      if(request.method==="POST"&&exceptionDecision){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        await visits.decideException(context.tenantId,user.id,accessToken,exceptionDecision[1],await readJsonObject(request));
+        return new Response(null,{status:204});
       }
 
       if (request.method === "GET" && path === "/v1/tour-executions/progress") {
