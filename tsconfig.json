@@ -20,6 +20,7 @@
     "modules/tour-planning/src/**/*.ts",
     "modules/tour-approval/src/**/*.ts",
     "modules/tour-execution/src/**/*.ts",
-    "modules/tour-progress/src/**/*.ts"
+    "modules/tour-progress/src/**/*.ts",
+    "modules/visit-execution/src/**/*.ts"
   ]
 }
