@@ -7,6 +7,7 @@ import type { TourApprovalRepository } from "../../../modules/tour-approval/src/
 import type { StartTourOption, TourExecution, TourExecutionRepository } from "../../../modules/tour-execution/src/index.ts";
 import type { TourProgress, TourProgressRepository } from "../../../modules/tour-progress/src/index.ts";
 import type { FieldSettings, Visit, VisitRepository } from "../../../modules/visit-execution/src/index.ts";
+import type { Dcr, DcrSummary, DoctorCall, DoctorCallRepository } from "../../../modules/doctor-call/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -124,6 +125,7 @@ export function createSupabaseAdapter(
   tourExecution: TourExecutionRepository;
   tourProgress: TourProgressRepository;
   visits: VisitRepository;
+  doctorCalls: DoctorCallRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -676,5 +678,58 @@ export function createSupabaseAdapter(
     },
   };
 
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits };
+  const mapDoctorCall=(row:Record<string,any>,details:Array<Record<string,any>>):DoctorCall=>({
+    id:row.id,visitId:row.visit_id,doctorId:row.doctor_id,callOutcome:row.call_outcome,
+    remarks:row.remarks,nextAction:row.next_action,updatedAt:row.updated_at,
+    products:details.map((detail)=>({
+      sequence:detail.sequence_no,productId:detail.product_id,detailNotes:detail.detail_notes,
+    })),
+  });
+  const mapDcrSummary=(row:Record<string,any>):DcrSummary=>({
+    id:row.id,visitId:row.visit_id,executionId:row.execution_id,doctorId:row.doctor_id,
+    doctorCode:row.doctor_code,doctorName:row.doctor_name,status:row.status,
+    callOutcome:row.call_outcome,remarks:row.remarks,nextAction:row.next_action,
+    callStartedAt:row.call_started_at,callEndedAt:row.call_ended_at,submittedAt:row.submitted_at,
+    gpsVerification:row.gps_verification,gpsExceptionStatus:row.gps_exception_status,
+  });
+  const doctorCalls:DoctorCallRepository={
+    async save(tenantId,userId,visitId,input){
+      const response=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_save_doctor_call`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_user_id:userId,p_visit_id:visitId,p_operation_id:input.operationId,
+          p_call_outcome:input.callOutcome,p_remarks:input.remarks,p_next_action:input.nextAction,
+          p_products:input.products,
+        }),
+      }));
+      return await response.json() as string;
+    },
+    async getByVisit(tenantId,visitId,accessToken){
+      const q=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,visit_id:`eq.${visitId}`,limit:"1"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/doctor_calls?${q}`,{headers:authHeaders(config,accessToken)}));
+      const rows=await r.json() as Array<Record<string,any>>;
+      if(!rows[0])return null;
+      const dq=new URLSearchParams({select:"sequence_no,product_id,detail_notes",tenant_id:`eq.${tenantId}`,doctor_call_id:`eq.${rows[0].id}`,order:"sequence_no.asc"});
+      const dr=await expectOk(await fetcher(`${base}/rest/v1/doctor_call_products?${dq}`,{headers:authHeaders(config,accessToken)}));
+      return mapDoctorCall(rows[0],await dr.json() as Array<Record<string,any>>);
+    },
+    async listDcrs(tenantId,accessToken){
+      const q=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,order:"submitted_at.desc"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/dcrs?${q}`,{headers:authHeaders(config,accessToken)}));
+      return (await r.json() as Array<Record<string,any>>).map(mapDcrSummary);
+    },
+    async getDcr(tenantId,dcrId,accessToken){
+      const q=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,id:`eq.${dcrId}`,limit:"1"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/dcrs?${q}`,{headers:authHeaders(config,accessToken)}));
+      const rows=await r.json() as Array<Record<string,any>>;
+      if(!rows[0])return null;
+      const pq=new URLSearchParams({select:"sequence_no,product_id,product_code,product_name,detail_notes",tenant_id:`eq.${tenantId}`,dcr_id:`eq.${dcrId}`,order:"sequence_no.asc"});
+      const pr=await expectOk(await fetcher(`${base}/rest/v1/dcr_products?${pq}`,{headers:authHeaders(config,accessToken)}));
+      return {...mapDcrSummary(rows[0]),products:(await pr.json() as Array<Record<string,any>>).map((item)=>({
+        sequence:item.sequence_no,productId:item.product_id,productCode:item.product_code,
+        productName:item.product_name,detailNotes:item.detail_notes,
+      }))} as Dcr;
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls };
 }

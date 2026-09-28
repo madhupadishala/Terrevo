@@ -21,6 +21,7 @@
     "modules/tour-approval/src/**/*.ts",
     "modules/tour-execution/src/**/*.ts",
     "modules/tour-progress/src/**/*.ts",
-    "modules/visit-execution/src/**/*.ts"
+    "modules/visit-execution/src/**/*.ts",
+    "modules/doctor-call/src/**/*.ts"
   ]
 }
