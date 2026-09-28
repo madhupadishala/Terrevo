@@ -4,8 +4,8 @@
 |---|---|---|
 | 0 | Engineering Foundation | CLOSED |
 | 1 | Identity + Tenant | CLOSED |
-| 2 | Organisation Hierarchy + RBAC | ACTIVE |
-| 3 | Core Masters | PLANNED |
+| 2 | Organisation Hierarchy + RBAC | CLOSED |
+| 3 | Core Masters | ACTIVE |
 | 4 | Tour Planning | PLANNED |
 | 5 | Tour Approval | PLANNED |
 | 6 | Start My Tour | PLANNED |
@@ -29,4 +29,4 @@
 | 24 | Regression + UAT + Closure | PLANNED |
 | 25 | Pilot Release | PLANNED |
 
-Current baseline before Sprint 2: `1191b8a4291997b8c7817c5061c427b3907bac06`
+Current baseline before Sprint 3: `35b71eb05679c75eecb2a1fe2ca081ecfbb187f2`

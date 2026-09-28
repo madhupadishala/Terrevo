@@ -15,6 +15,7 @@
     "modules/identity/src/**/*.ts",
     "modules/tenant/src/**/*.ts",
     "modules/organization/src/**/*.ts",
-    "modules/rbac/src/**/*.ts"
+    "modules/rbac/src/**/*.ts",
+    "modules/masters/src/**/*.ts"
   ]
 }
