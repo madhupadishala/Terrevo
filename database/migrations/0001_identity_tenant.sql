@@ -7,8 +7,7 @@ create table public.tenants (
   name text not null check (length(trim(name)) between 2 and 160),
   slug text not null unique check (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
   status text not null default 'active' check (status in ('active', 'inactive')),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  created_at timestamptz not null default now()
 );
 
 create table public.tenant_memberships (
@@ -27,6 +26,8 @@ alter table public.tenant_memberships enable row level security;
 
 revoke all on public.tenants from anon;
 revoke all on public.tenant_memberships from anon;
+revoke all on public.tenants from authenticated;
+revoke all on public.tenant_memberships from authenticated;
 
 grant select on public.tenants to authenticated;
 grant select on public.tenant_memberships to authenticated;

@@ -12,6 +12,7 @@ export type AuthSession = {
 
 export type AuthProvider = {
   signIn(email: string, password: string): Promise<AuthSession>;
+  refreshSession(refreshToken: string): Promise<AuthSession>;
   getUser(accessToken: string): Promise<AuthUser>;
   requestPasswordReset(email: string): Promise<void>;
   signOut(accessToken: string): Promise<void>;
@@ -40,10 +41,21 @@ export function requirePassword(value: unknown): string {
   return value;
 }
 
+export function requireRefreshToken(value: unknown): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new AuthInputError("Refresh token is required");
+  }
+  return value;
+}
+
 export function createIdentityService(provider: AuthProvider) {
   return {
     signIn(emailValue: unknown, passwordValue: unknown) {
       return provider.signIn(normalizeEmail(emailValue), requirePassword(passwordValue));
+    },
+
+    refreshSession(refreshTokenValue: unknown) {
+      return provider.refreshSession(requireRefreshToken(refreshTokenValue));
     },
 
     authenticate(authorization: string | null) {

@@ -21,7 +21,10 @@ class ApiError extends Error {
 }
 
 function json(status: number, body: unknown): Response {
-  return Response.json(body, { status });
+  return Response.json(body, {
+    status,
+    headers: { "cache-control": "no-store" },
+  });
 }
 
 async function readJsonObject(request: Request): Promise<Record<string, unknown>> {
@@ -84,15 +87,21 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         return json(200, session);
       }
 
+      if (request.method === "POST" && path === "/v1/auth/refresh") {
+        const body = await readJsonObject(request);
+        const session = await identity.refreshSession(body.refreshToken);
+        return json(200, session);
+      }
+
       if (request.method === "POST" && path === "/v1/auth/password-reset") {
         const body = await readJsonObject(request);
         await identity.requestPasswordReset(body.email);
-        return new Response(null, { status: 202 });
+        return new Response(null, { status: 202, headers: { "cache-control": "no-store" } });
       }
 
       if (request.method === "POST" && path === "/v1/auth/logout") {
         await identity.signOut(request.headers.get("authorization"));
-        return new Response(null, { status: 204 });
+        return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
       }
 
       if (request.method === "GET" && path === "/v1/me") {

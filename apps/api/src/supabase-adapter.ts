@@ -85,6 +85,21 @@ export function createSupabaseAdapter(
       };
     },
 
+    async refreshSession(refreshToken): Promise<AuthSession> {
+      const response = await expectSignInOk(await fetcher(`${base}/auth/v1/token?grant_type=refresh_token`, {
+        method: "POST",
+        headers: authHeaders(config),
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      }));
+      const body = await response.json() as SupabaseSessionResponse;
+      return {
+        accessToken: body.access_token,
+        refreshToken: body.refresh_token,
+        expiresIn: body.expires_in,
+        user: { id: body.user.id, email: body.user.email ?? null },
+      };
+    },
+
     async getUser(accessToken): Promise<AuthUser> {
       const response = await expectOk(await fetcher(`${base}/auth/v1/user`, {
         headers: authHeaders(config, accessToken),

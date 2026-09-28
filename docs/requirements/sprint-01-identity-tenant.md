@@ -8,6 +8,7 @@ Status: Implementation
 - **TRV-ID-002** — Protected API operations shall require a valid bearer access token.
 - **TRV-ID-003** — Terrevo shall support logout through the configured identity provider.
 - **TRV-ID-004** — Terrevo shall support password-reset initiation through the configured identity provider.
+- **TRV-ID-005** — Terrevo shall renew an authenticated session through the configured identity provider using a refresh token.
 - **TRV-TENANT-001** — An authenticated user shall see only active tenants available through an active membership.
 - **TRV-TENANT-002** — A tenant-scoped request shall be rejected unless the authenticated user has active access to the requested active tenant.
 - **TRV-TENANT-003** — Database row-level security shall prevent authenticated users from reading tenants outside their active memberships.
