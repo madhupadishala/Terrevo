@@ -28,6 +28,7 @@ import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, Expen
 const APP_VERSION = "0.27.0";
 const EXPENSE_CATEGORIES: ExpenseCategory[] = ["TRAVEL", "MEAL", "LODGING", "LOCAL_CONVEYANCE", "OTHER"];
 
+/** Renders the Terrevo field application and coordinates tenant-scoped field state. */
 export default function App() {
   const [booting, setBooting] = useState(true);
   const [session, setSession] = useState<AuthSession | null>(null);
@@ -220,6 +221,7 @@ export default function App() {
     setInventory(nextInventory);
   }
 
+  /** Refreshes self-service records and manager views without coupling analytics availability to operational refreshes. */
   async function loadWorkRecords(client = api) {
     const [daily, weekly, attendanceRows, leaveRows, expenseRows, jointRows] = await Promise.all([
       client.dailyTimesheets(),
@@ -702,6 +704,7 @@ export default function App() {
     });
   }
 
+  /** Reloads the manager analytics card for one of the supported mobile reporting windows. */
   async function handleAnalyticsWindow(days: 7 | 30) {
     await run(async () => {
       const report = await api.managerAnalytics(days);
