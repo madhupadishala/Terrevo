@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isSyncDue, retryDelayMs, summarizeSyncQueue, syncModeFor, type SyncQueueItem } from "../src/sync.ts";
+import { isSyncDue, isSyncQueueItem, retryDelayMs, summarizeSyncQueue, syncModeFor, type SyncQueueItem } from "../src/sync.ts";
 
 test("only retry-safe evidence writes auto replay", () => {
   assert.equal(syncModeFor("doctor-call"), "AUTO");
@@ -43,4 +43,30 @@ test("due checks and queue summary preserve manual and dead-letter state", () =>
     { ...base, scope: "manual", mode: "MANUAL" },
     { ...base, scope: "dead", state: "DEAD_LETTER" },
   ]), { waiting: 1, manual: 1, needsAttention: 1 });
+});
+
+test("persisted queue validation rejects corrupt retry metadata", () => {
+  const valid: SyncQueueItem = {
+    scope: "tenant.user.order.v",
+    userId: "user",
+    tenantId: "tenant",
+    action: "order",
+    targetId: "v",
+    operationId: "op",
+    payload: { lines: [] },
+    mode: "AUTO",
+    state: "QUEUED",
+    attempts: 1,
+    createdAt: "2026-09-30T00:00:00.000Z",
+    updatedAt: "2026-09-30T00:00:00.000Z",
+    nextAttemptAt: null,
+    lastError: null,
+  };
+  assert.equal(isSyncQueueItem(valid), true);
+  assert.equal(isSyncQueueItem({ ...valid, attempts: "1" }), false);
+  assert.equal(isSyncQueueItem({ ...valid, createdAt: "not-a-date" }), false);
+  assert.equal(isSyncQueueItem({ ...valid, mode: "BACKGROUND" }), false);
+  assert.equal(isSyncQueueItem({ ...valid, state: "UNKNOWN" }), false);
+  const { payload: _payload, ...withoutPayload } = valid;
+  assert.equal(isSyncQueueItem(withoutPayload), false);
 });
