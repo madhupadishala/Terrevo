@@ -1,4 +1,4 @@
-import type { AccessContext, AttendanceRow, AuthSession, DailyTimesheet, DistributionLine, DoctorCall, DoctorCallProductInput, ExpenseClaim, ExpenseLine, FieldMasterKind, InventoryBalance, JointWork, LeaveRequest, ManagerCommandCenter, MasterItem, OrderLine, RcpaLine, RcpaReport, SalesOrder, StartTourOption, SubmitTourResult, Tenant, TourProgress, TradeCall, Visit, VisitDistribution, WeeklyTimesheet } from "./types";
+import type { AccessContext, AttendanceRow, AuthSession, DailyTimesheet, DistributionLine, DoctorCall, DoctorCallProductInput, ExpenseClaim, ExpenseLine, FieldMasterKind, InventoryBalance, JointWork, LeaveRequest, ManagerAnalytics, ManagerCommandCenter, MasterItem, OrderLine, RcpaLine, RcpaReport, SalesOrder, StartTourOption, SubmitTourResult, Tenant, TourProgress, TradeCall, Visit, VisitDistribution, WeeklyTimesheet } from "./types";
 import type { DepartureIntegrity, PresencePoint } from "./presence";
 
 const API_BASE_URL = (process.env.EXPO_PUBLIC_TERREVO_API_URL ?? "https://terrevo.vercel.app").replace(/\/+$/, "");
@@ -337,6 +337,13 @@ export class TerrevoApi {
     const response = await this.request("/v1/manager/command-center");
     const body = await response.json() as { commandCenter: ManagerCommandCenter };
     return body.commandCenter;
+  }
+
+  /** Fetches the manager's read-only analytics projection for the requested rolling window. */
+  async managerAnalytics(days: number): Promise<ManagerAnalytics> {
+    const response = await this.request(`/v1/manager/analytics?days=${encodeURIComponent(String(days))}`);
+    const body = await response.json() as { analytics: ManagerAnalytics };
+    return body.analytics;
   }
 
   async attendance(): Promise<AttendanceRow[]> {

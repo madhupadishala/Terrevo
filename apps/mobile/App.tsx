@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -23,11 +23,12 @@ import {
   savePendingPresence,
 } from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
-import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, ExpenseClaim, ExpenseLine, InventoryBalance, JointWork, LeaveRequest, ManagerCommandCenter, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
+import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, ExpenseClaim, ExpenseLine, InventoryBalance, JointWork, LeaveRequest, ManagerAnalytics, ManagerCommandCenter, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
 
-const APP_VERSION = "0.26.0";
+const APP_VERSION = "0.27.0";
 const EXPENSE_CATEGORIES: ExpenseCategory[] = ["TRAVEL", "MEAL", "LODGING", "LOCAL_CONVEYANCE", "OTHER"];
 
+/** Renders the Terrevo field application and coordinates tenant-scoped field state. */
 export default function App() {
   const [booting, setBooting] = useState(true);
   const [session, setSession] = useState<AuthSession | null>(null);
@@ -85,6 +86,11 @@ export default function App() {
   const [expenseSubmitComment, setExpenseSubmitComment] = useState("");
   const [jointWork, setJointWork] = useState<JointWork[]>([]);
   const [managerCommand, setManagerCommand] = useState<ManagerCommandCenter | null>(null);
+  const [managerAnalytics, setManagerAnalytics] = useState<ManagerAnalytics | null>(null);
+  const [analyticsDays, setAnalyticsDays] = useState<7 | 30>(7);
+  const analyticsDaysRef = useRef<7 | 30>(7);
+  const analyticsRequestRef = useRef(0);
+  const tenantIdRef = useRef<string | null>(null);
   const [departure, setDeparture] = useState<DepartureIntegrity | null>(null);
   const [departureSamples, setDepartureSamples] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -97,6 +103,7 @@ export default function App() {
   }), []);
 
   useEffect(() => {
+    tenantIdRef.current = tenantId;
     api.configure(session, tenantId);
   }, [api, session, tenantId]);
 
@@ -106,6 +113,7 @@ export default function App() {
         const [storedSession, storedTenant] = await Promise.all([loadSession(), loadTenantId()]);
         setSession(storedSession);
         setTenantId(storedTenant);
+        tenantIdRef.current = storedTenant;
         api.configure(storedSession, storedTenant);
         if (storedSession) {
           const accessible = await api.tenants();
@@ -114,6 +122,7 @@ export default function App() {
             ? storedTenant
             : accessible.length === 1 ? accessible[0].id : null;
           setTenantId(selected);
+          tenantIdRef.current = selected;
           api.setTenant(selected);
           await saveTenantId(selected);
           if (selected) {
@@ -172,6 +181,7 @@ export default function App() {
     setExpenseSubmitComment("");
   }
 
+  /** Clears tenant-derived UI state and invalidates in-flight analytics before a tenant/session boundary changes. */
   function clearTenantViewState() {
     setProgress(null);
     setOpenVisit(null);
@@ -194,6 +204,10 @@ export default function App() {
     setExpenses([]);
     setJointWork([]);
     setManagerCommand(null);
+    analyticsRequestRef.current += 1;
+    setManagerAnalytics(null);
+    analyticsDaysRef.current = 7;
+    setAnalyticsDays(7);
     setDeparture(null);
     setDepartureSamples(0);
   }
@@ -216,6 +230,7 @@ export default function App() {
     setInventory(nextInventory);
   }
 
+  /** Refreshes self-service records and manager views without coupling analytics availability to operational refreshes. */
   async function loadWorkRecords(client = api) {
     const [daily, weekly, attendanceRows, leaveRows, expenseRows, jointRows] = await Promise.all([
       client.dailyTimesheets(),
@@ -232,11 +247,29 @@ export default function App() {
     setExpenses(expenseRows);
     setJointWork(jointRows);
     const access = await client.accessContext();
-    setManagerCommand(access.permissions.includes("MANAGER_DASHBOARD_VIEW")
-      ? await client.managerCommandCenter()
-      : null);
+    if (access.permissions.includes("MANAGER_DASHBOARD_VIEW")) {
+      setManagerCommand(await client.managerCommandCenter());
+      const requestedDays = analyticsDaysRef.current;
+      const requestedTenant = tenantIdRef.current;
+      const requestId = ++analyticsRequestRef.current;
+      try {
+        const report = await client.managerAnalytics(requestedDays);
+        if (requestId === analyticsRequestRef.current && tenantIdRef.current === requestedTenant) {
+          setAnalyticsDays(requestedDays);
+          setManagerAnalytics(report);
+        }
+      } catch {
+        if (requestId === analyticsRequestRef.current && tenantIdRef.current === requestedTenant) {
+          setManagerAnalytics(null);
+        }
+      }
+    } else {
+      setManagerCommand(null);
+      setManagerAnalytics(null);
+    }
   }
 
+  /** Restores doctor-call draft context for the currently open doctor visit. */
   async function loadDoctorContext(client: TerrevoApi, nextProgress: TourProgress | null, nextOpenVisit: Visit | null) {
     const stop = nextProgress?.stops.find((item) => item.planStopId === nextOpenVisit?.planStopId);
     if (!nextOpenVisit || stop?.type !== "doctor") {
@@ -310,6 +343,7 @@ export default function App() {
     ]);
   }
 
+  /** Runs one foreground UI action with shared busy, error, and message state handling. */
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setError(null);
@@ -334,8 +368,10 @@ export default function App() {
     });
   }
 
+  /** Switches the active tenant after clearing prior tenant state and then reloads tenant-scoped resources. */
   async function selectTenant(id: string, currentSession = session) {
     clearTenantViewState();
+    tenantIdRef.current = id;
     setTenantId(id);
     api.configure(currentSession, id);
     await saveTenantId(id);
@@ -393,6 +429,7 @@ export default function App() {
     await run(async () => {
       await api.logout();
       await saveTenantId(null);
+      tenantIdRef.current = null;
       setTenantId(null);
       setTenants([]);
       clearTenantViewState();
@@ -683,10 +720,26 @@ export default function App() {
     });
   }
 
+  /** Refreshes manager operational and analytics views using the latest selected analytics window. */
   async function handleRefreshManager() {
     await run(async () => {
       await loadWorkRecords();
       setMessage("Manager command view refreshed from current scoped operational evidence.");
+    });
+  }
+
+  /** Reloads the manager analytics card and discards responses from superseded windows or tenants. */
+  async function handleAnalyticsWindow(days: 7 | 30) {
+    analyticsDaysRef.current = days;
+    setAnalyticsDays(days);
+    setManagerAnalytics(null);
+    await run(async () => {
+      const requestedTenant = tenantIdRef.current;
+      const requestId = ++analyticsRequestRef.current;
+      const report = await api.managerAnalytics(days);
+      if (requestId !== analyticsRequestRef.current || tenantIdRef.current !== requestedTenant) return;
+      setManagerAnalytics(report);
+      setMessage(`Manager analytics refreshed for the last ${days} tenant-local day(s).`);
     });
   }
 
@@ -971,6 +1024,37 @@ export default function App() {
             {managerCommand.queues.leaves.slice(0, 3).map((item) => <Text key={`leave-${item.id}`} style={styles.small}>Leave · {item.startDate} to {item.endDate}</Text>)}
             {managerCommand.queues.expenses.slice(0, 3).map((item) => <Text key={`expense-${item.id}`} style={styles.small}>Expense · {item.workDate} · {item.currencyCode} {item.totalAmount.toFixed(2)}</Text>)}
             <SecondaryButton label="Refresh Manager Command" onPress={() => void handleRefreshManager()} />
+          </View>
+        ) : null}
+
+        {managerAnalytics ? (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>ANALYTICS + REPORTS</Text>
+            <Text style={styles.cardTitle}>{managerAnalytics.period.startDate} to {managerAnalytics.period.endDate}</Text>
+            <Text style={styles.muted}>Read-only metrics derived from trusted field evidence. No AI score or manual performance value is used.</Text>
+            <View style={styles.choiceButtons}>
+              {([7, 30] as const).map((days) => (
+                <Pressable key={days} disabled={busy} style={[styles.compactChoice, analyticsDays === days && styles.choiceSelected]} onPress={() => void handleAnalyticsWindow(days)}>
+                  <Text style={styles.choiceText}>{days} days</Text>
+                </Pressable>
+              ))}
+            </View>
+            <View style={styles.managerMetrics}>
+              <View style={styles.metricBox}><Text style={styles.metricValue}>{managerAnalytics.coverage.coveragePercent}%</Text><Text style={styles.small}>Coverage</Text></View>
+              <View style={styles.metricBox}><Text style={styles.metricValue}>{managerAnalytics.coverage.completedVisits}</Text><Text style={styles.small}>Completed calls</Text></View>
+              <View style={styles.metricBox}><Text style={styles.metricValue}>{managerAnalytics.tours.submitted}</Text><Text style={styles.small}>Submitted tours</Text></View>
+            </View>
+            <Text style={styles.small}>Planned {managerAnalytics.coverage.plannedStops} · Doctor {managerAnalytics.coverage.doctorCalls} · Chemist {managerAnalytics.coverage.chemistCalls} · Stockist {managerAnalytics.coverage.stockistCalls}</Text>
+            <Text style={styles.small}>Unique doctors {managerAnalytics.coverage.uniqueDoctorsCovered} · Calls/tour {managerAnalytics.coverage.callsPerSubmittedTour} · Avg worked {managerAnalytics.tours.averageWorkedMinutes} min</Text>
+            <Text style={styles.sectionTitle}>Orders & RCPA</Text>
+            <Text style={styles.small}>Orders {managerAnalytics.orders.count} · Units {managerAnalytics.orders.units} · RCPA reports {managerAnalytics.rcpa.reports}</Text>
+            <Text style={styles.small}>RCPA Rx {managerAnalytics.rcpa.prescriptionCount} · Stock {managerAnalytics.rcpa.stockQuantity} · Sales {managerAnalytics.rcpa.salesQuantity}</Text>
+            <Text style={styles.sectionTitle}>Attendance</Text>
+            <Text style={styles.small}>Present days {managerAnalytics.attendance.presentDays} · Short days {managerAnalytics.attendance.shortDays} · Full-day leave {managerAnalytics.attendance.approvedFullDayLeaveDays} · Half-day leave {managerAnalytics.attendance.approvedHalfDayLeaveDays}</Text>
+            <Text style={styles.sectionTitle}>Expenses</Text>
+            {managerAnalytics.expenses.length === 0 ? <Text style={styles.small}>No submitted/approved claims in this period.</Text> : managerAnalytics.expenses.map((expense) => (
+              <Text key={expense.currencyCode} style={styles.small}>{expense.currencyCode} {expense.totalAmount.toFixed(2)} · {expense.claimCount} claim(s)</Text>
+            ))}
           </View>
         ) : null}
 
