@@ -237,12 +237,12 @@ export default function App() {
     setJointWork(jointRows);
     const access = await client.accessContext();
     if (access.permissions.includes("MANAGER_DASHBOARD_VIEW")) {
-      const [command, report] = await Promise.all([
-        client.managerCommandCenter(),
-        client.managerAnalytics(analyticsDays),
-      ]);
-      setManagerCommand(command);
-      setManagerAnalytics(report);
+      setManagerCommand(await client.managerCommandCenter());
+      try {
+        setManagerAnalytics(await client.managerAnalytics(analyticsDays));
+      } catch {
+        setManagerAnalytics(null);
+      }
     } else {
       setManagerCommand(null);
       setManagerAnalytics(null);
