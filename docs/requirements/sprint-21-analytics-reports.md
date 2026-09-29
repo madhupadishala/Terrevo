@@ -15,3 +15,6 @@ Sprint 21 is read-only analytics over trusted field evidence. It does not introd
 - **TRV-ANL-009** — Expense analytics shall group submitted/approved claim totals by currency; different currencies shall never be summed together.
 - **TRV-ANL-010** — Analytics is read-only and must not mutate tour, visit, DCR, order, RCPA, attendance, leave, expense or inventory records.
 - **TRV-ANL-011** — No AI prediction, ranking, target fabrication, or synthetic performance score is in Sprint 21.
+- **TRV-ANL-012** — Sprint 21 API and database changes shall be additive so previously supported clients remain compatible.
+- **TRV-ANL-013** — Analytics availability shall not cause an already-successful field mutation or manager-command refresh to appear failed; analytics may degrade independently.
+- **TRV-ANL-014** — Mobile analytics shall discard superseded responses after reporting-window changes or tenant changes so stale data cannot overwrite the current tenant/window view.
