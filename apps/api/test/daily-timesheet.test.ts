@@ -7,10 +7,19 @@ const user="22222222-2222-4222-8222-222222222222";
 const sheet="33333333-3333-4333-8333-333333333333";
 const op="44444444-4444-4444-8444-444444444444";
 
+test("TRV-TXF-009 owner daily read forwards authenticated user scope",async()=>{
+  let received:string[]=[];
+  const service=createDailyTimesheetService({
+    listOwn:async()=>[],listSelf:async(t,u,token)=>{received=[t,u,token];return[]},getOwn:async()=>null,review:async()=>{},
+  });
+  assert.deepEqual(await service.listSelf(tenant,user,"token"),[]);
+  assert.deepEqual(received,[tenant,user,"token"]);
+});
+
 test("TRV-DTS-007 review validates operation UUID before write",async()=>{
   let writes=0;
   const service=createDailyTimesheetService({
-    listOwn:async()=>[],getOwn:async()=>null,review:async()=>{writes++},
+    listOwn:async()=>[],listSelf:async()=>[],getOwn:async()=>null,review:async()=>{writes++},
   });
   await assert.rejects(service.review(tenant,user,"token",sheet,{operationId:"bad"}),DailyTimesheetInputError);
   assert.equal(writes,0);
@@ -21,6 +30,7 @@ test("TRV-DTS-006 review confirms immutable generated record became REVIEWED",as
   let received:any;
   const service=createDailyTimesheetService({
     listOwn:async()=>[],
+    listSelf:async()=>[],
     getOwn:async()=>row,
     review:async(_t,_u,_id,input)=>{received=input},
   });
@@ -30,7 +40,7 @@ test("TRV-DTS-006 review confirms immutable generated record became REVIEWED",as
 
 test("TRV-DTS-006 confirmation failure is explicit",async()=>{
   const service=createDailyTimesheetService({
-    listOwn:async()=>[],getOwn:async()=>null,review:async()=>{},
+    listOwn:async()=>[],listSelf:async()=>[],getOwn:async()=>null,review:async()=>{},
   });
   await assert.rejects(service.review(tenant,user,"token",sheet,{operationId:op}),DailyTimesheetConflictError);
 });

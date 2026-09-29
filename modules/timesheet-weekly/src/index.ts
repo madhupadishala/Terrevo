@@ -19,6 +19,7 @@ export type WeeklyTimesheet = {
 
 export type WeeklyTimesheetRepository = {
   listVisible(tenantId:string,accessToken:string):Promise<WeeklyTimesheet[]>;
+  listOwn(tenantId:string,userId:string,accessToken:string):Promise<WeeklyTimesheet[]>;
   listPending(tenantId:string,accessToken:string):Promise<WeeklyTimesheet[]>;
   getVisible(tenantId:string,id:string,accessToken:string):Promise<WeeklyTimesheet|null>;
   generate(tenantId:string,userId:string,weekStart:string):Promise<string>;
@@ -65,6 +66,7 @@ function comment(value:unknown,required=false):string|null{
 export function createWeeklyTimesheetService(repository:WeeklyTimesheetRepository,rbac:RbacService){
   return {
     list(tenantId:string,accessToken:string){return repository.listVisible(tenantId,accessToken)},
+    listOwn(tenantId:string,userId:string,accessToken:string){return repository.listOwn(tenantId,userId,accessToken)},
     listPending(tenantId:string,accessToken:string){return repository.listPending(tenantId,accessToken)},
     async get(tenantId:string,accessToken:string,idValue:unknown){
       const id=uuid(idValue,"timesheetId");

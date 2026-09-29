@@ -231,6 +231,10 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         if(request.method==="PUT")return json(200,{tradeCall:await tradeCalls.save(context.tenantId,user.id,accessToken,tradeCall[1],await readJsonObject(request))});
       }
 
+      if(request.method==="GET"&&path==="/v1/timesheets/weekly/own"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(200,{timesheets:await weeklyTimesheets.listOwn(context.tenantId,user.id,accessToken)});
+      }
       if(request.method==="GET"&&path==="/v1/timesheets/weekly"){
         const {accessToken,context}=await resolveTenantRequest(request);
         return json(200,{timesheets:await weeklyTimesheets.list(context.tenantId,accessToken)});
@@ -260,6 +264,10 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         return json(200,{timesheet:await weeklyTimesheets.get(context.tenantId,accessToken,weeklyOne[1])});
       }
 
+      if(request.method==="GET"&&path==="/v1/timesheets/daily/own"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(200,{timesheets:await dailyTimesheets.listSelf(context.tenantId,user.id,accessToken)});
+      }
       if(request.method==="GET"&&path==="/v1/timesheets/daily"){
         const {accessToken,context}=await resolveTenantRequest(request);
         return json(200,{timesheets:await dailyTimesheets.list(context.tenantId,accessToken)});

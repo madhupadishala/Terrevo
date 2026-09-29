@@ -887,6 +887,16 @@ export function createSupabaseAdapter(
       const r=await expectOk(await fetcher(`${base}/rest/v1/daily_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
       return (await r.json() as Array<Record<string,any>>).map(mapDailyTimesheet);
     },
+    async listSelf(tenantId,userId,accessToken){
+      const q=new URLSearchParams({
+        select:"*,employees!inner(user_id)",
+        tenant_id:`eq.${tenantId}`,
+        "employees.user_id":`eq.${userId}`,
+        order:"work_date.desc",
+      });
+      const r=await expectOk(await fetcher(`${base}/rest/v1/daily_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
+      return (await r.json() as Array<Record<string,any>>).map(mapDailyTimesheet);
+    },
     async getOwn(tenantId,id,accessToken){
       const q=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,id:`eq.${id}`,limit:"1"});
       const r=await expectOk(await fetcher(`${base}/rest/v1/daily_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
@@ -915,6 +925,16 @@ export function createSupabaseAdapter(
   const weeklyTimesheets:WeeklyTimesheetRepository={
     async listVisible(tenantId,accessToken){
       const q=new URLSearchParams({select:"*,employees!inner(org_unit_id)",tenant_id:`eq.${tenantId}`,order:"week_start.desc"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/weekly_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
+      return (await r.json() as Array<Record<string,any>>).map(mapWeekly);
+    },
+    async listOwn(tenantId,userId,accessToken){
+      const q=new URLSearchParams({
+        select:"*,employees!inner(org_unit_id,user_id)",
+        tenant_id:`eq.${tenantId}`,
+        "employees.user_id":`eq.${userId}`,
+        order:"week_start.desc",
+      });
       const r=await expectOk(await fetcher(`${base}/rest/v1/weekly_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
       return (await r.json() as Array<Record<string,any>>).map(mapWeekly);
     },

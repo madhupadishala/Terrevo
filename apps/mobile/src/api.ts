@@ -1,4 +1,4 @@
-import type { AuthSession, DistributionLine, DoctorCall, DoctorCallProductInput, FieldMasterKind, InventoryBalance, MasterItem, StartTourOption, SubmitTourResult, Tenant, TourProgress, Visit, VisitDistribution } from "./types";
+import type { AuthSession, DailyTimesheet, DistributionLine, DoctorCall, DoctorCallProductInput, FieldMasterKind, InventoryBalance, MasterItem, StartTourOption, SubmitTourResult, Tenant, TourProgress, Visit, VisitDistribution, WeeklyTimesheet } from "./types";
 import type { DepartureIntegrity, PresencePoint } from "./presence";
 
 const API_BASE_URL = (process.env.EXPO_PUBLIC_TERREVO_API_URL ?? "https://terrevo.vercel.app").replace(/\/+$/, "");
@@ -226,6 +226,45 @@ export class TerrevoApi {
     });
     const body = await response.json() as { execution: SubmitTourResult };
     return body.execution;
+  }
+
+  async dailyTimesheets(): Promise<DailyTimesheet[]> {
+    const response = await this.request("/v1/timesheets/daily/own");
+    const body = await response.json() as { timesheets: DailyTimesheet[] };
+    return body.timesheets;
+  }
+
+  async reviewDailyTimesheet(timesheetId: string, input: { operationId: string; remarks: string | null }): Promise<DailyTimesheet> {
+    const response = await this.request(`/v1/timesheets/daily/${encodeURIComponent(timesheetId)}/review`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    const body = await response.json() as { timesheet: DailyTimesheet };
+    return body.timesheet;
+  }
+
+  async weeklyTimesheets(): Promise<WeeklyTimesheet[]> {
+    const response = await this.request("/v1/timesheets/weekly/own");
+    const body = await response.json() as { timesheets: WeeklyTimesheet[] };
+    return body.timesheets;
+  }
+
+  async generateWeeklyTimesheet(weekStart: string): Promise<WeeklyTimesheet> {
+    const response = await this.request("/v1/timesheets/weekly/generate", {
+      method: "POST",
+      body: JSON.stringify({ weekStart }),
+    });
+    const body = await response.json() as { timesheet: WeeklyTimesheet };
+    return body.timesheet;
+  }
+
+  async submitWeeklyTimesheet(timesheetId: string, input: { operationId: string; comment: string | null }): Promise<WeeklyTimesheet> {
+    const response = await this.request(`/v1/timesheets/weekly/${encodeURIComponent(timesheetId)}/submit`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    const body = await response.json() as { timesheet: WeeklyTimesheet };
+    return body.timesheet;
   }
 
   async recordPresence(visitId: string, input: { operationId: string; samples: PresencePoint[] }): Promise<DepartureIntegrity> {

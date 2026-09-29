@@ -15,6 +15,7 @@ export type DailyTimesheet = {
 
 export type DailyTimesheetRepository = {
   listOwn(tenantId: string, accessToken: string): Promise<DailyTimesheet[]>;
+  listSelf(tenantId: string, userId: string, accessToken: string): Promise<DailyTimesheet[]>;
   getOwn(tenantId: string, timesheetId: string, accessToken: string): Promise<DailyTimesheet | null>;
   review(
     tenantId: string,
@@ -45,6 +46,7 @@ function remarks(value:unknown):string|null{
 export function createDailyTimesheetService(repository:DailyTimesheetRepository){
   return {
     list(tenantId:string,accessToken:string){return repository.listOwn(tenantId,accessToken)},
+    listSelf(tenantId:string,userId:string,accessToken:string){return repository.listSelf(tenantId,userId,accessToken)},
     async get(tenantId:string,accessToken:string,timesheetIdValue:unknown){
       const id=uuid(timesheetIdValue,"timesheetId");
       const row=await repository.getOwn(tenantId,id,accessToken);
