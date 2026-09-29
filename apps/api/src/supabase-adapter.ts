@@ -16,6 +16,7 @@ import type { TradeCall, TradeCallRepository } from "../../../modules/trade-call
 import type { RcpaReport, RcpaRepository } from "../../../modules/rcpa/src/index.ts";
 import type { OrderRepository, SalesOrder } from "../../../modules/orders/src/index.ts";
 import type { AttendanceLeaveRepository, AttendanceRow, LeaveRequest } from "../../../modules/attendance-leave/src/index.ts";
+import type { ExpenseClaim, ExpenseRepository } from "../../../modules/expenses/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -142,6 +143,7 @@ export function createSupabaseAdapter(
   rcpa: RcpaRepository;
   orders: OrderRepository;
   attendanceLeave: AttendanceLeaveRepository;
+  expenses: ExpenseRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -945,5 +947,7 @@ export function createSupabaseAdapter(
     async submitLeave(t,u,input){const r=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_submit_leave`,{method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_user_id:u,p_operation_id:input.operationId,p_leave_type:input.leaveType,p_start:input.startDate,p_end:input.endDate,p_reason:input.reason})}));return await r.json() as string;},
     async decideLeave(t,a,id,d,c){await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_decide_leave`,{method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_actor:a,p_leave_id:id,p_decision:d,p_comment:c})}));},
   };
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders, attendanceLeave };
+  const mapExpense=async(row:Record<string,any>,token:string):Promise<ExpenseClaim>=>{const e=Array.isArray(row.employees)?row.employees[0]:row.employees;const q=new URLSearchParams({select:"sequence_no,category,amount,remarks,receipt_reference",tenant_id:`eq.${row.tenant_id}`,expense_claim_id:`eq.${row.id}`,order:"sequence_no.asc"});const lr=await expectOk(await fetcher(`${base}/rest/v1/expense_lines?${q}`,{headers:authHeaders(config,token)}));return{id:row.id,executionId:row.execution_id,employeeId:row.employee_id,orgUnitId:e?.org_unit_id??"",workDate:row.work_date,currencyCode:row.currency_code,status:row.status,totalAmount:Number(row.total_amount),submissionComment:row.submission_comment,reviewComment:row.review_comment,lines:(await lr.json() as Array<Record<string,any>>).map(x=>({sequence:x.sequence_no,category:x.category,amount:Number(x.amount),remarks:x.remarks,receiptReference:x.receipt_reference}))};};
+  const expenses:ExpenseRepository={async listVisible(t,token,pending=false){const q=new URLSearchParams({select:"*,employees!inner(org_unit_id)",tenant_id:`eq.${t}`,order:"work_date.desc"});if(pending)q.set("status","eq.SUBMITTED");const r=await expectOk(await fetcher(`${base}/rest/v1/expense_claims?${q}`,{headers:authHeaders(config,token)}));return Promise.all((await r.json() as Array<Record<string,any>>).map(x=>mapExpense(x,token)));},async getVisible(t,id,token){const q=new URLSearchParams({select:"*,employees!inner(org_unit_id)",tenant_id:`eq.${t}`,id:`eq.${id}`,limit:"1"});const r=await expectOk(await fetcher(`${base}/rest/v1/expense_claims?${q}`,{headers:authHeaders(config,token)}));const row=(await r.json() as Array<Record<string,any>>)[0];return row?mapExpense(row,token):null;},async save(t,u,e,input){const r=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_save_expense_claim`,{method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_user_id:u,p_execution_id:e,p_operation_id:input.operationId,p_currency:input.currencyCode,p_lines:input.lines})}));return await r.json() as string;},async submit(t,u,id,input){await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_submit_expense_claim`,{method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_user_id:u,p_claim_id:id,p_operation_id:input.operationId,p_comment:input.comment})}));},async decide(t,a,id,d,c){await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_decide_expense_claim`,{method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_actor:a,p_claim_id:id,p_decision:d,p_comment:c})}));}};
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders, attendanceLeave, expenses };
 }

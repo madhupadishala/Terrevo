@@ -30,6 +30,7 @@
     "modules/trade-call/src/**/*.ts",
     "modules/rcpa/src/**/*.ts",
     "modules/orders/src/**/*.ts",
-    "modules/attendance-leave/src/**/*.ts"
+    "modules/attendance-leave/src/**/*.ts",
+    "modules/expenses/src/**/*.ts"
   ]
 }
