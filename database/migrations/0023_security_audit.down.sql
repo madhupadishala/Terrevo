@@ -36,11 +36,11 @@ $$;
 
 drop function if exists public.capture_security_audit_event();
 
-do $
+do $audit$
 begin
   if to_regclass('public.security_audit_events') is not null
      and to_regclass('public.security_audit_events_archived_0023') is null then
     alter table public.security_audit_events rename to security_audit_events_archived_0023;
   end if;
 end
-$;
+$audit$;
