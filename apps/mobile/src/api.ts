@@ -229,7 +229,7 @@ export class TerrevoApi {
   }
 
   async dailyTimesheets(): Promise<DailyTimesheet[]> {
-    const response = await this.request("/v1/timesheets/daily");
+    const response = await this.request("/v1/timesheets/daily/own");
     const body = await response.json() as { timesheets: DailyTimesheet[] };
     return body.timesheets;
   }
