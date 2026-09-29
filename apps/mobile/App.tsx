@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -88,6 +88,8 @@ export default function App() {
   const [managerCommand, setManagerCommand] = useState<ManagerCommandCenter | null>(null);
   const [managerAnalytics, setManagerAnalytics] = useState<ManagerAnalytics | null>(null);
   const [analyticsDays, setAnalyticsDays] = useState<7 | 30>(7);
+  const analyticsRequestRef = useRef(0);
+  const tenantIdRef = useRef<string | null>(null);
   const [departure, setDeparture] = useState<DepartureIntegrity | null>(null);
   const [departureSamples, setDepartureSamples] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -100,6 +102,7 @@ export default function App() {
   }), []);
 
   useEffect(() => {
+    tenantIdRef.current = tenantId;
     api.configure(session, tenantId);
   }, [api, session, tenantId]);
 
@@ -109,6 +112,7 @@ export default function App() {
         const [storedSession, storedTenant] = await Promise.all([loadSession(), loadTenantId()]);
         setSession(storedSession);
         setTenantId(storedTenant);
+        tenantIdRef.current = storedTenant;
         api.configure(storedSession, storedTenant);
         if (storedSession) {
           const accessible = await api.tenants();
@@ -117,6 +121,7 @@ export default function App() {
             ? storedTenant
             : accessible.length === 1 ? accessible[0].id : null;
           setTenantId(selected);
+          tenantIdRef.current = selected;
           api.setTenant(selected);
           await saveTenantId(selected);
           if (selected) {
@@ -197,6 +202,7 @@ export default function App() {
     setExpenses([]);
     setJointWork([]);
     setManagerCommand(null);
+    analyticsRequestRef.current += 1;
     setManagerAnalytics(null);
     setAnalyticsDays(7);
     setDeparture(null);
@@ -240,10 +246,18 @@ export default function App() {
     const access = await client.accessContext();
     if (access.permissions.includes("MANAGER_DASHBOARD_VIEW")) {
       setManagerCommand(await client.managerCommandCenter());
+      const requestedDays = analyticsDays;
+      const requestedTenant = tenantIdRef.current;
+      const requestId = ++analyticsRequestRef.current;
       try {
-        setManagerAnalytics(await client.managerAnalytics(analyticsDays));
+        const report = await client.managerAnalytics(requestedDays);
+        if (requestId === analyticsRequestRef.current && tenantIdRef.current === requestedTenant) {
+          setManagerAnalytics(report);
+        }
       } catch {
-        setManagerAnalytics(null);
+        if (requestId === analyticsRequestRef.current && tenantIdRef.current === requestedTenant) {
+          setManagerAnalytics(null);
+        }
       }
     } else {
       setManagerCommand(null);
@@ -350,6 +364,7 @@ export default function App() {
 
   async function selectTenant(id: string, currentSession = session) {
     clearTenantViewState();
+    tenantIdRef.current = id;
     setTenantId(id);
     api.configure(currentSession, id);
     await saveTenantId(id);
@@ -407,6 +422,7 @@ export default function App() {
     await run(async () => {
       await api.logout();
       await saveTenantId(null);
+      tenantIdRef.current = null;
       setTenantId(null);
       setTenants([]);
       clearTenantViewState();
@@ -704,10 +720,13 @@ export default function App() {
     });
   }
 
-  /** Reloads the manager analytics card for one of the supported mobile reporting windows. */
+  /** Reloads the manager analytics card and discards responses from superseded windows or tenants. */
   async function handleAnalyticsWindow(days: 7 | 30) {
     await run(async () => {
+      const requestedTenant = tenantIdRef.current;
+      const requestId = ++analyticsRequestRef.current;
       const report = await api.managerAnalytics(days);
+      if (requestId !== analyticsRequestRef.current || tenantIdRef.current !== requestedTenant) return;
       setAnalyticsDays(days);
       setManagerAnalytics(report);
       setMessage(`Manager analytics refreshed for the last ${days} tenant-local day(s).`);
@@ -1005,7 +1024,7 @@ export default function App() {
             <Text style={styles.muted}>Read-only metrics derived from trusted field evidence. No AI score or manual performance value is used.</Text>
             <View style={styles.choiceButtons}>
               {([7, 30] as const).map((days) => (
-                <Pressable key={days} style={[styles.compactChoice, analyticsDays === days && styles.choiceSelected]} onPress={() => void handleAnalyticsWindow(days)}>
+                <Pressable key={days} disabled={busy} style={[styles.compactChoice, analyticsDays === days && styles.choiceSelected]} onPress={() => void handleAnalyticsWindow(days)}>
                   <Text style={styles.choiceText}>{days} days</Text>
                 </Pressable>
               ))}
