@@ -13,6 +13,7 @@ import type { SubmitTourRepository, SubmitTourResult } from "../../../modules/to
 import type { DailyTimesheet, DailyTimesheetRepository } from "../../../modules/timesheet-daily/src/index.ts";
 import type { WeeklyTimesheet, WeeklyTimesheetRepository } from "../../../modules/timesheet-weekly/src/index.ts";
 import type { TradeCall, TradeCallRepository } from "../../../modules/trade-call/src/index.ts";
+import type { RcpaReport, RcpaRepository } from "../../../modules/rcpa/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -136,6 +137,7 @@ export function createSupabaseAdapter(
   dailyTimesheets: DailyTimesheetRepository;
   weeklyTimesheets: WeeklyTimesheetRepository;
   tradeCalls: TradeCallRepository;
+  rcpa: RcpaRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -922,5 +924,13 @@ export function createSupabaseAdapter(
     },
   };
 
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls };
+  const rcpa:RcpaRepository={
+    async save(tenantId,userId,visitId,input){const r=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_save_rcpa`,{method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:tenantId,p_user_id:userId,p_visit_id:visitId,p_operation_id:input.operationId,p_lines:input.lines})}));return await r.json() as string;},
+    async getByVisit(tenantId,visitId,accessToken){
+      const q=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,visit_id:`eq.${visitId}`,limit:"1"});const r=await expectOk(await fetcher(`${base}/rest/v1/rcpa_reports?${q}`,{headers:authHeaders(config,accessToken)}));const row=(await r.json() as Array<Record<string,any>>)[0];if(!row)return null;
+      const lq=new URLSearchParams({select:"sequence_no,product_id,competitor_brand,prescription_count,stock_quantity,sales_quantity",tenant_id:`eq.${tenantId}`,rcpa_report_id:`eq.${row.id}`,order:"sequence_no.asc"});const lr=await expectOk(await fetcher(`${base}/rest/v1/rcpa_lines?${lq}`,{headers:authHeaders(config,accessToken)}));
+      return{id:row.id,visitId:row.visit_id,chemistId:row.chemist_id,updatedAt:row.updated_at,lines:(await lr.json() as Array<Record<string,any>>).map(x=>({sequence:x.sequence_no,productId:x.product_id,competitorBrand:x.competitor_brand,prescriptionCount:x.prescription_count,stockQuantity:x.stock_quantity,salesQuantity:x.sales_quantity}))} as RcpaReport;
+    },
+  };
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa };
 }

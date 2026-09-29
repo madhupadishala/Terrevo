@@ -17,7 +17,7 @@
 | 12 | Daily Timesheet | CLOSED |
 | 13 | Weekly Timesheet | CLOSED |
 | 14 | Chemist + Stockist Calls | CLOSED |
-| 15 | RCPA | PLANNED |
+| 15 | RCPA | CLOSED |
 | 16 | POB / Orders | PLANNED |
 | 17 | Attendance + Leave | PLANNED |
 | 18 | Expenses | PLANNED |
@@ -29,4 +29,4 @@
 | 24 | Regression + UAT + Closure | PLANNED |
 | 25 | Pilot Release | PLANNED |
 
-Completed through Sprint 14. Next planned sprint: 15 — RCPA.
+Completed through Sprint 15. Next planned sprint: 16 — POB / Orders.

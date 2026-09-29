@@ -1,0 +1,1 @@
+begin;drop function if exists public.admin_save_rcpa(uuid,uuid,uuid,uuid,jsonb);drop table if exists public.rcpa_operations;drop table if exists public.rcpa_lines;drop table if exists public.rcpa_reports;commit;
