@@ -319,6 +319,50 @@ export default function App() {
   }
 
   async function replaySyncItem(item: SyncQueueItem, client = api): Promise<"SYNCED" | "RETRY" | "DEAD"> {
+    const payloadRecord =
+      item.payload !== null && typeof item.payload === "object" && !Array.isArray(item.payload)
+        ? item.payload as Record<string, unknown>
+        : null;
+    const targetRequired = item.action !== "leave-submit";
+    const invalidTarget = targetRequired && (typeof item.targetId !== "string" || item.targetId.length === 0);
+    const validPayload = (() => {
+      if (!payloadRecord) return false;
+      switch (item.action) {
+        case "distribution":
+          return Array.isArray(payloadRecord.items);
+        case "doctor-call":
+          return typeof payloadRecord.callOutcome === "string" && Array.isArray(payloadRecord.products);
+        case "trade-call":
+          return typeof payloadRecord.outcome === "string";
+        case "rcpa":
+          return Array.isArray(payloadRecord.lines);
+        case "order":
+          return Array.isArray(payloadRecord.lines);
+        case "daily-review":
+          return payloadRecord.remarks === null || typeof payloadRecord.remarks === "string";
+        case "weekly-submit":
+        case "expense-submit":
+          return payloadRecord.comment === null || typeof payloadRecord.comment === "string";
+        case "leave-submit":
+          return (
+            (payloadRecord.leaveType === "FULL_DAY" || payloadRecord.leaveType === "HALF_DAY") &&
+            typeof payloadRecord.startDate === "string" &&
+            typeof payloadRecord.endDate === "string" &&
+            typeof payloadRecord.reason === "string"
+          );
+        case "expense-save":
+          return typeof payloadRecord.currencyCode === "string" && Array.isArray(payloadRecord.lines);
+        default:
+          return false;
+      }
+    })();
+
+    if (invalidTarget || !validPayload) {
+      await deadLetterSyncItem(item, "Stored sync item is malformed and requires user attention.");
+      await clearPendingMutationIfOperation(item.scope, item.operationId);
+      return "DEAD";
+    }
+
     try {
       switch (item.action) {
         case "distribution": {
