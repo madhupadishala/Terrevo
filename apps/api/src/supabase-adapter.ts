@@ -11,6 +11,7 @@ import type { Dcr, DcrSummary, DoctorCall, DoctorCallRepository } from "../../..
 import type { InventoryBalance, InventoryRepository, VisitDistribution } from "../../../modules/inventory/src/index.ts";
 import type { SubmitTourRepository, SubmitTourResult } from "../../../modules/tour-submit/src/index.ts";
 import type { DailyTimesheet, DailyTimesheetRepository } from "../../../modules/timesheet-daily/src/index.ts";
+import type { WeeklyTimesheet, WeeklyTimesheetRepository } from "../../../modules/timesheet-weekly/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -132,6 +133,7 @@ export function createSupabaseAdapter(
   inventory: InventoryRepository;
   tourSubmit: SubmitTourRepository;
   dailyTimesheets: DailyTimesheetRepository;
+  weeklyTimesheets: WeeklyTimesheetRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -851,5 +853,52 @@ export function createSupabaseAdapter(
     },
   };
 
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets };
+  const mapWeekly=(row:Record<string,any>):WeeklyTimesheet=>{
+    const employee=Array.isArray(row.employees)?row.employees[0]:row.employees;
+    return {
+      id:row.id,employeeId:row.employee_id,orgUnitId:employee?.org_unit_id??"",
+      weekStart:row.week_start,status:row.status,dailyCount:row.daily_count,totalMinutes:row.total_minutes,
+      visitMinutes:row.visit_minutes,unclassifiedMinutes:row.unclassified_minutes,callCount:row.call_count,
+      submissionComment:row.submission_comment,submittedAt:row.submitted_at,
+      reviewComment:row.review_comment,reviewedAt:row.reviewed_at,
+    };
+  };
+  const weeklyTimesheets:WeeklyTimesheetRepository={
+    async listVisible(tenantId,accessToken){
+      const q=new URLSearchParams({select:"*,employees!inner(org_unit_id)",tenant_id:`eq.${tenantId}`,order:"week_start.desc"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/weekly_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
+      return (await r.json() as Array<Record<string,any>>).map(mapWeekly);
+    },
+    async listPending(tenantId,accessToken){
+      const q=new URLSearchParams({select:"*,employees!inner(org_unit_id)",tenant_id:`eq.${tenantId}`,status:"eq.SUBMITTED",order:"submitted_at.asc"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/weekly_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
+      return (await r.json() as Array<Record<string,any>>).map(mapWeekly);
+    },
+    async getVisible(tenantId,id,accessToken){
+      const q=new URLSearchParams({select:"*,employees!inner(org_unit_id)",tenant_id:`eq.${tenantId}`,id:`eq.${id}`,limit:"1"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/weekly_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
+      const row=(await r.json() as Array<Record<string,any>>)[0];return row?mapWeekly(row):null;
+    },
+    async generate(tenantId,userId,week){
+      const r=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_generate_weekly_timesheet`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:tenantId,p_user_id:userId,p_week_start:week}),
+      }));return await r.json() as string;
+    },
+    async submit(tenantId,userId,id,input){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_submit_weekly_timesheet`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_user_id:userId,p_timesheet_id:id,p_operation_id:input.operationId,p_comment:input.comment,
+        }),
+      }));
+    },
+    async decide(tenantId,actor,id,decision,comment){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_decide_weekly_timesheet`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_actor_user_id:actor,p_timesheet_id:id,p_decision:decision,p_comment:comment,
+        }),
+      }));
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets };
 }

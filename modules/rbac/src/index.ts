@@ -14,6 +14,8 @@ export const PERMISSION_KEYS = [
   "INVENTORY_VIEW_OWN",
   "INVENTORY_VIEW_TEAM",
   "INVENTORY_MANAGE",
+  "TIMESHEET_VIEW_TEAM",
+  "TIMESHEET_APPROVE",
 ] as const;
 export type PermissionKey = typeof PERMISSION_KEYS[number];
 
