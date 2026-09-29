@@ -42,7 +42,6 @@ export async function getOrCreatePendingMutation<T>(
   scope: string,
   createPayload: () => Promise<T>,
 ): Promise<PendingMutation<T>> {
-  const key = storageKey(scope);
   const existing = await loadPendingMutation<T>(scope);
   if (existing) return existing;
 
