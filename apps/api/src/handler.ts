@@ -22,6 +22,7 @@ import { createJointWorkService, JointWorkConflictError, JointWorkInputError, Jo
 import { createManagerCommandService } from "../../../modules/manager-command/src/index.ts";
 import { AnalyticsInputError, createAnalyticsService } from "../../../modules/analytics/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
+import { readBoundedJsonObject, RequestBodyError } from "../../../modules/security/src/index.ts";
 
 export type ApiEnv = {
   SUPABASE_URL?: string;
@@ -54,17 +55,7 @@ function json(status: number, body: unknown): Response {
 
 /** Parses a bounded JSON object request body and rejects non-object payloads. */
 async function readJsonObject(request: Request, maxBytes = 8_192): Promise<Record<string, unknown>> {
-  const contentLength = Number(request.headers.get("content-length") ?? "0");
-  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
-    throw new ApiError(413, "Request body too large");
-  }
-  try {
-    const value = await request.json();
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("not object");
-    return value as Record<string, unknown>;
-  } catch {
-    throw new ApiError(400, "Invalid JSON body");
-  }
+  return readBoundedJsonObject(request, maxBytes);
 }
 
 /** Resolves the supported Supabase environment aliases into one provider configuration. */
@@ -83,7 +74,7 @@ function requireConfig(env: ApiEnv): SupabaseConfig {
 
 /** Maps domain and provider failures to stable public API responses. */
 function mapError(error: unknown): Response {
-  if (error instanceof ApiError) return json(error.status, { error: error.message });
+  if (error instanceof ApiError || error instanceof RequestBodyError) return json(error.status, { error: error.message });
   if (error instanceof AuthInputError) {
     const status = error.message.includes("Authorization header") ? 401 : 400;
     return json(status, { error: error.message });
