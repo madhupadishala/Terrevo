@@ -1,4 +1,4 @@
-import type { AuthSession, DailyTimesheet, DistributionLine, DoctorCall, DoctorCallProductInput, FieldMasterKind, InventoryBalance, MasterItem, OrderLine, RcpaLine, RcpaReport, SalesOrder, StartTourOption, SubmitTourResult, Tenant, TourProgress, TradeCall, Visit, VisitDistribution, WeeklyTimesheet } from "./types";
+import type { AttendanceRow, AuthSession, DailyTimesheet, DistributionLine, DoctorCall, DoctorCallProductInput, ExpenseClaim, ExpenseLine, FieldMasterKind, InventoryBalance, JointWork, LeaveRequest, MasterItem, OrderLine, RcpaLine, RcpaReport, SalesOrder, StartTourOption, SubmitTourResult, Tenant, TourProgress, TradeCall, Visit, VisitDistribution, WeeklyTimesheet } from "./types";
 import type { DepartureIntegrity, PresencePoint } from "./presence";
 
 const API_BASE_URL = (process.env.EXPO_PUBLIC_TERREVO_API_URL ?? "https://terrevo.vercel.app").replace(/\/+$/, "");
@@ -325,6 +325,82 @@ export class TerrevoApi {
     });
     const body = await response.json() as { order: SalesOrder };
     return body.order;
+  }
+
+  async attendance(): Promise<AttendanceRow[]> {
+    const response = await this.request("/v1/attendance");
+    const body = await response.json() as { attendance: AttendanceRow[] };
+    return body.attendance;
+  }
+
+  async leaves(): Promise<LeaveRequest[]> {
+    const response = await this.request("/v1/leaves/own");
+    const body = await response.json() as { leaves: LeaveRequest[] };
+    return body.leaves;
+  }
+
+  async submitLeave(input: { operationId: string; leaveType: "FULL_DAY" | "HALF_DAY"; startDate: string; endDate: string; reason: string }): Promise<LeaveRequest> {
+    const response = await this.request("/v1/leaves", { method: "POST", body: JSON.stringify(input) });
+    const body = await response.json() as { leave: LeaveRequest };
+    return body.leave;
+  }
+
+  async expenses(): Promise<ExpenseClaim[]> {
+    const response = await this.request("/v1/expenses/own");
+    const body = await response.json() as { claims: ExpenseClaim[] };
+    return body.claims;
+  }
+
+  async saveExpense(executionId: string, input: { operationId: string; currencyCode: string; lines: ExpenseLine[] }): Promise<ExpenseClaim> {
+    const response = await this.request(`/v1/executions/${encodeURIComponent(executionId)}/expense`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+    const body = await response.json() as { claim: ExpenseClaim };
+    return body.claim;
+  }
+
+  async submitExpense(claimId: string, input: { operationId: string; comment: string | null }): Promise<ExpenseClaim> {
+    const response = await this.request(`/v1/expenses/${encodeURIComponent(claimId)}/submit`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    const body = await response.json() as { claim: ExpenseClaim };
+    return body.claim;
+  }
+
+  async jointWork(): Promise<JointWork[]> {
+    const response = await this.request("/v1/joint-work/own");
+    const body = await response.json() as { assignments: JointWork[] };
+    return body.assignments;
+  }
+
+  async joinJointWork(id: string, input: { operationId: string; location: PresencePoint }): Promise<JointWork> {
+    const response = await this.request(`/v1/joint-work/${encodeURIComponent(id)}/join`, {
+      method: "POST",
+      body: JSON.stringify({
+        operationId: input.operationId,
+        latitude: input.location.latitude,
+        longitude: input.location.longitude,
+        accuracyMeters: input.location.accuracyMeters,
+      }),
+    });
+    const body = await response.json() as { assignment: JointWork };
+    return body.assignment;
+  }
+
+  async leaveJointWork(id: string, input: { operationId: string; location: PresencePoint }): Promise<JointWork> {
+    const response = await this.request(`/v1/joint-work/${encodeURIComponent(id)}/leave`, {
+      method: "POST",
+      body: JSON.stringify({
+        operationId: input.operationId,
+        latitude: input.location.latitude,
+        longitude: input.location.longitude,
+        accuracyMeters: input.location.accuracyMeters,
+      }),
+    });
+    const body = await response.json() as { assignment: JointWork };
+    return body.assignment;
   }
 
   async recordPresence(visitId: string, input: { operationId: string; samples: PresencePoint[] }): Promise<DepartureIntegrity> {
