@@ -136,10 +136,11 @@ export default function App() {
           api.setTenant(selected);
           await saveTenantId(selected);
           if (selected) {
+            await trySyncPendingQueue(api, storedSession, selected);
             await loadFieldResources(api);
             await refreshField(api);
             await loadWorkRecords(api);
-            await tryResumePendingPresence(api, storedSession, selected);
+            await refreshSyncStatus(storedSession, selected);
           }
         }
       } catch (cause) {
@@ -252,7 +253,7 @@ export default function App() {
   }
 
   async function completePendingMutation(scope: string): Promise<void> {
-    await completePendingMutation(scope);
+    await clearPendingMutation(scope);
     await refreshSyncStatus();
   }
 
@@ -279,7 +280,7 @@ export default function App() {
         await markPendingMutationAttempt(item.scope);
         try {
           await replayPendingMutation(client, item.scope, pending, currentSession.user.id, currentTenantId);
-          await completePendingMutation(item.scope);
+          await clearPendingMutation(item.scope);
           synced += 1;
         } catch (cause) {
           const definitive = isDefinitiveSyncFailure(cause);
@@ -312,6 +313,39 @@ export default function App() {
     if (result.synced > 0) {
       setMessage(`${result.synced} queued field action(s) synced safely.`);
     }
+  }
+
+  async function handleSyncNow(): Promise<void> {
+    await run(async () => {
+      const result = await syncPendingQueue();
+      if (!result.stopped) {
+        try {
+          await Promise.all([refreshField(), loadWorkRecords()]);
+        } catch {
+          // Sync success is authoritative; a follow-up read can be retried separately.
+        }
+      }
+      const remaining = syncItems.filter((item) => item.status === "PENDING").length;
+      setMessage(result.synced > 0
+        ? `${result.synced} queued action(s) synced. ${remaining} may still be pending.`
+        : result.stopped
+          ? "Sync paused because the server or network is unavailable. Queued work is retained."
+          : "No pending queued actions needed replay.");
+    });
+  }
+
+  async function handleRetryDeadLetters(): Promise<void> {
+    await run(async () => {
+      if (!session || !tenantId) throw new Error("Select a company before retrying sync.");
+      const items = await listPendingMutations(session.user.id, tenantId);
+      const dead = items.filter((item) => item.status === "DEAD_LETTER");
+      for (const item of dead) await revivePendingMutation(item.scope);
+      await refreshSyncStatus();
+      const result = await syncPendingQueue();
+      setMessage(result.stopped
+        ? "Failed actions were reopened, but sync paused because the server or network is unavailable."
+        : `${result.synced} recovered action(s) synced after retry.`);
+    });
   }
 
   function syncItemLabel(item: PendingMutationSummary): string {
@@ -478,10 +512,11 @@ export default function App() {
     setTenantId(id);
     api.configure(currentSession, id);
     await saveTenantId(id);
+    await trySyncPendingQueue(api, currentSession, id);
     await loadFieldResources(api);
     await refreshField(api);
     await loadWorkRecords(api);
-    await tryResumePendingPresence(api, currentSession, id);
+    await refreshSyncStatus(currentSession, id);
   }
 
   async function syncPendingPresence(
