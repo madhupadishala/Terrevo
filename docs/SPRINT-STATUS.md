@@ -14,7 +14,7 @@
 | 9 | Doctor Call + DCR | CLOSED |
 | 10 | Samples + Gifts | CLOSED |
 | 11 | Submit Tour | CLOSED |
-| 12 | Daily Timesheet | PLANNED |
+| 12 | Daily Timesheet | CLOSED |
 | 13 | Weekly Timesheet | PLANNED |
 | 14 | Chemist + Stockist Calls | PLANNED |
 | 15 | RCPA | PLANNED |
@@ -29,4 +29,4 @@
 | 24 | Regression + UAT + Closure | PLANNED |
 | 25 | Pilot Release | PLANNED |
 
-Completed through Sprint 11. Next planned sprint: 12 — Daily Timesheet.
+Completed through Sprint 12. Next planned sprint: 13 — Weekly Timesheet.
