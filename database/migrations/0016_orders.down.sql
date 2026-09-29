@@ -1,0 +1,1 @@
+begin;drop function if exists public.admin_save_sales_order(uuid,uuid,uuid,uuid,text,jsonb);drop table if exists public.sales_order_operations;drop table if exists public.sales_order_lines;drop table if exists public.sales_orders;commit;

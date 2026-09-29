@@ -14,6 +14,7 @@ import type { DailyTimesheet, DailyTimesheetRepository } from "../../../modules/
 import type { WeeklyTimesheet, WeeklyTimesheetRepository } from "../../../modules/timesheet-weekly/src/index.ts";
 import type { TradeCall, TradeCallRepository } from "../../../modules/trade-call/src/index.ts";
 import type { RcpaReport, RcpaRepository } from "../../../modules/rcpa/src/index.ts";
+import type { OrderRepository, SalesOrder } from "../../../modules/orders/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -138,6 +139,7 @@ export function createSupabaseAdapter(
   weeklyTimesheets: WeeklyTimesheetRepository;
   tradeCalls: TradeCallRepository;
   rcpa: RcpaRepository;
+  orders: OrderRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -932,5 +934,6 @@ export function createSupabaseAdapter(
       return{id:row.id,visitId:row.visit_id,chemistId:row.chemist_id,updatedAt:row.updated_at,lines:(await lr.json() as Array<Record<string,any>>).map(x=>({sequence:x.sequence_no,productId:x.product_id,competitorBrand:x.competitor_brand,prescriptionCount:x.prescription_count,stockQuantity:x.stock_quantity,salesQuantity:x.sales_quantity}))} as RcpaReport;
     },
   };
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa };
+  const orders:OrderRepository={async save(t,u,v,input){const r=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_save_sales_order`,{method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_user_id:u,p_visit_id:v,p_operation_id:input.operationId,p_remarks:input.remarks,p_lines:input.lines})}));return await r.json() as string;},async getByVisit(t,v,token){const q=new URLSearchParams({select:"*",tenant_id:`eq.${t}`,visit_id:`eq.${v}`,limit:"1"});const r=await expectOk(await fetcher(`${base}/rest/v1/sales_orders?${q}`,{headers:authHeaders(config,token)}));const row=(await r.json() as Array<Record<string,any>>)[0];if(!row)return null;const lq=new URLSearchParams({select:"sequence_no,product_id,product_code,product_name,quantity,remarks",tenant_id:`eq.${t}`,sales_order_id:`eq.${row.id}`,order:"sequence_no.asc"});const lr=await expectOk(await fetcher(`${base}/rest/v1/sales_order_lines?${lq}`,{headers:authHeaders(config,token)}));return{id:row.id,visitId:row.visit_id,customerType:row.customer_type,customerId:row.chemist_id??row.stockist_id,customerCode:row.customer_code,customerName:row.customer_name,status:row.status,updatedAt:row.updated_at,lines:(await lr.json() as Array<Record<string,any>>).map(x=>({sequence:x.sequence_no,productId:x.product_id,productCode:x.product_code,productName:x.product_name,quantity:x.quantity,remarks:x.remarks}))} as SalesOrder;}};
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders };
 }
