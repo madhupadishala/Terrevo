@@ -10,6 +10,7 @@ import type { FieldSettings, Visit, VisitRepository } from "../../../modules/vis
 import type { Dcr, DcrSummary, DoctorCall, DoctorCallRepository } from "../../../modules/doctor-call/src/index.ts";
 import type { InventoryBalance, InventoryRepository, VisitDistribution } from "../../../modules/inventory/src/index.ts";
 import type { SubmitTourRepository, SubmitTourResult } from "../../../modules/tour-submit/src/index.ts";
+import type { DailyTimesheet, DailyTimesheetRepository } from "../../../modules/timesheet-daily/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -130,6 +131,7 @@ export function createSupabaseAdapter(
   doctorCalls: DoctorCallRepository;
   inventory: InventoryRepository;
   tourSubmit: SubmitTourRepository;
+  dailyTimesheets: DailyTimesheetRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -822,5 +824,32 @@ export function createSupabaseAdapter(
     },
   };
 
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit };
+  const mapDailyTimesheet=(row:Record<string,any>):DailyTimesheet=>({
+    id:row.id,executionId:row.execution_id,workDate:row.work_date,
+    startedAt:row.started_at,submittedAt:row.submitted_at,totalMinutes:row.total_minutes,
+    visitMinutes:row.visit_minutes,unclassifiedMinutes:row.unclassified_minutes,
+    callCount:row.call_count,status:row.status,remarks:row.remarks,reviewedAt:row.reviewed_at,
+  });
+  const dailyTimesheets:DailyTimesheetRepository={
+    async listOwn(tenantId,accessToken){
+      const q=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,order:"work_date.desc"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/daily_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
+      return (await r.json() as Array<Record<string,any>>).map(mapDailyTimesheet);
+    },
+    async getOwn(tenantId,id,accessToken){
+      const q=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,id:`eq.${id}`,limit:"1"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/daily_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
+      const row=(await r.json() as Array<Record<string,any>>)[0];
+      return row?mapDailyTimesheet(row):null;
+    },
+    async review(tenantId,userId,id,input){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_review_daily_timesheet`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_user_id:userId,p_timesheet_id:id,p_operation_id:input.operationId,p_remarks:input.remarks,
+        }),
+      }));
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets };
 }

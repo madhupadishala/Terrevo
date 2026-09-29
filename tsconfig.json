@@ -24,6 +24,7 @@
     "modules/visit-execution/src/**/*.ts",
     "modules/doctor-call/src/**/*.ts",
     "modules/inventory/src/**/*.ts",
-    "modules/tour-submit/src/**/*.ts"
+    "modules/tour-submit/src/**/*.ts",
+    "modules/timesheet-daily/src/**/*.ts"
   ]
 }
