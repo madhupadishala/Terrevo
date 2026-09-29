@@ -115,3 +115,36 @@ export type SubmitTourResult = {
   workedMinutes: number;
   shortDayReason: string | null;
 };
+
+
+export type DailyTimesheet = {
+  id: string;
+  executionId: string;
+  workDate: string;
+  startedAt: string;
+  submittedAt: string;
+  totalMinutes: number;
+  visitMinutes: number;
+  unclassifiedMinutes: number;
+  callCount: number;
+  status: "GENERATED" | "REVIEWED";
+  remarks: string | null;
+  reviewedAt: string | null;
+};
+
+export type WeeklyTimesheet = {
+  id: string;
+  employeeId: string;
+  orgUnitId: string;
+  weekStart: string;
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "RETURNED";
+  dailyCount: number;
+  totalMinutes: number;
+  visitMinutes: number;
+  unclassifiedMinutes: number;
+  callCount: number;
+  submissionComment: string | null;
+  submittedAt: string | null;
+  reviewComment: string | null;
+  reviewedAt: string | null;
+};
