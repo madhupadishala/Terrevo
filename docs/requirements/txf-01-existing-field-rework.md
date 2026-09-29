@@ -10,3 +10,4 @@ Status: ACTIVE
 - **TRV-TXF-006** — Sample/gift entry shall display authoritative available balance and a non-authoritative projected post-call balance before submission.
 - **TRV-TXF-007** — Existing GPS, tenant isolation, DCR snapshot, inventory ledger and retry/idempotency controls shall remain unchanged.
 - **TRV-TXF-008** — No new dependency, backend API contract or database migration is permitted for this rework.
+- **TRV-TXF-009** — The MR mobile experience shall read only the authenticated employee's weekly timesheets even when the account also has team-view permissions; team-visible weekly records remain available through manager workflows.
