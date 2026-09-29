@@ -19,7 +19,7 @@ function storageKey(scope: string): string {
   return PREFIX + scope.replace(/[^A-Za-z0-9._-]/g, "_");
 }
 
-async function loadPendingMutation<T>(scope: string): Promise<PendingMutation<T> | null> {
+export async function loadPendingMutation<T>(scope: string): Promise<PendingMutation<T> | null> {
   const raw = await SecureStore.getItemAsync(storageKey(scope));
   if (!raw) return null;
   try {
