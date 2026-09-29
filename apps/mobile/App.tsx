@@ -215,6 +215,7 @@ export default function App() {
     analyticsDaysRef.current = 7;
     setAnalyticsDays(7);
     setSyncItems([]);
+    setSyncing(false);
     setDeparture(null);
     setDepartureSamples(0);
   }
@@ -1212,6 +1213,7 @@ export default function App() {
   const latestExpense = expenses[0] ?? null;
   const expenseExecutionId = progress?.executionId ?? latestDaily?.executionId ?? null;
   const recentJointWork = jointWork.slice(0, 5);
+  const syncSummary = summarizeSyncQueue(syncItems);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -1226,6 +1228,38 @@ export default function App() {
 
         {error ? <Notice text={error} error /> : null}
         {message ? <Notice text={message} /> : null}
+
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>SYNC STATUS</Text>
+          {syncItems.length === 0 ? (
+            <>
+              <Text style={styles.cardTitle}>All retry-safe writes are synced</Text>
+              <Text style={styles.muted}>Server-authoritative GPS/time actions still require a live server response before the field workflow advances.</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.cardTitle}>{syncItems.length} unsynced item(s) on this device</Text>
+              <Text style={styles.small}>Waiting {syncSummary.waiting} · Retry original action {syncSummary.manual} · Needs attention {syncSummary.needsAttention}</Text>
+              {syncItems.slice(0, 6).map((item) => (
+                <View key={item.scope} style={styles.choiceRow}>
+                  <Text style={styles.choiceText}>{item.action.replaceAll("-", " ")}</Text>
+                  <Text style={styles.small}>
+                    {item.state === "DEAD_LETTER"
+                      ? "Needs attention"
+                      : item.mode === "MANUAL" ? "Retry from the original field action" : "Queued for safe replay"}
+                  </Text>
+                  {item.lastError ? <Text style={styles.small}>{item.lastError}</Text> : null}
+                  {item.state === "DEAD_LETTER" ? (
+                    <Pressable onPress={() => void handleDismissDeadLetter(item)}>
+                      <Text style={styles.link}>Dismiss after correction</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ))}
+              <PrimaryButton label={syncing ? "Syncing…" : "Sync Now"} disabled={busy || syncing} onPress={() => void handleSyncNow()} />
+            </>
+          )}
+        </View>
 
         {managerCommand ? (
           <View style={styles.card}>
