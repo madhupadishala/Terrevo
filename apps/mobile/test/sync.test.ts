@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isDefinitiveSyncFailure, parseSyncOperation, shouldStopSyncAfterFailure } from "../src/sync.ts";
+import { isAutoReplaySafe, isDefinitiveSyncFailure, parseSyncOperation, shouldStopSyncAfterFailure } from "../src/sync.ts";
 
 test("sync scope parsing remains identity scoped", () => {
   assert.deepEqual(parseSyncOperation("tenant-a.user-a.order.visit-1", "user-a", "tenant-a"), {
@@ -24,4 +24,15 @@ test("sync failure policy distinguishes definitive business failures from retrya
   assert.equal(shouldStopSyncAfterFailure({ status: 429 }), true);
   assert.equal(shouldStopSyncAfterFailure({ status: 503 }), true);
   assert.equal(shouldStopSyncAfterFailure(new TypeError("network")), true);
+});
+
+test("automatic replay excludes stale GPS and server-time actions", () => {
+  assert.equal(isAutoReplaySafe("doctor-call"), true);
+  assert.equal(isAutoReplaySafe("order"), true);
+  assert.equal(isAutoReplaySafe("expense-submit"), true);
+  assert.equal(isAutoReplaySafe("start"), false);
+  assert.equal(isAutoReplaySafe("check-in"), false);
+  assert.equal(isAutoReplaySafe("submit-tour"), false);
+  assert.equal(isAutoReplaySafe("joint-work-join"), false);
+  assert.equal(isAutoReplaySafe("check-out"), false);
 });
