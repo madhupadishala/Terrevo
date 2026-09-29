@@ -1,4 +1,4 @@
-import type { DistributionLine, DoctorCallProductInput, InventoryBalance } from "./types";
+import type { DistributionLine, DoctorCallProductInput, InventoryBalance, OrderLine, RcpaLine } from "./types";
 
 export function buildDoctorProducts(productIds: string[]): DoctorCallProductInput[] {
   const unique = [...new Set(productIds)];
@@ -50,4 +50,67 @@ export function weekStartFromDate(value: string): string {
   const offset = (date.getUTCDay() + 6) % 7;
   date.setUTCDate(date.getUTCDate() - offset);
   return date.toISOString().slice(0, 10);
+}
+
+function positiveWhole(raw: string | undefined, label: string): number {
+  const value = raw?.trim() ?? "";
+  if (!/^[1-9]\d*$/.test(value)) throw new Error(`${label} must be a positive whole number.`);
+  return Number(value);
+}
+
+function observedWhole(raw: string | undefined, label: string): number {
+  const value = raw?.trim() ?? "";
+  if (!value) return 0;
+  if (!/^\d+$/.test(value)) throw new Error(`${label} must be a whole number.`);
+  return Number(value);
+}
+
+export function buildOrderLines(productIds: string[], quantities: Record<string, string>): OrderLine[] {
+  const unique = [...new Set(productIds)];
+  if (unique.length > 50) throw new Error("Select no more than 50 order products.");
+  return unique.map((productId, index) => ({
+    sequence: index + 1,
+    productId,
+    quantity: positiveWhole(quantities[productId], "Order quantity"),
+    remarks: null,
+  }));
+}
+
+export type RcpaCompetitorDraft = {
+  brand: string;
+  prescriptionCount: string;
+  stockQuantity: string;
+  salesQuantity: string;
+};
+
+export function buildRcpaLines(
+  productIds: string[],
+  observations: Record<string, { prescriptionCount?: string; stockQuantity?: string; salesQuantity?: string }>,
+  competitors: RcpaCompetitorDraft[],
+): RcpaLine[] {
+  const unique = [...new Set(productIds)];
+  if (unique.length + competitors.length > 50) throw new Error("RCPA supports up to 50 unique items.");
+  const result: RcpaLine[] = [];
+  for (const productId of unique) {
+    const raw = observations[productId] ?? {};
+    const prescriptionCount = observedWhole(raw.prescriptionCount, "Prescription count");
+    const stockQuantity = observedWhole(raw.stockQuantity, "Stock quantity");
+    const salesQuantity = observedWhole(raw.salesQuantity, "Sales quantity");
+    if (prescriptionCount + stockQuantity + salesQuantity === 0) throw new Error("Each selected RCPA product needs at least one observed quantity.");
+    result.push({ sequence: result.length + 1, productId, competitorBrand: null, prescriptionCount, stockQuantity, salesQuantity });
+  }
+  const seen = new Set<string>();
+  for (const draft of competitors) {
+    const brand = draft.brand.trim();
+    if (!brand) throw new Error("Competitor brand is required.");
+    const key = brand.toLowerCase();
+    if (seen.has(key)) throw new Error("Duplicate competitor brand.");
+    seen.add(key);
+    const prescriptionCount = observedWhole(draft.prescriptionCount, "Prescription count");
+    const stockQuantity = observedWhole(draft.stockQuantity, "Stock quantity");
+    const salesQuantity = observedWhole(draft.salesQuantity, "Sales quantity");
+    if (prescriptionCount + stockQuantity + salesQuantity === 0) throw new Error("Each competitor RCPA line needs at least one observed quantity.");
+    result.push({ sequence: result.length + 1, productId: null, competitorBrand: brand, prescriptionCount, stockQuantity, salesQuantity });
+  }
+  return result;
 }
