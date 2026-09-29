@@ -19,7 +19,7 @@
 | 14 | Chemist + Stockist Calls | CLOSED |
 | 15 | RCPA | CLOSED |
 | 16 | POB / Orders | CLOSED |
-| 17 | Attendance + Leave | PLANNED |
+| 17 | Attendance + Leave | CLOSED |
 | 18 | Expenses | PLANNED |
 | 19 | Joint Field Work | PLANNED |
 | 20 | Manager Command Center | PLANNED |
@@ -29,4 +29,4 @@
 | 24 | Regression + UAT + Closure | PLANNED |
 | 25 | Pilot Release | PLANNED |
 
-Completed through Sprint 16. Next planned sprint: 17 — Attendance + Leave.
+Completed through Sprint 17. Next planned sprint: 18 — Expenses.

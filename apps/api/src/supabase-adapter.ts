@@ -15,6 +15,7 @@ import type { WeeklyTimesheet, WeeklyTimesheetRepository } from "../../../module
 import type { TradeCall, TradeCallRepository } from "../../../modules/trade-call/src/index.ts";
 import type { RcpaReport, RcpaRepository } from "../../../modules/rcpa/src/index.ts";
 import type { OrderRepository, SalesOrder } from "../../../modules/orders/src/index.ts";
+import type { AttendanceLeaveRepository, AttendanceRow, LeaveRequest } from "../../../modules/attendance-leave/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -140,6 +141,7 @@ export function createSupabaseAdapter(
   tradeCalls: TradeCallRepository;
   rcpa: RcpaRepository;
   orders: OrderRepository;
+  attendanceLeave: AttendanceLeaveRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -935,5 +937,13 @@ export function createSupabaseAdapter(
     },
   };
   const orders:OrderRepository={async save(t,u,v,input){const r=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_save_sales_order`,{method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_user_id:u,p_visit_id:v,p_operation_id:input.operationId,p_remarks:input.remarks,p_lines:input.lines})}));return await r.json() as string;},async getByVisit(t,v,token){const q=new URLSearchParams({select:"*",tenant_id:`eq.${t}`,visit_id:`eq.${v}`,limit:"1"});const r=await expectOk(await fetcher(`${base}/rest/v1/sales_orders?${q}`,{headers:authHeaders(config,token)}));const row=(await r.json() as Array<Record<string,any>>)[0];if(!row)return null;const lq=new URLSearchParams({select:"sequence_no,product_id,product_code,product_name,quantity,remarks",tenant_id:`eq.${t}`,sales_order_id:`eq.${row.id}`,order:"sequence_no.asc"});const lr=await expectOk(await fetcher(`${base}/rest/v1/sales_order_lines?${lq}`,{headers:authHeaders(config,token)}));return{id:row.id,visitId:row.visit_id,customerType:row.customer_type,customerId:row.chemist_id??row.stockist_id,customerCode:row.customer_code,customerName:row.customer_name,status:row.status,updatedAt:row.updated_at,lines:(await lr.json() as Array<Record<string,any>>).map(x=>({sequence:x.sequence_no,productId:x.product_id,productCode:x.product_code,productName:x.product_name,quantity:x.quantity,remarks:x.remarks}))} as SalesOrder;}};
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders };
+  const mapLeave=(row:Record<string,any>):LeaveRequest=>{const e=Array.isArray(row.employees)?row.employees[0]:row.employees;return{id:row.id,employeeId:row.employee_id,orgUnitId:e?.org_unit_id??"",leaveType:row.leave_type,startDate:row.start_date,endDate:row.end_date,reason:row.reason,status:row.status,managerComment:row.manager_comment,reviewedAt:row.reviewed_at}};
+  const attendanceLeave:AttendanceLeaveRepository={
+    async listAttendance(t,token){const r=await expectOk(await fetcher(`${base}/rest/v1/rpc/my_attendance`,{method:"POST",headers:authHeaders(config,token),body:JSON.stringify({p_tenant_id:t})}));return await r.json() as AttendanceRow[];},
+    async listVisibleLeaves(t,token,pending=false){const q=new URLSearchParams({select:"*,employees!inner(org_unit_id)",tenant_id:`eq.${t}`,order:"start_date.desc"});if(pending)q.set("status","eq.SUBMITTED");const r=await expectOk(await fetcher(`${base}/rest/v1/leave_requests?${q}`,{headers:authHeaders(config,token)}));return(await r.json() as Array<Record<string,any>>).map(mapLeave);},
+    async getLeave(t,id,token){const q=new URLSearchParams({select:"*,employees!inner(org_unit_id)",tenant_id:`eq.${t}`,id:`eq.${id}`,limit:"1"});const r=await expectOk(await fetcher(`${base}/rest/v1/leave_requests?${q}`,{headers:authHeaders(config,token)}));const row=(await r.json() as Array<Record<string,any>>)[0];return row?mapLeave(row):null;},
+    async submitLeave(t,u,input){const r=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_submit_leave`,{method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_user_id:u,p_operation_id:input.operationId,p_leave_type:input.leaveType,p_start:input.startDate,p_end:input.endDate,p_reason:input.reason})}));return await r.json() as string;},
+    async decideLeave(t,a,id,d,c){await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_decide_leave`,{method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_actor:a,p_leave_id:id,p_decision:d,p_comment:c})}));},
+  };
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders, attendanceLeave };
 }
