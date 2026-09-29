@@ -28,6 +28,7 @@ export type PendingPresence<T> = {
 const PREFIX = "terrevo.pending.";
 const INDEX_PREFIX = "terrevo.pending.index.v2.";
 const PRESENCE_KEY = "terrevo.pending.presence.v1";
+const indexLocks = new Map<string, Promise<void>>();
 
 function storageKey(scope: string): string {
   return PREFIX + scope.replace(/[^A-Za-z0-9._-]/g, "_");
@@ -66,20 +67,37 @@ async function saveIndex(userId: string, tenantId: string, scopes: string[]): Pr
   });
 }
 
+async function withIndexLock(key: string, action: () => Promise<void>): Promise<void> {
+  const prior = indexLocks.get(key) ?? Promise.resolve();
+  const next = prior.then(action, action);
+  indexLocks.set(key, next.catch(() => {}));
+  try {
+    await next;
+  } finally {
+    if (indexLocks.get(key) === next) indexLocks.delete(key);
+  }
+}
+
 async function registerScope(scope: string): Promise<void> {
   const identity = scopeIdentity(scope);
   if (!identity) return;
-  const scopes = await loadIndex(identity.userId, identity.tenantId);
-  if (scopes.includes(scope)) return;
-  await saveIndex(identity.userId, identity.tenantId, [...scopes, scope]);
+  const key = indexKey(identity.userId, identity.tenantId);
+  await withIndexLock(key, async () => {
+    const scopes = await loadIndex(identity.userId, identity.tenantId);
+    if (scopes.includes(scope)) return;
+    await saveIndex(identity.userId, identity.tenantId, [...scopes, scope]);
+  });
 }
 
 async function unregisterScope(scope: string): Promise<void> {
   const identity = scopeIdentity(scope);
   if (!identity) return;
-  const scopes = await loadIndex(identity.userId, identity.tenantId);
-  if (!scopes.includes(scope)) return;
-  await saveIndex(identity.userId, identity.tenantId, scopes.filter((item) => item !== scope));
+  const key = indexKey(identity.userId, identity.tenantId);
+  await withIndexLock(key, async () => {
+    const scopes = await loadIndex(identity.userId, identity.tenantId);
+    if (!scopes.includes(scope)) return;
+    await saveIndex(identity.userId, identity.tenantId, scopes.filter((item) => item !== scope));
+  });
 }
 
 function normalizePending<T>(value: unknown): PendingMutation<T> | null {
@@ -130,7 +148,7 @@ export async function getOrCreatePendingMutation<T>(
 ): Promise<PendingMutation<T>> {
   const existing = await loadPendingMutation<T>(scope);
   const now = new Date().toISOString();
-  if (existing) {
+  if (existing && existing.status !== "DEAD_LETTER") {
     const retry: PendingMutation<T> = {
       ...existing,
       attempts: existing.attempts + 1,
@@ -140,6 +158,10 @@ export async function getOrCreatePendingMutation<T>(
     };
     await savePendingMutation(scope, retry);
     return retry;
+  }
+  if (existing?.status === "DEAD_LETTER") {
+    // A foreground resubmission is a corrected user action, not a replay of rejected data.
+    await clearPendingMutation(scope);
   }
 
   const pending: PendingMutation<T> = {
