@@ -44,6 +44,7 @@ class ApiError extends Error {
   }
 }
 
+/** Returns a no-store JSON response for API contracts. */
 function json(status: number, body: unknown): Response {
   return Response.json(body, {
     status,
@@ -51,6 +52,7 @@ function json(status: number, body: unknown): Response {
   });
 }
 
+/** Parses a bounded JSON object request body and rejects non-object payloads. */
 async function readJsonObject(request: Request, maxBytes = 8_192): Promise<Record<string, unknown>> {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(contentLength) && contentLength > maxBytes) {
@@ -65,6 +67,7 @@ async function readJsonObject(request: Request, maxBytes = 8_192): Promise<Recor
   }
 }
 
+/** Resolves the supported Supabase environment aliases into one provider configuration. */
 function requireConfig(env: ApiEnv): SupabaseConfig {
   const publishableKey = env.SUPABASE_PUBLISHABLE_KEY ?? env.SUPABASE_ANON_KEY;
   const secretKey = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
