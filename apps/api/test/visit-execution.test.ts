@@ -22,7 +22,7 @@ test("TRV-VIS-001 check-in confirms created visit",async()=>{
  const service=createVisitService({
   getSettings:async()=>({geofenceRadiusMeters:100,maxGpsAccuracyMeters:50}),updateSettings:async()=>{},
   checkIn:async()=>{writes++;return visitId},getOpen:async()=>visit,getById:async()=>visit,
-  checkOut:async()=>{},listPendingExceptions:async()=>[],decideException:async()=>{},
+  checkOut:async()=>{},recordDeparture:async()=>visitId,getPresence:async()=>null,listPendingExceptions:async()=>[],decideException:async()=>{},
  },rbac());
  const result=await service.checkIn(tenant,user,"token",{operationId:op,planStopId:stopId,latitude:17,longitude:78,accuracyMeters:15});
  assert.equal(result.id,visitId);assert.equal(writes,1);
@@ -35,4 +35,48 @@ test("TRV-VIS-008 GPS exception review requires pending visible visit",async()=>
   listPendingExceptions:async()=>[],decideException:async()=>{},
  },rbac());
  await assert.rejects(service.decideException(tenant,user,"token",visitId,{decision:"APPROVE"}),VisitNotFoundError);
+});
+
+
+test("TRV-PRES-010 records 3+ departure samples and confirms server result",async()=>{
+ const closed={id:visitId,executionId:"e",planStopId:stopId,territoryId:territory,status:"CHECKED_OUT" as const,verification:"VERIFIED" as const,exceptionStatus:"NOT_REQUIRED" as const,distanceMeters:20,geofenceRadiusMeters:100,checkinAt:"x",checkoutAt:"2026-09-29T11:00:00Z"};
+ const presence={
+  id:"77777777-7777-4777-8777-777777777777",visitId,executionId:"e",status:"CONSISTENT" as const,
+  sampleCount:3,totalDistanceMeters:42,maxSegmentSpeedKph:18,mockedDetected:false,
+  reason:"consistent",deviceId:"device",serverDelaySeconds:120,recordedAt:"2026-09-29T11:02:00Z",
+  samples:[],
+ };
+ let recorded:any=null;
+ const service=createVisitService({
+  getSettings:async()=>({geofenceRadiusMeters:100,maxGpsAccuracyMeters:50}),updateSettings:async()=>{},
+  checkIn:async()=>visitId,getOpen:async()=>null,getById:async()=>closed,checkOut:async()=>{},
+  recordDeparture:async(_t,_u,_v,input)=>{recorded=input;return presence.id},
+  getPresence:async()=>presence,listPendingExceptions:async()=>[],decideException:async()=>{},
+ },rbac());
+ const result=await service.recordDeparture(tenant,user,"token",visitId,{
+  operationId:op,
+  samples:[
+   {capturedAt:"2026-09-29T11:00:20Z",latitude:17,longitude:78,accuracyMeters:8,mocked:false},
+   {capturedAt:"2026-09-29T11:00:50Z",latitude:17.0001,longitude:78.0001,accuracyMeters:9,mocked:false},
+   {capturedAt:"2026-09-29T11:01:20Z",latitude:17.0002,longitude:78.0002,accuracyMeters:10,mocked:false},
+  ],
+ });
+ assert.equal(result.status,"CONSISTENT");
+ assert.equal(recorded.samples.length,3);
+});
+
+test("TRV-PRES-010 rejects too few departure samples",async()=>{
+ const closed={id:visitId,executionId:"e",planStopId:stopId,territoryId:territory,status:"CHECKED_OUT" as const,verification:"VERIFIED" as const,exceptionStatus:"NOT_REQUIRED" as const,distanceMeters:20,geofenceRadiusMeters:100,checkinAt:"x",checkoutAt:"2026-09-29T11:00:00Z"};
+ const service=createVisitService({
+  getSettings:async()=>({geofenceRadiusMeters:100,maxGpsAccuracyMeters:50}),updateSettings:async()=>{},
+  checkIn:async()=>visitId,getOpen:async()=>null,getById:async()=>closed,checkOut:async()=>{},
+  recordDeparture:async()=>visitId,getPresence:async()=>null,listPendingExceptions:async()=>[],decideException:async()=>{},
+ },rbac());
+ await assert.rejects(service.recordDeparture(tenant,user,"token",visitId,{
+  operationId:op,
+  samples:[
+   {capturedAt:"2026-09-29T11:00:20Z",latitude:17,longitude:78,accuracyMeters:8,mocked:false},
+   {capturedAt:"2026-09-29T11:00:50Z",latitude:17.0001,longitude:78.0001,accuracyMeters:9,mocked:false},
+  ],
+ }),VisitInputError);
 });

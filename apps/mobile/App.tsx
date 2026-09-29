@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { ApiError, TerrevoApi } from "./src/api";
 import { captureFreshLocation, collectDepartureSamples } from "./src/location";
-import { evaluateDeparture, type DepartureIntegrity } from "./src/presence";
+import type { DepartureIntegrity } from "./src/presence";
 import { clearPendingMutation, getOrCreatePendingMutation } from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
 import type { AuthSession, StartTourOption, Tenant, TourProgress, TourStop, Visit } from "./src/types";
@@ -250,13 +250,25 @@ export default function App() {
       setMessage("Check-out recorded. Keep Terrevo open while departure continuity is observed for about 2 minutes.");
 
       const samples = await collectDepartureSamples((_point, count) => setDepartureSamples(count));
-      const result = evaluateDeparture(checkoutLocation, samples);
+      const presenceScope = `presence.${visit.id}`;
+      const pendingPresence = await getOrCreatePendingMutation(presenceScope, async () => ({ samples }));
+      let result: DepartureIntegrity;
+      try {
+        result = await api.recordPresence(visit.id, {
+          operationId: pendingPresence.operationId,
+          samples: pendingPresence.payload.samples,
+        });
+        await clearPendingMutation(presenceScope);
+      } catch (cause) {
+        await clearPendingOnDefinitiveFailure(presenceScope, cause);
+        throw cause;
+      }
       setDeparture(result);
       setMessage(result.status === "CONSISTENT"
-        ? "Check-out complete. Departure movement is physically consistent."
+        ? "Check-out complete. Server presence verification is consistent."
         : result.status === "SPOOF_SUSPECTED"
-          ? "Check-out retained, but location integrity requires investigation."
-          : "Check-out complete. Departure movement requires review.");
+          ? "Check-out retained, but server presence verification detected suspicious location evidence."
+          : "Check-out complete. Server presence verification requires review.");
     } catch (cause) {
       if (checkoutRecorded) {
         setMessage("Check-out is already recorded. Departure continuity could not complete, so no continuity conclusion was made.");
@@ -401,7 +413,7 @@ export default function App() {
         ) : null}
 
         <View style={styles.privacy}>
-          <Text style={styles.small}>Presence verification uses fresh GPS only around field actions. Departure continuity observes four samples for about two minutes after check-out. This build does not perform 24/7 tracking.</Text>
+          <Text style={styles.small}>Presence verification uses fresh GPS only around field actions. Departure continuity observes four samples for about two minutes after check-out and the server derives the integrity result. This build does not perform 24/7 tracking.</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

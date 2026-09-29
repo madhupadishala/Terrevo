@@ -1,5 +1,5 @@
 import type { AuthSession, StartTourOption, Tenant, TourProgress, Visit } from "./types";
-import type { PresencePoint } from "./presence";
+import type { DepartureIntegrity, PresencePoint } from "./presence";
 
 const API_BASE_URL = (process.env.EXPO_PUBLIC_TERREVO_API_URL ?? "https://terrevo.vercel.app").replace(/\/+$/, "");
 
@@ -178,6 +178,15 @@ export class TerrevoApi {
         products: [],
       }),
     });
+  }
+
+  async recordPresence(visitId: string, input: { operationId: string; samples: PresencePoint[] }): Promise<DepartureIntegrity> {
+    const response = await this.request(`/v1/visits/${encodeURIComponent(visitId)}/presence`, {
+      method: "POST",
+      body: JSON.stringify({ operationId: input.operationId, samples: input.samples }),
+    });
+    const body = await response.json() as { presence: DepartureIntegrity };
+    return body.presence;
   }
 
   async checkOut(visitId: string, input: { operationId: string; location: PresencePoint }): Promise<Visit> {

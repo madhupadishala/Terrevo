@@ -352,6 +352,14 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         const {accessToken,user,context}=await resolveTenantRequest(request);
         return json(200,{visit:await visits.checkOut(context.tenantId,user.id,accessToken,checkout[1],await readJsonObject(request))});
       }
+      const presence=/^\/v1\/visits\/([^/]+)\/presence$/.exec(path);
+      if(presence){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        if(request.method==="GET")return json(200,{presence:await visits.getPresence(context.tenantId,accessToken,presence[1])});
+        if(request.method==="POST")return json(201,{presence:await visits.recordDeparture(
+          context.tenantId,user.id,accessToken,presence[1],await readJsonObject(request,32_768)
+        )});
+      }
       if(request.method==="GET"&&path==="/v1/visit-exceptions"){
         const {accessToken,context}=await resolveTenantRequest(request);
         return json(200,{exceptions:await visits.listPendingExceptions(context.tenantId,accessToken)});
