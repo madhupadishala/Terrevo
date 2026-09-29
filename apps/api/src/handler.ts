@@ -16,6 +16,7 @@ import { createWeeklyTimesheetService, WeeklyTimesheetConflictError, WeeklyTimes
 import { createTradeCallService, TradeCallConflictError, TradeCallInputError, TradeCallNotFoundError } from "../../../modules/trade-call/src/index.ts";
 import { createRcpaService, RcpaConflictError, RcpaInputError, RcpaNotFoundError } from "../../../modules/rcpa/src/index.ts";
 import { createOrderService, OrderConflictError, OrderInputError, OrderNotFoundError } from "../../../modules/orders/src/index.ts";
+import { createAttendanceLeaveService, LeaveConflictError, LeaveInputError, LeaveNotFoundError } from "../../../modules/attendance-leave/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 
 export type ApiEnv = {
@@ -80,11 +81,11 @@ function mapError(error: unknown): Response {
     return json(status, { error: error.message });
   }
   if (error instanceof AuthorizationError) return json(403, { error: "Permission denied" });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError) {
     return json(400, { error: error.message });
   }
-  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError || error instanceof TradeCallNotFoundError || error instanceof RcpaNotFoundError || error instanceof OrderNotFoundError) return json(404, { error: error.message });
-  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError) return json(409, { error: error.message });
+  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError || error instanceof TradeCallNotFoundError || error instanceof RcpaNotFoundError || error instanceof OrderNotFoundError || error instanceof LeaveNotFoundError) return json(404, { error: error.message });
+  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError || error instanceof LeaveConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
     if (error.status === 400) return json(400, { error: "Provider rejected request" });
@@ -115,6 +116,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const tradeCalls = createTradeCallService(adapter.tradeCalls);
   const rcpa = createRcpaService(adapter.rcpa);
   const orders = createOrderService(adapter.orders);
+  const attendanceLeave = createAttendanceLeaveService(adapter.attendanceLeave, rbac);
 
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -194,6 +196,11 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         });
       }
 
+      if(request.method==="GET"&&path==="/v1/attendance"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{attendance:await attendanceLeave.listAttendance(context.tenantId,accessToken)});}
+      if(request.method==="GET"&&path==="/v1/leaves"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{leaves:await attendanceLeave.listLeaves(context.tenantId,accessToken)});}
+      if(request.method==="POST"&&path==="/v1/leaves"){const {accessToken,user,context}=await resolveTenantRequest(request);return json(201,{leave:await attendanceLeave.submit(context.tenantId,user.id,accessToken,await readJsonObject(request))});}
+      if(request.method==="GET"&&path==="/v1/leave-approvals"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{leaves:await attendanceLeave.listPending(context.tenantId,accessToken)});}
+      const leaveDecision=/^\/v1\/leave-approvals\/([^/]+)\/decision$/.exec(path);if(request.method==="POST"&&leaveDecision){const {accessToken,user,context}=await resolveTenantRequest(request);await attendanceLeave.decide(context.tenantId,user.id,accessToken,leaveDecision[1],await readJsonObject(request));return new Response(null,{status:204});}
       const orderMatch=/^\/v1\/visits\/([^/]+)\/order$/.exec(path);if(orderMatch){const {accessToken,user,context}=await resolveTenantRequest(request);if(request.method==="GET")return json(200,{order:await orders.get(context.tenantId,accessToken,orderMatch[1])});if(request.method==="PUT")return json(200,{order:await orders.save(context.tenantId,user.id,accessToken,orderMatch[1],await readJsonObject(request,65536))});}
       const rcpaMatch=/^\/v1\/visits\/([^/]+)\/rcpa$/.exec(path);
       if(rcpaMatch){const {accessToken,user,context}=await resolveTenantRequest(request);if(request.method==="GET")return json(200,{rcpa:await rcpa.get(context.tenantId,accessToken,rcpaMatch[1])});if(request.method==="PUT")return json(200,{rcpa:await rcpa.save(context.tenantId,user.id,accessToken,rcpaMatch[1],await readJsonObject(request,65536))});}
