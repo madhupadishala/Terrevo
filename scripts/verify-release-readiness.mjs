@@ -32,6 +32,7 @@ const requiredRequirements = [
   "docs/requirements/sprint-22-offline-sync.md",
   "docs/requirements/sprint-23-security-audit.md",
   "docs/requirements/sprint-24-regression-uat-closure.md",
+  "docs/requirements/sprint-25-pilot-release.md",
 ];
 
 for (const file of requiredRequirements) await requirePath(file);
@@ -42,6 +43,11 @@ for (const file of [
   "docs/qa/SPRINT-GATE.md",
   "docs/qa/UAT-CLOSURE.md",
   "docs/qa/REGRESSION-MATRIX.md",
+  ".github/workflows/pilot-release.yml",
+  "docs/deployment/PILOT-RELEASE.md",
+  "scripts/verify-uat-closure.mjs",
+  "scripts/create-release-manifest.mjs",
+  "scripts/smoke-pilot.mjs",
 ]) await requirePath(file);
 
 const migrationDir = "database/migrations";
