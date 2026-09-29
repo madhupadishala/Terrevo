@@ -253,3 +253,33 @@ export type JointWork = {
   leftAt: string | null;
   selfRole: "TARGET" | "PARTICIPANT" | null;
 };
+
+export type AccessContext = {
+  roles: Array<{ roleKey: "TENANT_ADMIN" | "MANAGER" | "MR"; scopeOrgUnitId: string | null }>;
+  permissions: string[];
+  orgAssignments: Array<{ orgUnitId: string; isPrimary: boolean }>;
+};
+
+export type ManagerCommandCenter = {
+  serverNow: string;
+  localDate: string;
+  teamMembers: number;
+  activeTours: number;
+  submittedToursToday: number;
+  shortDaysToday: number;
+  activeJointWork: number;
+  pending: {
+    tourApprovals: number;
+    gpsExceptions: number;
+    weeklyTimesheets: number;
+    leaves: number;
+    expenses: number;
+  };
+  queues: {
+    tourApprovals: Array<{ id: string; employeeId: string; weekStart: string }>;
+    gpsExceptions: Array<{ id: string; employeeId: string; workDate: string }>;
+    weeklyTimesheets: Array<{ id: string; employeeId: string; weekStart: string }>;
+    leaves: Array<{ id: string; employeeId: string; startDate: string; endDate: string }>;
+    expenses: Array<{ id: string; employeeId: string; workDate: string; totalAmount: number; currencyCode: string }>;
+  };
+};
