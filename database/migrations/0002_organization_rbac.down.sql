@@ -1,5 +1,9 @@
 begin;
 
+drop policy if exists user_role_assignments_read on public.user_role_assignments;
+drop policy if exists user_org_assignments_read on public.user_org_assignments;
+drop policy if exists organization_units_scoped_read on public.organization_units;
+
 drop function if exists public.admin_assign_user_org(uuid, uuid, uuid, boolean);
 drop function if exists public.has_permission(uuid, text, uuid);
 drop function if exists public.org_unit_in_scope(uuid, uuid, uuid);

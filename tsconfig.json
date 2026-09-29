@@ -22,6 +22,7 @@
     "modules/tour-execution/src/**/*.ts",
     "modules/tour-progress/src/**/*.ts",
     "modules/visit-execution/src/**/*.ts",
-    "modules/doctor-call/src/**/*.ts"
+    "modules/doctor-call/src/**/*.ts",
+    "modules/inventory/src/**/*.ts"
   ]
 }
