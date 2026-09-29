@@ -918,6 +918,16 @@ export function createSupabaseAdapter(
       const r=await expectOk(await fetcher(`${base}/rest/v1/weekly_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
       return (await r.json() as Array<Record<string,any>>).map(mapWeekly);
     },
+    async listOwn(tenantId,userId,accessToken){
+      const q=new URLSearchParams({
+        select:"*,employees!inner(org_unit_id,user_id)",
+        tenant_id:`eq.${tenantId}`,
+        "employees.user_id":`eq.${userId}`,
+        order:"week_start.desc",
+      });
+      const r=await expectOk(await fetcher(`${base}/rest/v1/weekly_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
+      return (await r.json() as Array<Record<string,any>>).map(mapWeekly);
+    },
     async listPending(tenantId,accessToken){
       const q=new URLSearchParams({select:"*,employees!inner(org_unit_id)",tenant_id:`eq.${tenantId}`,status:"eq.SUBMITTED",order:"submitted_at.asc"});
       const r=await expectOk(await fetcher(`${base}/rest/v1/weekly_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
