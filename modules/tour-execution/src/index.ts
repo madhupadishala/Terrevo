@@ -14,7 +14,7 @@ export type TourExecution = {
   planDayId: string;
   workDate: string;
   territoryId: string;
-  status: "ACTIVE";
+  status: "ACTIVE" | "SUBMITTED";
   startedAt: string;
   deviceStartedAt: string | null;
   requiredMinutes: number;
