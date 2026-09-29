@@ -78,6 +78,7 @@ function requireConfig(env: ApiEnv): SupabaseConfig {
   };
 }
 
+/** Maps domain and provider failures to stable public API responses. */
 function mapError(error: unknown): Response {
   if (error instanceof ApiError) return json(error.status, { error: error.message });
   if (error instanceof AuthInputError) {
@@ -104,6 +105,7 @@ function mapError(error: unknown): Response {
   return json(500, { error: "Internal server error" });
 }
 
+/** Creates the HTTP API handler with tenant-scoped domain services wired to the provider adapter. */
 export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const adapter = createSupabaseAdapter(requireConfig(env), deps.fetcher);
   const identity = createIdentityService(adapter.auth);
@@ -130,6 +132,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const managerCommand = createManagerCommandService(adapter.managerCommand);
   const analytics = createAnalyticsService(adapter.analytics);
 
+  /** Authenticates the caller and resolves the active tenant context for a tenant-scoped request. */
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
     const user = await identity.authenticate(request.headers.get("authorization"));
@@ -141,6 +144,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
     return { accessToken, user, context };
   }
 
+  /** Routes one HTTP request through authenticated Terrevo API contracts. */
   return async function handle(request: Request): Promise<Response> {
     try {
       const path = new URL(request.url).pathname;
