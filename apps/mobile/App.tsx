@@ -23,9 +23,11 @@ import {
   savePendingPresence,
 } from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
+import { deadLetterSyncItem, listSyncQueue, markSyncAttempt, queuePendingMutation, removeSyncItem } from "./src/sync-queue";
+import { isSyncDue, summarizeSyncQueue, type SyncAction, type SyncQueueItem } from "./src/sync";
 import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, ExpenseClaim, ExpenseLine, InventoryBalance, JointWork, LeaveRequest, ManagerAnalytics, ManagerCommandCenter, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
 
-const APP_VERSION = "0.27.0";
+const APP_VERSION = "0.28.0";
 const EXPENSE_CATEGORIES: ExpenseCategory[] = ["TRAVEL", "MEAL", "LODGING", "LOCAL_CONVEYANCE", "OTHER"];
 
 /** Renders the Terrevo field application and coordinates tenant-scoped field state. */
@@ -91,6 +93,8 @@ export default function App() {
   const analyticsDaysRef = useRef<7 | 30>(7);
   const analyticsRequestRef = useRef(0);
   const tenantIdRef = useRef<string | null>(null);
+  const [syncItems, setSyncItems] = useState<SyncQueueItem[]>([]);
+  const [syncing, setSyncing] = useState(false);
   const [departure, setDeparture] = useState<DepartureIntegrity | null>(null);
   const [departureSamples, setDepartureSamples] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -208,6 +212,7 @@ export default function App() {
     setManagerAnalytics(null);
     analyticsDaysRef.current = 7;
     setAnalyticsDays(7);
+    setSyncItems([]);
     setDeparture(null);
     setDepartureSamples(0);
   }
@@ -215,6 +220,151 @@ export default function App() {
   function mutationScope(scope: string): string {
     if (!session || !tenantId) throw new Error("Session context is unavailable for retry state.");
     return accountMutationScope(session.user.id, tenantId, scope);
+  }
+
+  async function refreshSyncQueue(
+    currentSession = session,
+    currentTenantId = tenantId,
+  ): Promise<SyncQueueItem[]> {
+    if (!currentSession || !currentTenantId) {
+      setSyncItems([]);
+      return [];
+    }
+    const items = await listSyncQueue(currentSession.user.id, currentTenantId);
+    setSyncItems(items);
+    return items;
+  }
+
+  function isDefinitiveSyncFailure(cause: unknown): boolean {
+    return cause instanceof ApiError && [400, 403, 404, 409].includes(cause.status);
+  }
+
+  async function completePendingMutation(scope: string): Promise<void> {
+    await clearPendingMutation(scope);
+    await removeSyncItem(scope);
+    await refreshSyncQueue();
+  }
+
+  async function recordMutationFailure<T>(
+    scope: string,
+    action: SyncAction,
+    targetId: string | null,
+    pending: { operationId: string; payload: T },
+    cause: unknown,
+  ): Promise<void> {
+    if (!session || !tenantId) return;
+    try {
+      await queuePendingMutation({
+        scope,
+        userId: session.user.id,
+        tenantId,
+        action,
+        targetId,
+        pending: pending as { operationId: string; payload: unknown },
+        error: toMessage(cause),
+      });
+      const item = (await listSyncQueue(session.user.id, tenantId)).find((candidate) => candidate.scope === scope);
+      if (item && isDefinitiveSyncFailure(cause)) {
+        await deadLetterSyncItem(item, toMessage(cause));
+        await clearPendingMutation(scope);
+      }
+      await refreshSyncQueue();
+    } catch {
+      setMessage("The retry payload is preserved on this device, but sync-status metadata could not be updated.");
+    }
+  }
+
+  async function replaySyncItem(item: SyncQueueItem): Promise<"SYNCED" | "RETRY" | "DEAD"> {
+    try {
+      switch (item.action) {
+        case "distribution": {
+          const payload = item.payload as { items: Parameters<TerrevoApi["distribute"]>[1]["items"] };
+          await api.distribute(item.targetId!, { operationId: item.operationId, items: payload.items });
+          break;
+        }
+        case "doctor-call": {
+          const payload = item.payload as Omit<Parameters<TerrevoApi["saveDoctorCall"]>[1], "operationId">;
+          await api.saveDoctorCall(item.targetId!, { operationId: item.operationId, ...payload });
+          break;
+        }
+        case "trade-call": {
+          const payload = item.payload as Omit<Parameters<TerrevoApi["saveTradeCall"]>[1], "operationId">;
+          await api.saveTradeCall(item.targetId!, { operationId: item.operationId, ...payload });
+          break;
+        }
+        case "rcpa": {
+          const payload = item.payload as { lines: Parameters<TerrevoApi["saveRcpa"]>[1]["lines"] };
+          await api.saveRcpa(item.targetId!, { operationId: item.operationId, lines: payload.lines });
+          break;
+        }
+        case "order": {
+          const payload = item.payload as Omit<Parameters<TerrevoApi["saveOrder"]>[1], "operationId">;
+          await api.saveOrder(item.targetId!, { operationId: item.operationId, ...payload });
+          break;
+        }
+        case "daily-review": {
+          const payload = item.payload as { remarks: string | null };
+          await api.reviewDailyTimesheet(item.targetId!, { operationId: item.operationId, remarks: payload.remarks });
+          break;
+        }
+        case "weekly-submit": {
+          const payload = item.payload as { comment: string | null };
+          await api.submitWeeklyTimesheet(item.targetId!, { operationId: item.operationId, comment: payload.comment });
+          break;
+        }
+        case "leave-submit": {
+          const payload = item.payload as Omit<Parameters<TerrevoApi["submitLeave"]>[0], "operationId">;
+          await api.submitLeave({ operationId: item.operationId, ...payload });
+          break;
+        }
+        case "expense-save": {
+          const payload = item.payload as Omit<Parameters<TerrevoApi["saveExpense"]>[1], "operationId">;
+          await api.saveExpense(item.targetId!, { operationId: item.operationId, ...payload });
+          break;
+        }
+        case "expense-submit": {
+          const payload = item.payload as { comment: string | null };
+          await api.submitExpense(item.targetId!, { operationId: item.operationId, comment: payload.comment });
+          break;
+        }
+        default:
+          return "RETRY";
+      }
+      await clearPendingMutation(item.scope);
+      await removeSyncItem(item.scope);
+      return "SYNCED";
+    } catch (cause) {
+      if (isDefinitiveSyncFailure(cause)) {
+        await deadLetterSyncItem(item, toMessage(cause));
+        await clearPendingMutation(item.scope);
+        return "DEAD";
+      }
+      await markSyncAttempt(item, toMessage(cause));
+      return "RETRY";
+    }
+  }
+
+  async function flushSyncQueue(force = false): Promise<{ synced: number; dead: number }> {
+    if (!session || !tenantId) return { synced: 0, dead: 0 };
+    const items = await listSyncQueue(session.user.id, tenantId);
+    let synced = 0;
+    let dead = 0;
+    for (const item of items) {
+      if (item.state !== "QUEUED" || item.mode !== "AUTO" || (!force && !isSyncDue(item))) continue;
+      const result = await replaySyncItem(item);
+      if (result === "SYNCED") synced += 1;
+      if (result === "DEAD") dead += 1;
+    }
+    await refreshSyncQueue();
+    return { synced, dead };
+  }
+
+  async function tryResumeSyncQueue(): Promise<void> {
+    try {
+      await flushSyncQueue(false);
+    } catch {
+      // Queue remains durable; explicit Sync Now can retry later.
+    }
   }
 
   async function loadFieldResources(client = api) {
