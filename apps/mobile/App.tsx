@@ -98,6 +98,7 @@ export default function App() {
   const analyticsDaysRef = useRef<7 | 30>(7);
   const analyticsRequestRef = useRef(0);
   const tenantIdRef = useRef<string | null>(null);
+  const sessionUserIdRef = useRef<string | null>(null);
   const [departure, setDeparture] = useState<DepartureIntegrity | null>(null);
   const [departureSamples, setDepartureSamples] = useState(0);
   const [syncItems, setSyncItems] = useState<PendingMutationSummary[]>([]);
@@ -108,6 +109,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   const api = useMemo(() => new TerrevoApi(async (nextSession) => {
+    sessionUserIdRef.current = nextSession?.user.id ?? null;
     setSession(nextSession);
     await saveSession(nextSession);
   }), []);
@@ -121,6 +123,7 @@ export default function App() {
     void (async () => {
       try {
         const [storedSession, storedTenant] = await Promise.all([loadSession(), loadTenantId()]);
+        sessionUserIdRef.current = storedSession?.user.id ?? null;
         setSession(storedSession);
         setTenantId(storedTenant);
         tenantIdRef.current = storedTenant;
@@ -244,6 +247,10 @@ export default function App() {
       listPendingMutations(currentSession.user.id, currentTenantId),
       loadPendingPresence<unknown>(),
     ]);
+    if (
+      sessionUserIdRef.current !== currentSession.user.id ||
+      tenantIdRef.current !== currentTenantId
+    ) return;
     setSyncItems(items);
     setSyncPresencePending(Boolean(
       presence &&
@@ -268,6 +275,10 @@ export default function App() {
     currentTenantId = tenantId,
   ): Promise<{ synced: number; stopped: boolean; manual: number }> {
     if (!currentSession || !currentTenantId) return { synced: 0, stopped: false, manual: 0 };
+    if (
+      sessionUserIdRef.current !== currentSession.user.id ||
+      tenantIdRef.current !== currentTenantId
+    ) return { synced: 0, stopped: false, manual: 0 };
     setSyncing(true);
     let synced = 0;
     let stopped = false;
@@ -307,7 +318,10 @@ export default function App() {
       await refreshSyncStatus(currentSession, currentTenantId);
       return { synced, stopped, manual };
     } finally {
-      setSyncing(false);
+      if (
+        sessionUserIdRef.current === currentSession.user.id &&
+        tenantIdRef.current === currentTenantId
+      ) setSyncing(false);
     }
   }
 
