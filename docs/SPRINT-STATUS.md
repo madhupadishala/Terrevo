@@ -22,11 +22,11 @@
 | 17 | Attendance + Leave | CLOSED |
 | 18 | Expenses | CLOSED |
 | 19 | Joint Field Work | CLOSED |
-| 20 | Manager Command Center | PLANNED |
+| 20 | Manager Command Center | CLOSED |
 | 21 | Analytics + Reports | PLANNED |
 | 22 | Offline/Sync Hardening | PLANNED |
 | 23 | Security + Audit Hardening | PLANNED |
 | 24 | Regression + UAT + Closure | PLANNED |
 | 25 | Pilot Release | PLANNED |
 
-Completed through Sprint 19. Next planned sprint: 20 — Manager Command Center.
+Completed through Sprint 20. Next planned sprint: 21 — Analytics + Reports.

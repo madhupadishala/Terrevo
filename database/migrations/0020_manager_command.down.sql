@@ -1,0 +1,1 @@
+begin;drop function if exists public.manager_command_center(uuid);delete from public.role_permissions where permission_key='MANAGER_DASHBOARD_VIEW';commit;
