@@ -23,9 +23,9 @@ import {
   savePendingPresence,
 } from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
-import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, ExpenseClaim, ExpenseLine, InventoryBalance, JointWork, LeaveRequest, ManagerCommandCenter, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
+import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, ExpenseClaim, ExpenseLine, InventoryBalance, JointWork, LeaveRequest, ManagerAnalytics, ManagerCommandCenter, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
 
-const APP_VERSION = "0.26.0";
+const APP_VERSION = "0.27.0";
 const EXPENSE_CATEGORIES: ExpenseCategory[] = ["TRAVEL", "MEAL", "LODGING", "LOCAL_CONVEYANCE", "OTHER"];
 
 export default function App() {
@@ -85,6 +85,8 @@ export default function App() {
   const [expenseSubmitComment, setExpenseSubmitComment] = useState("");
   const [jointWork, setJointWork] = useState<JointWork[]>([]);
   const [managerCommand, setManagerCommand] = useState<ManagerCommandCenter | null>(null);
+  const [managerAnalytics, setManagerAnalytics] = useState<ManagerAnalytics | null>(null);
+  const [analyticsDays, setAnalyticsDays] = useState<7 | 30>(7);
   const [departure, setDeparture] = useState<DepartureIntegrity | null>(null);
   const [departureSamples, setDepartureSamples] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -194,6 +196,8 @@ export default function App() {
     setExpenses([]);
     setJointWork([]);
     setManagerCommand(null);
+    setManagerAnalytics(null);
+    setAnalyticsDays(7);
     setDeparture(null);
     setDepartureSamples(0);
   }
@@ -232,9 +236,17 @@ export default function App() {
     setExpenses(expenseRows);
     setJointWork(jointRows);
     const access = await client.accessContext();
-    setManagerCommand(access.permissions.includes("MANAGER_DASHBOARD_VIEW")
-      ? await client.managerCommandCenter()
-      : null);
+    if (access.permissions.includes("MANAGER_DASHBOARD_VIEW")) {
+      const [command, report] = await Promise.all([
+        client.managerCommandCenter(),
+        client.managerAnalytics(analyticsDays),
+      ]);
+      setManagerCommand(command);
+      setManagerAnalytics(report);
+    } else {
+      setManagerCommand(null);
+      setManagerAnalytics(null);
+    }
   }
 
   async function loadDoctorContext(client: TerrevoApi, nextProgress: TourProgress | null, nextOpenVisit: Visit | null) {
@@ -690,6 +702,15 @@ export default function App() {
     });
   }
 
+  async function handleAnalyticsWindow(days: 7 | 30) {
+    await run(async () => {
+      const report = await api.managerAnalytics(days);
+      setAnalyticsDays(days);
+      setManagerAnalytics(report);
+      setMessage(`Manager analytics refreshed for the last ${days} tenant-local day(s).`);
+    });
+  }
+
   function handleAddRcpaCompetitor() {
     const brand = competitorBrand.trim();
     if (!brand) {
@@ -971,6 +992,37 @@ export default function App() {
             {managerCommand.queues.leaves.slice(0, 3).map((item) => <Text key={`leave-${item.id}`} style={styles.small}>Leave · {item.startDate} to {item.endDate}</Text>)}
             {managerCommand.queues.expenses.slice(0, 3).map((item) => <Text key={`expense-${item.id}`} style={styles.small}>Expense · {item.workDate} · {item.currencyCode} {item.totalAmount.toFixed(2)}</Text>)}
             <SecondaryButton label="Refresh Manager Command" onPress={() => void handleRefreshManager()} />
+          </View>
+        ) : null}
+
+        {managerAnalytics ? (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>ANALYTICS + REPORTS</Text>
+            <Text style={styles.cardTitle}>{managerAnalytics.period.startDate} to {managerAnalytics.period.endDate}</Text>
+            <Text style={styles.muted}>Read-only metrics derived from trusted field evidence. No AI score or manual performance value is used.</Text>
+            <View style={styles.choiceButtons}>
+              {([7, 30] as const).map((days) => (
+                <Pressable key={days} style={[styles.compactChoice, analyticsDays === days && styles.choiceSelected]} onPress={() => void handleAnalyticsWindow(days)}>
+                  <Text style={styles.choiceText}>{days} days</Text>
+                </Pressable>
+              ))}
+            </View>
+            <View style={styles.managerMetrics}>
+              <View style={styles.metricBox}><Text style={styles.metricValue}>{managerAnalytics.coverage.coveragePercent}%</Text><Text style={styles.small}>Coverage</Text></View>
+              <View style={styles.metricBox}><Text style={styles.metricValue}>{managerAnalytics.coverage.completedVisits}</Text><Text style={styles.small}>Completed calls</Text></View>
+              <View style={styles.metricBox}><Text style={styles.metricValue}>{managerAnalytics.tours.submitted}</Text><Text style={styles.small}>Submitted tours</Text></View>
+            </View>
+            <Text style={styles.small}>Planned {managerAnalytics.coverage.plannedStops} · Doctor {managerAnalytics.coverage.doctorCalls} · Chemist {managerAnalytics.coverage.chemistCalls} · Stockist {managerAnalytics.coverage.stockistCalls}</Text>
+            <Text style={styles.small}>Unique doctors {managerAnalytics.coverage.uniqueDoctorsCovered} · Calls/tour {managerAnalytics.coverage.callsPerSubmittedTour} · Avg worked {managerAnalytics.tours.averageWorkedMinutes} min</Text>
+            <Text style={styles.sectionTitle}>Orders & RCPA</Text>
+            <Text style={styles.small}>Orders {managerAnalytics.orders.count} · Units {managerAnalytics.orders.units} · RCPA reports {managerAnalytics.rcpa.reports}</Text>
+            <Text style={styles.small}>RCPA Rx {managerAnalytics.rcpa.prescriptionCount} · Stock {managerAnalytics.rcpa.stockQuantity} · Sales {managerAnalytics.rcpa.salesQuantity}</Text>
+            <Text style={styles.sectionTitle}>Attendance</Text>
+            <Text style={styles.small}>Present days {managerAnalytics.attendance.presentDays} · Short days {managerAnalytics.attendance.shortDays} · Full-day leave {managerAnalytics.attendance.approvedFullDayLeaveDays} · Half-day leave {managerAnalytics.attendance.approvedHalfDayLeaveDays}</Text>
+            <Text style={styles.sectionTitle}>Expenses</Text>
+            {managerAnalytics.expenses.length === 0 ? <Text style={styles.small}>No submitted/approved claims in this period.</Text> : managerAnalytics.expenses.map((expense) => (
+              <Text key={expense.currencyCode} style={styles.small}>{expense.currencyCode} {expense.totalAmount.toFixed(2)} · {expense.claimCount} claim(s)</Text>
+            ))}
           </View>
         ) : null}
 
