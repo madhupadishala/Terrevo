@@ -90,11 +90,7 @@ export default function App() {
     try {
       await action();
     } catch (cause) {
-      if (checkoutRecorded) {
-        setMessage("Check-out is already recorded. Departure continuity could not complete, so no continuity conclusion was made.");
-      } else {
-        setError(toMessage(cause));
-      }
+      setError(toMessage(cause));
     } finally {
       setBusy(false);
     }
@@ -207,7 +203,11 @@ export default function App() {
           ? "Check-out retained, but location integrity requires investigation."
           : "Check-out complete. Departure movement requires review.");
     } catch (cause) {
-      setError(toMessage(cause));
+      if (checkoutRecorded) {
+        setMessage("Check-out is already recorded. Departure continuity could not complete, so no continuity conclusion was made.");
+      } else {
+        setError(toMessage(cause));
+      }
     } finally {
       setBusy(false);
     }
