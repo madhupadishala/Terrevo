@@ -1,4 +1,5 @@
 export type TourProgressStop = {
+  planStopId: string;
   sequence: number;
   type: "doctor" | "chemist" | "stockist";
   targetId: string;
