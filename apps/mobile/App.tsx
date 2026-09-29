@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { ApiError, TerrevoApi } from "./src/api";
+import { TerrevoApi } from "./src/api";
 import { accountMutationScope, buildDistributionLines, buildDoctorProducts, buildOrderLines, buildRcpaLines, distributionKey, projectedInventoryBalance, type RcpaCompetitorDraft, weekStartFromDate } from "./src/field";
 import { captureFreshLocation, collectDepartureSamples } from "./src/location";
 import { presenceStatusMessage, type DepartureIntegrity, type PresencePoint } from "./src/presence";
@@ -228,6 +228,96 @@ export default function App() {
   function mutationScope(scope: string): string {
     if (!session || !tenantId) throw new Error("Session context is unavailable for retry state.");
     return accountMutationScope(session.user.id, tenantId, scope);
+  }
+
+  async function refreshSyncStatus(
+    currentSession = session,
+    currentTenantId = tenantId,
+  ): Promise<void> {
+    if (!currentSession || !currentTenantId) {
+      setSyncItems([]);
+      setSyncPresencePending(false);
+      return;
+    }
+    const [items, presence] = await Promise.all([
+      listPendingMutations(currentSession.user.id, currentTenantId),
+      loadPendingPresence<unknown>(),
+    ]);
+    setSyncItems(items);
+    setSyncPresencePending(Boolean(
+      presence &&
+      presence.userId === currentSession.user.id &&
+      presence.tenantId === currentTenantId
+    ));
+  }
+
+  async function completePendingMutation(scope: string): Promise<void> {
+    await completePendingMutation(scope);
+    await refreshSyncStatus();
+  }
+
+  async function recordPendingFailure(scope: string, cause: unknown): Promise<void> {
+    await markPendingMutationFailure(scope, toMessage(cause), isDefinitiveSyncFailure(cause));
+    await refreshSyncStatus();
+  }
+
+  async function syncPendingQueue(
+    client = api,
+    currentSession = session,
+    currentTenantId = tenantId,
+  ): Promise<{ synced: number; stopped: boolean }> {
+    if (!currentSession || !currentTenantId) return { synced: 0, stopped: false };
+    setSyncing(true);
+    let synced = 0;
+    let stopped = false;
+    try {
+      const items = await listPendingMutations(currentSession.user.id, currentTenantId);
+      for (const item of items) {
+        if (item.status === "DEAD_LETTER") continue;
+        const pending = await loadPendingMutation<unknown>(item.scope);
+        if (!pending) continue;
+        await markPendingMutationAttempt(item.scope);
+        try {
+          await replayPendingMutation(client, item.scope, pending, currentSession.user.id, currentTenantId);
+          await completePendingMutation(item.scope);
+          synced += 1;
+        } catch (cause) {
+          const definitive = isDefinitiveSyncFailure(cause);
+          await markPendingMutationFailure(item.scope, toMessage(cause), definitive);
+          if (shouldStopSyncAfterFailure(cause)) {
+            stopped = true;
+            break;
+          }
+        }
+      }
+
+      try {
+        await syncPendingPresence(client, currentSession, currentTenantId);
+      } catch {
+        // Presence evidence has its own stronger retry contract and stays persisted.
+      }
+      await refreshSyncStatus(currentSession, currentTenantId);
+      return { synced, stopped };
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function trySyncPendingQueue(
+    client = api,
+    currentSession = session,
+    currentTenantId = tenantId,
+  ): Promise<void> {
+    const result = await syncPendingQueue(client, currentSession, currentTenantId);
+    if (result.synced > 0) {
+      setMessage(`${result.synced} queued field action(s) synced safely.`);
+    }
+  }
+
+  function syncItemLabel(item: PendingMutationSummary): string {
+    if (!session || !tenantId) return "Queued action";
+    const operation = parseSyncOperation(item.scope, session.user.id, tenantId);
+    return operation ? operation.kind.replaceAll("-", " ") : "Queued action";
   }
 
   async function loadFieldResources(client = api) {
@@ -455,12 +545,6 @@ export default function App() {
     }
   }
 
-  async function clearPendingOnDefinitiveFailure(scope: string, cause: unknown) {
-    if (cause instanceof ApiError && [400, 403, 404].includes(cause.status)) {
-      await clearPendingMutation(scope);
-    }
-  }
-
   async function handleStartTour(option: StartTourOption) {
     await run(async () => {
       const scope = mutationScope(`start.${option.planDayId}`);
@@ -479,9 +563,9 @@ export default function App() {
           planDayId: option.planDayId,
           ...pending.payload,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       await refreshField();
@@ -508,9 +592,9 @@ export default function App() {
           planStopId: stop.planStopId,
           ...pending.payload,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setOpenVisit(visit);
@@ -533,13 +617,13 @@ export default function App() {
           operationId: pending.operationId,
           items: pending.payload.items,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
         setVisitDistributions(distributions);
         setDistributionQuantities({});
         setInventory(await api.inventory());
         setMessage("Samples/gifts recorded against this doctor visit.");
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
     });
@@ -560,13 +644,13 @@ export default function App() {
           operationId: pending.operationId,
           shortDayReason: pending.payload.shortDayReason,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
         setShortDayReason("");
         await refreshField();
         await loadWorkRecords();
         setMessage(`Workday closed. Worked time: ${submitted.workedMinutes} minutes. Daily timesheet generated automatically.`);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
     });
@@ -583,9 +667,9 @@ export default function App() {
           operationId: pending.operationId,
           remarks: pending.payload.remarks,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setDailyRemarks("");
@@ -614,9 +698,9 @@ export default function App() {
           operationId: pending.operationId,
           comment: pending.payload.comment,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setWeeklyComment("");
@@ -640,9 +724,9 @@ export default function App() {
       }));
       try {
         await api.submitLeave({ operationId: pending.operationId, ...pending.payload });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setLeaveStart("");
@@ -682,9 +766,9 @@ export default function App() {
       }));
       try {
         await api.saveExpense(executionId, { operationId: pending.operationId, ...pending.payload });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setExpenseDraftLines([]);
@@ -701,9 +785,9 @@ export default function App() {
       }));
       try {
         await api.submitExpense(claim.id, { operationId: pending.operationId, comment: pending.payload.comment });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setExpenseSubmitComment("");
@@ -723,9 +807,9 @@ export default function App() {
       try {
         if (action === "join") await api.joinJointWork(assignment.id, { operationId: pending.operationId, location: pending.payload.location });
         else await api.leaveJointWork(assignment.id, { operationId: pending.operationId, location: pending.payload.location });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       await loadWorkRecords();
@@ -816,9 +900,9 @@ export default function App() {
             operationId: pendingCall.operationId,
             ...pendingCall.payload,
           });
-          await clearPendingMutation(callScope);
+          await completePendingMutation(callScope);
         } catch (cause) {
-          await clearPendingOnDefinitiveFailure(callScope, cause);
+          await recordPendingFailure(callScope, cause);
           throw cause;
         }
       }
@@ -833,9 +917,9 @@ export default function App() {
         }));
         try {
           await api.saveTradeCall(visit.id, { operationId: pendingTrade.operationId, ...pendingTrade.payload });
-          await clearPendingMutation(tradeScope);
+          await completePendingMutation(tradeScope);
         } catch (cause) {
-          await clearPendingOnDefinitiveFailure(tradeScope, cause);
+          await recordPendingFailure(tradeScope, cause);
           throw cause;
         }
 
@@ -845,9 +929,9 @@ export default function App() {
           const pendingRcpa = await getOrCreatePendingMutation(rcpaScope, async () => ({ lines }));
           try {
             await api.saveRcpa(visit.id, { operationId: pendingRcpa.operationId, lines: pendingRcpa.payload.lines });
-            await clearPendingMutation(rcpaScope);
+            await completePendingMutation(rcpaScope);
           } catch (cause) {
-            await clearPendingOnDefinitiveFailure(rcpaScope, cause);
+            await recordPendingFailure(rcpaScope, cause);
             throw cause;
           }
         }
@@ -865,9 +949,9 @@ export default function App() {
               remarks: pendingOrder.payload.remarks,
               lines: pendingOrder.payload.lines,
             });
-            await clearPendingMutation(orderScope);
+            await completePendingMutation(orderScope);
           } catch (cause) {
-            await clearPendingOnDefinitiveFailure(orderScope, cause);
+            await recordPendingFailure(orderScope, cause);
             throw cause;
           }
         }
@@ -890,10 +974,10 @@ export default function App() {
           ...pendingCheckout.payload,
         });
         checkoutRecorded = true;
-        await clearPendingMutation(checkoutScope);
+        await completePendingMutation(checkoutScope);
       } catch (cause) {
-        const definitive = cause instanceof ApiError && [400, 403, 404].includes(cause.status);
-        await clearPendingOnDefinitiveFailure(checkoutScope, cause);
+        const definitive = isDefinitiveSyncFailure(cause);
+        await recordPendingFailure(checkoutScope, cause);
         if (definitive) await clearPendingPresence();
         throw cause;
       }
