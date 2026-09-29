@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import { ApiError, TerrevoApi } from "./src/api";
-import { buildDistributionLines, buildDoctorProducts, buildOrderLines, buildRcpaLines, distributionKey, projectedInventoryBalance, type RcpaCompetitorDraft, weekStartFromDate } from "./src/field";
+import { accountMutationScope, buildDistributionLines, buildDoctorProducts, buildOrderLines, buildRcpaLines, distributionKey, projectedInventoryBalance, type RcpaCompetitorDraft, weekStartFromDate } from "./src/field";
 import { captureFreshLocation, collectDepartureSamples } from "./src/location";
 import { presenceStatusMessage, type DepartureIntegrity, type PresencePoint } from "./src/presence";
 import {
@@ -25,7 +25,7 @@ import {
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
 import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, ExpenseClaim, ExpenseLine, InventoryBalance, JointWork, LeaveRequest, ManagerCommandCenter, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
 
-const APP_VERSION = "0.25.0";
+const APP_VERSION = "0.26.0";
 const EXPENSE_CATEGORIES: ExpenseCategory[] = ["TRAVEL", "MEAL", "LODGING", "LOCAL_CONVEYANCE", "OTHER"];
 
 export default function App() {
@@ -157,6 +157,50 @@ export default function App() {
     setSelectedOrderProductIds([]);
     setOrderQuantities({});
     setOrderRemarks("");
+  }
+
+  function resetWorkforceDraft() {
+    setLeaveType("FULL_DAY");
+    setLeaveStart("");
+    setLeaveEnd("");
+    setLeaveReason("");
+    setExpenseCategory("TRAVEL");
+    setExpenseAmount("");
+    setExpenseRemarks("");
+    setExpenseReceipt("");
+    setExpenseDraftLines([]);
+    setExpenseSubmitComment("");
+  }
+
+  function clearTenantViewState() {
+    setProgress(null);
+    setOpenVisit(null);
+    setStartOptions([]);
+    setExceptionReason("");
+    setProducts([]);
+    setSamples([]);
+    setGifts([]);
+    setInventory([]);
+    resetDoctorDraft();
+    resetTradeDraft();
+    resetWorkforceDraft();
+    setShortDayReason("");
+    setDailyTimesheets([]);
+    setWeeklyTimesheets([]);
+    setDailyRemarks("");
+    setWeeklyComment("");
+    setAttendance([]);
+    setLeaves([]);
+    setExpenses([]);
+    setJointWork([]);
+    setManagerCommand(null);
+    setDeparture(null);
+    setDepartureSamples(0);
+  }
+
+  function mutationScope(scope: string): string {
+    if (!session || !tenantId) throw new Error("Session context is unavailable for retry state.");
+    return accountMutationScope(session.user.id, tenantId, scope);
   }
 
   async function loadFieldResources(client = api) {
@@ -291,6 +335,7 @@ export default function App() {
   }
 
   async function selectTenant(id: string, currentSession = session) {
+    clearTenantViewState();
     setTenantId(id);
     api.configure(currentSession, id);
     await saveTenantId(id);
@@ -350,31 +395,7 @@ export default function App() {
       await saveTenantId(null);
       setTenantId(null);
       setTenants([]);
-      setProgress(null);
-      setOpenVisit(null);
-      setStartOptions([]);
-      setProducts([]);
-      setSamples([]);
-      setGifts([]);
-      setInventory([]);
-      resetDoctorDraft();
-      resetTradeDraft();
-      setShortDayReason("");
-      setDailyTimesheets([]);
-      setWeeklyTimesheets([]);
-      setDailyRemarks("");
-      setWeeklyComment("");
-      setAttendance([]);
-      setLeaves([]);
-      setLeaveStart("");
-      setLeaveEnd("");
-      setLeaveReason("");
-      setExpenses([]);
-      setExpenseDraftLines([]);
-      setExpenseSubmitComment("");
-      setJointWork([]);
-      setManagerCommand(null);
-      setDeparture(null);
+      clearTenantViewState();
     });
   }
 
@@ -392,7 +413,7 @@ export default function App() {
 
   async function handleStartTour(option: StartTourOption) {
     await run(async () => {
-      const scope = `start.${option.planDayId}`;
+      const scope = mutationScope(`start.${option.planDayId}`);
       const pending = await getOrCreatePendingMutation(scope, async () => {
         const location = await captureFreshLocation();
         rejectMocked(location);
@@ -421,7 +442,7 @@ export default function App() {
   async function handleCheckIn(stop: TourStop) {
     await run(async () => {
       await requirePendingPresenceSynced();
-      const scope = `check-in.${stop.planStopId}`;
+      const scope = mutationScope(`check-in.${stop.planStopId}`);
       const pending = await getOrCreatePendingMutation(scope, async () => {
         const location = await captureFreshLocation();
         rejectMocked(location);
@@ -455,7 +476,7 @@ export default function App() {
     await run(async () => {
       const items = buildDistributionLines(inventory, distributionQuantities);
       if (items.length === 0) throw new Error("Enter at least one sample or gift quantity.");
-      const scope = `distribution.${visit.id}`;
+      const scope = mutationScope(`distribution.${visit.id}`);
       const pending = await getOrCreatePendingMutation(scope, async () => ({ items }));
       try {
         const distributions = await api.distribute(visit.id, {
@@ -480,7 +501,7 @@ export default function App() {
       if (current.remainingMinutes > 0 && !shortDayReason.trim()) {
         throw new Error("Enter a short-day reason before submitting this tour.");
       }
-      const scope = `submit-tour.${current.executionId}`;
+      const scope = mutationScope(`submit-tour.${current.executionId}`);
       const pending = await getOrCreatePendingMutation(scope, async () => ({
         shortDayReason: shortDayReason.trim() || null,
       }));
@@ -503,7 +524,7 @@ export default function App() {
 
   async function handleReviewDaily(timesheet: DailyTimesheet) {
     await run(async () => {
-      const scope = `daily-timesheet-review.${timesheet.id}`;
+      const scope = mutationScope(`daily-timesheet-review.${timesheet.id}`);
       const pending = await getOrCreatePendingMutation(scope, async () => ({
         remarks: dailyRemarks.trim() || null,
       }));
@@ -534,7 +555,7 @@ export default function App() {
 
   async function handleSubmitWeekly(timesheet: WeeklyTimesheet) {
     await run(async () => {
-      const scope = `weekly-timesheet-submit.${timesheet.id}`;
+      const scope = mutationScope(`weekly-timesheet-submit.${timesheet.id}`);
       const pending = await getOrCreatePendingMutation(scope, async () => ({
         comment: weeklyComment.trim() || null,
       }));
@@ -560,7 +581,7 @@ export default function App() {
       const endDate = leaveType === "HALF_DAY" ? leaveStart.trim() : leaveEnd.trim();
       if (!endDate) throw new Error("Enter the leave end date as YYYY-MM-DD.");
       if (!leaveReason.trim()) throw new Error("Enter a leave reason.");
-      const scope = "leave-submit";
+      const scope = mutationScope("leave-submit");
       const pending = await getOrCreatePendingMutation(scope, async () => ({
         leaveType,
         startDate: leaveStart.trim(),
@@ -604,7 +625,7 @@ export default function App() {
   async function handleSaveExpense(executionId: string) {
     await run(async () => {
       if (expenseDraftLines.length === 0) throw new Error("Add at least one expense line.");
-      const scope = `expense-save.${executionId}`;
+      const scope = mutationScope(`expense-save.${executionId}`);
       const pending = await getOrCreatePendingMutation(scope, async () => ({
         currencyCode: "INR",
         lines: expenseDraftLines,
@@ -624,7 +645,7 @@ export default function App() {
 
   async function handleSubmitExpense(claim: ExpenseClaim) {
     await run(async () => {
-      const scope = `expense-submit.${claim.id}`;
+      const scope = mutationScope(`expense-submit.${claim.id}`);
       const pending = await getOrCreatePendingMutation(scope, async () => ({
         comment: expenseSubmitComment.trim() || null,
       }));
@@ -643,7 +664,7 @@ export default function App() {
 
   async function handleJointWorkAction(assignment: JointWork, action: "join" | "leave") {
     await run(async () => {
-      const scope = `joint-work-${action}.${assignment.id}`;
+      const scope = mutationScope(`joint-work-${action}.${assignment.id}`);
       const pending = await getOrCreatePendingMutation(scope, async () => {
         const location = await captureFreshLocation();
         rejectMocked(location);
@@ -712,12 +733,12 @@ export default function App() {
     let checkoutRecorded = false;
     try {
       if (stop.type === "doctor") {
-        const pendingDistribution = await loadPendingMutation(`distribution.${visit.id}`);
+        const pendingDistribution = await loadPendingMutation(mutationScope(`distribution.${visit.id}`));
         if (pendingDistribution) {
           throw new Error("Sample/gift entry is waiting to sync. Retry it before check-out.");
         }
         if (!doctorOutcome.trim()) throw new Error("Enter the doctor call outcome before check-out.");
-        const callScope = `doctor-call.${visit.id}`;
+        const callScope = mutationScope(`doctor-call.${visit.id}`);
         const pendingCall = await getOrCreatePendingMutation(callScope, async () => ({
           callOutcome: doctorOutcome.trim(),
           remarks: doctorRemarks.trim() || null,
@@ -738,7 +759,7 @@ export default function App() {
 
       if (stop.type === "chemist" || stop.type === "stockist") {
         if (!tradeOutcome.trim()) throw new Error(`Enter the ${stop.type} call outcome before check-out.`);
-        const tradeScope = `trade-call.${visit.id}`;
+        const tradeScope = mutationScope(`trade-call.${visit.id}`);
         const pendingTrade = await getOrCreatePendingMutation(tradeScope, async () => ({
           outcome: tradeOutcome.trim(),
           remarks: tradeRemarks.trim() || null,
@@ -753,7 +774,7 @@ export default function App() {
         }
 
         if (stop.type === "chemist" && (selectedRcpaProductIds.length > 0 || rcpaCompetitors.length > 0)) {
-          const rcpaScope = `rcpa.${visit.id}`;
+          const rcpaScope = mutationScope(`rcpa.${visit.id}`);
           const lines = buildRcpaLines(selectedRcpaProductIds, rcpaObservations, rcpaCompetitors);
           const pendingRcpa = await getOrCreatePendingMutation(rcpaScope, async () => ({ lines }));
           try {
@@ -766,7 +787,7 @@ export default function App() {
         }
 
         if (selectedOrderProductIds.length > 0) {
-          const orderScope = `order.${visit.id}`;
+          const orderScope = mutationScope(`order.${visit.id}`);
           const lines = buildOrderLines(selectedOrderProductIds, orderQuantities);
           const pendingOrder = await getOrCreatePendingMutation(orderScope, async () => ({
             remarks: orderRemarks.trim() || null,
@@ -786,7 +807,7 @@ export default function App() {
         }
       }
 
-      const checkoutScope = `check-out.${visit.id}`;
+      const checkoutScope = mutationScope(`check-out.${visit.id}`);
       const pendingCheckout = await getOrCreatePendingMutation(checkoutScope, async () => {
         const location = await captureFreshLocation();
         rejectMocked(location);
