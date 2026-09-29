@@ -243,9 +243,19 @@ export default function App() {
   }
 
   async function completePendingMutation(scope: string): Promise<void> {
-    await clearPendingMutation(scope);
-    await removeSyncItem(scope);
-    await refreshSyncQueue();
+    // The server mutation has already succeeded. Local cleanup is best-effort:
+    // a stale retry remains safe because the original operation ID is preserved.
+    try {
+      await clearPendingMutation(scope);
+    } catch {
+      // Keep going so a local storage error cannot turn a committed server write into a false failure.
+    }
+    try {
+      await removeSyncItem(scope);
+      await refreshSyncQueue();
+    } catch {
+      // A stale queue entry may replay idempotently and can be cleaned on the next sync pass.
+    }
   }
 
   function syncDescriptor(scope: string): { action: SyncAction; targetId: string | null } | null {
@@ -356,8 +366,12 @@ export default function App() {
         default:
           return "RETRY";
       }
-      await clearPendingMutation(item.scope);
-      await removeSyncItem(item.scope);
+      try {
+        await clearPendingMutation(item.scope);
+        await removeSyncItem(item.scope);
+      } catch {
+        // The server accepted the original operation ID; any stale local entry can replay idempotently.
+      }
       return "SYNCED";
     } catch (cause) {
       if (isDefinitiveSyncFailure(cause)) {
@@ -396,7 +410,16 @@ export default function App() {
     client = api,
   ): Promise<void> {
     try {
-      await flushSyncQueue(false, currentSession, currentTenantId, client);
+      const result = await flushSyncQueue(false, currentSession, currentTenantId, client);
+      if (result.synced > 0) {
+        try {
+          await refreshField(client);
+          await loadWorkRecords(client);
+          setInventory(await client.inventory());
+        } catch {
+          // Replay remains authoritative; the normal refresh path can recover later.
+        }
+      }
     } catch {
       // Queue remains durable; explicit Sync Now can retry later.
     }
