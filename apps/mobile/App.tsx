@@ -11,8 +11,15 @@ import {
 } from "react-native";
 import { ApiError, TerrevoApi } from "./src/api";
 import { captureFreshLocation, collectDepartureSamples } from "./src/location";
-import { presenceStatusMessage, type DepartureIntegrity } from "./src/presence";
-import { clearPendingMutation, getOrCreatePendingMutation } from "./src/pending";
+import { presenceStatusMessage, type DepartureIntegrity, type PresencePoint } from "./src/presence";
+import {
+  clearPendingMutation,
+  clearPendingPresenceRef,
+  getOrCreatePendingMutation,
+  loadPendingMutation,
+  loadPendingPresenceRef,
+  rememberPendingPresenceRef,
+} from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
 import type { AuthSession, StartTourOption, Tenant, TourProgress, TourStop, Visit } from "./src/types";
 
@@ -62,7 +69,10 @@ export default function App() {
           setTenantId(selected);
           api.setTenant(selected);
           await saveTenantId(selected);
-          if (selected) await refreshField(api);
+          if (selected) {
+            await refreshField(api);
+            await tryResumePendingPresence(api, storedSession, selected);
+          }
         }
       } catch (cause) {
         setError(toMessage(cause));
@@ -112,6 +122,59 @@ export default function App() {
     api.configure(currentSession, id);
     await saveTenantId(id);
     await refreshField(api);
+    await tryResumePendingPresence(api, currentSession, id);
+  }
+
+  async function syncPendingPresence(
+    client = api,
+    currentSession = session,
+    currentTenantId = tenantId,
+  ): Promise<DepartureIntegrity | null> {
+    const ref = await loadPendingPresenceRef();
+    if (!ref || !currentSession || !currentTenantId) return null;
+    if (ref.userId !== currentSession.user.id || ref.tenantId !== currentTenantId) return null;
+
+    const scope = `presence.${ref.visitId}`;
+    const pending = await loadPendingMutation<{ samples: PresencePoint[] }>(scope);
+    if (!pending) {
+      await clearPendingPresenceRef();
+      return null;
+    }
+
+    const result = await client.recordPresence(ref.visitId, {
+      operationId: pending.operationId,
+      samples: pending.payload.samples,
+    });
+    await clearPendingMutation(scope);
+    await clearPendingPresenceRef();
+    setDeparture(result);
+    return result;
+  }
+
+  async function tryResumePendingPresence(
+    client = api,
+    currentSession = session,
+    currentTenantId = tenantId,
+  ): Promise<void> {
+    try {
+      const result = await syncPendingPresence(client, currentSession, currentTenantId);
+      if (result) setMessage(`Pending presence evidence synced: ${result.status.replaceAll("_", " ")}.`);
+    } catch {
+      setMessage("Presence evidence is safely stored on this device and is waiting to sync.");
+    }
+  }
+
+  async function requirePendingPresenceSynced(): Promise<void> {
+    const ref = await loadPendingPresenceRef();
+    if (!ref) return;
+    if (!session || !tenantId || ref.userId !== session.user.id || ref.tenantId !== tenantId) {
+      throw new Error("Unsynced presence evidence exists for another account or company on this device.");
+    }
+    try {
+      await syncPendingPresence();
+    } catch {
+      throw new Error("Previous visit presence evidence is waiting to sync. Reconnect before starting another field visit.");
+    }
   }
 
   async function handleLogout() {
@@ -169,6 +232,7 @@ export default function App() {
 
   async function handleCheckIn(stop: TourStop) {
     await run(async () => {
+      await requirePendingPresenceSynced();
       const scope = `check-in.${stop.planStopId}`;
       const pending = await getOrCreatePendingMutation(scope, async () => {
         const location = await captureFreshLocation();
@@ -251,6 +315,8 @@ export default function App() {
 
       const samples = await collectDepartureSamples((_point, count) => setDepartureSamples(count));
       const presenceScope = `presence.${visit.id}`;
+      if (!session || !tenantId) throw new Error("Session context is unavailable for presence sync.");
+      await rememberPendingPresenceRef({ userId: session.user.id, tenantId, visitId: visit.id });
       const pendingPresence = await getOrCreatePendingMutation(presenceScope, async () => ({ samples }));
       let result: DepartureIntegrity;
       try {
@@ -259,6 +325,7 @@ export default function App() {
           samples: pendingPresence.payload.samples,
         });
         await clearPendingMutation(presenceScope);
+        await clearPendingPresenceRef();
       } catch (cause) {
         await clearPendingOnDefinitiveFailure(presenceScope, cause);
         throw cause;
