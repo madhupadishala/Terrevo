@@ -275,10 +275,15 @@ export default function App() {
     currentTenantId = tenantId,
   ): Promise<{ synced: number; stopped: boolean; manual: number }> {
     if (!currentSession || !currentTenantId) return { synced: 0, stopped: false, manual: 0 };
-    if (
-      sessionUserIdRef.current !== currentSession.user.id ||
-      tenantIdRef.current !== currentTenantId
-    ) return { synced: 0, stopped: false, manual: 0 };
+    const contextIsActive = () =>
+      sessionUserIdRef.current === currentSession.user.id &&
+      tenantIdRef.current === currentTenantId;
+    if (!contextIsActive()) return { synced: 0, stopped: false, manual: 0 };
+
+    // Freeze auth + tenant for this sync run so a UI tenant switch cannot retarget replay.
+    const replayClient = client === api ? new TerrevoApi(() => {}) : client;
+    if (client === api) replayClient.configure(currentSession, currentTenantId);
+
     setSyncing(true);
     let synced = 0;
     let stopped = false;
@@ -286,6 +291,10 @@ export default function App() {
     try {
       const items = await listPendingMutations(currentSession.user.id, currentTenantId);
       for (const item of items) {
+        if (!contextIsActive()) {
+          stopped = true;
+          break;
+        }
         if (item.status === "DEAD_LETTER") continue;
         const operation = parseSyncOperation(item.scope, currentSession.user.id, currentTenantId);
         if (!operation) continue;
@@ -296,8 +305,12 @@ export default function App() {
         const pending = await loadPendingMutation<unknown>(item.scope);
         if (!pending) continue;
         await markPendingMutationAttempt(item.scope);
+        if (!contextIsActive()) {
+          stopped = true;
+          break;
+        }
         try {
-          await replayPendingMutation(client, item.scope, pending, currentSession.user.id, currentTenantId);
+          await replayPendingMutation(replayClient, item.scope, pending, currentSession.user.id, currentTenantId);
           await clearPendingMutation(item.scope);
           synced += 1;
         } catch (cause) {
@@ -311,7 +324,7 @@ export default function App() {
       }
 
       try {
-        await syncPendingPresence(client, currentSession, currentTenantId);
+        if (contextIsActive()) await syncPendingPresence(replayClient, currentSession, currentTenantId);
       } catch {
         // Presence evidence has its own stronger retry contract and stays persisted.
       }
@@ -367,6 +380,16 @@ export default function App() {
       setMessage(result.stopped
         ? `${dead.length} failed action(s) reopened, but sync paused because the server or network is unavailable.`
         : `${dead.length} failed action(s) reopened. ${result.synced} synced now.${result.manual ? ` ${result.manual} require controlled field retry.` : ""}`);
+    });
+  }
+
+  async function handleDiscardDeadLetter(scope: string): Promise<void> {
+    await run(async () => {
+      const item = syncItems.find((candidate) => candidate.scope === scope);
+      if (!item || item.status !== "DEAD_LETTER") return;
+      await clearPendingMutation(scope);
+      await refreshSyncStatus();
+      setMessage("Failed queued action discarded. Submit again from the original workflow to create fresh evidence and a new operation ID.");
     });
   }
 
@@ -1170,6 +1193,11 @@ export default function App() {
               <View key={item.scope} style={styles.syncRow}>
                 <Text style={styles.small}>{syncItemLabel(item)} · {item.status === "DEAD_LETTER" ? "failed" : manual ? "controlled retry" : "pending"} · attempt {item.attempts}</Text>
                 {item.lastError ? <Text style={styles.errorText}>{item.lastError}</Text> : null}
+                {item.status === "DEAD_LETTER" ? (
+                  <Pressable disabled={busy || syncing} onPress={() => void handleDiscardDeadLetter(item.scope)}>
+                    <Text style={styles.link}>Discard failed action</Text>
+                  </Pressable>
+                ) : null}
               </View>
             );
           })}
