@@ -288,6 +288,11 @@ export default function App() {
         rejectMocked(location);
         return { location };
       });
+      if (!session || !tenantId) throw new Error("Session context is unavailable for presence sync.");
+      const pendingPresence = await getOrCreatePendingPresence<{ samples: PresencePoint[] }>(
+        { userId: session.user.id, tenantId, visitId: visit.id },
+        async () => ({ samples: [] }),
+      );
       try {
         await api.checkOut(visit.id, {
           operationId: pendingCheckout.operationId,
@@ -296,7 +301,9 @@ export default function App() {
         checkoutRecorded = true;
         await clearPendingMutation(checkoutScope);
       } catch (cause) {
+        const definitive = cause instanceof ApiError && [400, 403, 404].includes(cause.status);
         await clearPendingOnDefinitiveFailure(checkoutScope, cause);
+        if (definitive) await clearPendingPresence();
         throw cause;
       }
       const checkoutLocation = pendingCheckout.payload.location;
@@ -304,12 +311,6 @@ export default function App() {
       setDoctorOutcome("");
       setDoctorRemarks("");
       setMessage("Check-out recorded. Keep Terrevo open while departure continuity is observed for about 2 minutes.");
-
-      if (!session || !tenantId) throw new Error("Session context is unavailable for presence sync.");
-      const pendingPresence = await getOrCreatePendingPresence<{ samples: PresencePoint[] }>(
-        { userId: session.user.id, tenantId, visitId: visit.id },
-        async () => ({ samples: [] }),
-      );
       await collectDepartureSamples(async (point, count) => {
         pendingPresence.payload.samples = [...pendingPresence.payload.samples, point];
         await savePendingPresence(pendingPresence);
