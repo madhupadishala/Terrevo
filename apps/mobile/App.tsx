@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { ApiError, TerrevoApi } from "./src/api";
+import { buildDistributionLines, buildDoctorProducts, distributionKey } from "./src/field";
 import { captureFreshLocation, collectDepartureSamples } from "./src/location";
 import { presenceStatusMessage, type DepartureIntegrity, type PresencePoint } from "./src/presence";
 import {
@@ -17,13 +18,14 @@ import {
   clearPendingPresence,
   getOrCreatePendingMutation,
   getOrCreatePendingPresence,
+  loadPendingMutation,
   loadPendingPresence,
   savePendingPresence,
 } from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
-import type { AuthSession, StartTourOption, Tenant, TourProgress, TourStop, Visit } from "./src/types";
+import type { AuthSession, InventoryBalance, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution } from "./src/types";
 
-const APP_VERSION = "0.20.0";
+const APP_VERSION = "0.21.0";
 
 export default function App() {
   const [booting, setBooting] = useState(true);
@@ -38,6 +40,16 @@ export default function App() {
   const [exceptionReason, setExceptionReason] = useState("");
   const [doctorOutcome, setDoctorOutcome] = useState("");
   const [doctorRemarks, setDoctorRemarks] = useState("");
+  const [doctorNextAction, setDoctorNextAction] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [products, setProducts] = useState<MasterItem[]>([]);
+  const [samples, setSamples] = useState<MasterItem[]>([]);
+  const [gifts, setGifts] = useState<MasterItem[]>([]);
+  const [inventory, setInventory] = useState<InventoryBalance[]>([]);
+  const [distributionQuantities, setDistributionQuantities] = useState<Record<string, string>>({});
+  const [visitDistributions, setVisitDistributions] = useState<VisitDistribution[]>([]);
+  const [shortDayReason, setShortDayReason] = useState("");
   const [departure, setDeparture] = useState<DepartureIntegrity | null>(null);
   const [departureSamples, setDepartureSamples] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -70,6 +82,7 @@ export default function App() {
           api.setTenant(selected);
           await saveTenantId(selected);
           if (selected) {
+            await loadFieldResources(api);
             await refreshField(api);
             await tryResumePendingPresence(api, storedSession, selected);
           }
@@ -82,6 +95,48 @@ export default function App() {
     })();
   }, [api]);
 
+  function resetDoctorDraft() {
+    setDoctorOutcome("");
+    setDoctorRemarks("");
+    setDoctorNextAction("");
+    setProductSearch("");
+    setSelectedProductIds([]);
+    setDistributionQuantities({});
+    setVisitDistributions([]);
+  }
+
+  async function loadFieldResources(client = api) {
+    const [nextProducts, nextSamples, nextGifts, nextInventory] = await Promise.all([
+      client.master("products"),
+      client.master("samples"),
+      client.master("gifts"),
+      client.inventory(),
+    ]);
+    setProducts(nextProducts.filter((item) => item.status === "active"));
+    setSamples(nextSamples.filter((item) => item.status === "active"));
+    setGifts(nextGifts.filter((item) => item.status === "active"));
+    setInventory(nextInventory);
+  }
+
+  async function loadDoctorContext(client: TerrevoApi, nextProgress: TourProgress | null, nextOpenVisit: Visit | null) {
+    const stop = nextProgress?.stops.find((item) => item.planStopId === nextOpenVisit?.planStopId);
+    if (!nextOpenVisit || stop?.type !== "doctor") {
+      resetDoctorDraft();
+      return;
+    }
+    const [call, distributions] = await Promise.all([
+      client.doctorCall(nextOpenVisit.id),
+      client.visitDistributions(nextOpenVisit.id),
+    ]);
+    setDoctorOutcome(call?.callOutcome ?? "");
+    setDoctorRemarks(call?.remarks ?? "");
+    setDoctorNextAction(call?.nextAction ?? "");
+    setSelectedProductIds(call?.products.slice().sort((a, b) => a.sequence - b.sequence).map((item) => item.productId) ?? []);
+    setProductSearch("");
+    setDistributionQuantities({});
+    setVisitDistributions(distributions);
+  }
+
   async function refreshField(client = api) {
     const [nextProgress, nextOpenVisit, nextStartOptions] = await Promise.all([
       client.progress(),
@@ -91,6 +146,7 @@ export default function App() {
     setProgress(nextProgress);
     setOpenVisit(nextOpenVisit);
     setStartOptions(nextStartOptions);
+    await loadDoctorContext(client, nextProgress, nextOpenVisit);
   }
 
   async function run(action: () => Promise<void>) {
@@ -121,6 +177,7 @@ export default function App() {
     setTenantId(id);
     api.configure(currentSession, id);
     await saveTenantId(id);
+    await loadFieldResources(api);
     await refreshField(api);
     await tryResumePendingPresence(api, currentSession, id);
   }
@@ -178,6 +235,12 @@ export default function App() {
       setProgress(null);
       setOpenVisit(null);
       setStartOptions([]);
+      setProducts([]);
+      setSamples([]);
+      setGifts([]);
+      setInventory([]);
+      resetDoctorDraft();
+      setShortDayReason("");
       setDeparture(null);
     });
   }
@@ -255,6 +318,55 @@ export default function App() {
     });
   }
 
+  async function handleRecordDistribution(visit: Visit) {
+    await run(async () => {
+      const items = buildDistributionLines(inventory, distributionQuantities);
+      if (items.length === 0) throw new Error("Enter at least one sample or gift quantity.");
+      const scope = `distribution.${visit.id}`;
+      const pending = await getOrCreatePendingMutation(scope, async () => ({ items }));
+      try {
+        const distributions = await api.distribute(visit.id, {
+          operationId: pending.operationId,
+          items: pending.payload.items,
+        });
+        await clearPendingMutation(scope);
+        setVisitDistributions(distributions);
+        setDistributionQuantities({});
+        setInventory(await api.inventory());
+        setMessage("Samples/gifts recorded against this doctor visit.");
+      } catch (cause) {
+        await clearPendingOnDefinitiveFailure(scope, cause);
+        throw cause;
+      }
+    });
+  }
+
+  async function handleSubmitTour(current: TourProgress) {
+    await run(async () => {
+      await requirePendingPresenceSynced();
+      if (current.remainingMinutes > 0 && !shortDayReason.trim()) {
+        throw new Error("Enter a short-day reason before submitting this tour.");
+      }
+      const scope = `submit-tour.${current.executionId}`;
+      const pending = await getOrCreatePendingMutation(scope, async () => ({
+        shortDayReason: shortDayReason.trim() || null,
+      }));
+      try {
+        const submitted = await api.submitTour({
+          operationId: pending.operationId,
+          shortDayReason: pending.payload.shortDayReason,
+        });
+        await clearPendingMutation(scope);
+        setShortDayReason("");
+        await refreshField();
+        setMessage(`Tour submitted. Worked time: ${submitted.workedMinutes} minutes.`);
+      } catch (cause) {
+        await clearPendingOnDefinitiveFailure(scope, cause);
+        throw cause;
+      }
+    });
+  }
+
   async function handleCheckOut(stop: TourStop, visit: Visit) {
     setBusy(true);
     setError(null);
@@ -264,11 +376,17 @@ export default function App() {
     let checkoutRecorded = false;
     try {
       if (stop.type === "doctor") {
+        const pendingDistribution = await loadPendingMutation(`distribution.${visit.id}`);
+        if (pendingDistribution) {
+          throw new Error("Sample/gift entry is waiting to sync. Retry it before check-out.");
+        }
         if (!doctorOutcome.trim()) throw new Error("Enter the doctor call outcome before check-out.");
         const callScope = `doctor-call.${visit.id}`;
         const pendingCall = await getOrCreatePendingMutation(callScope, async () => ({
           callOutcome: doctorOutcome.trim(),
           remarks: doctorRemarks.trim() || null,
+          nextAction: doctorNextAction.trim() || null,
+          products: buildDoctorProducts(selectedProductIds),
         }));
         try {
           await api.saveDoctorCall(visit.id, {
@@ -308,8 +426,7 @@ export default function App() {
       }
       const checkoutLocation = pendingCheckout.payload.location;
       await refreshField();
-      setDoctorOutcome("");
-      setDoctorRemarks("");
+      resetDoctorDraft();
       setMessage("Check-out recorded. Keep Terrevo open while departure continuity is observed for about 2 minutes.");
       await collectDepartureSamples(async (point, count) => {
         pendingPresence.payload.samples = [...pendingPresence.payload.samples, point];
@@ -389,6 +506,12 @@ export default function App() {
   const activeStop = progress?.stops.find((stop) => stop.planStopId === openVisit?.planStopId) ?? null;
   const nextStop = progress?.stops.find((stop) => stop.status === "PENDING") ?? null;
   const selectedTenant = tenants.find((tenant) => tenant.id === tenantId);
+  const productQuery = productSearch.trim().toLowerCase();
+  const visibleProducts = products
+    .filter((item) => !productQuery || item.code.toLowerCase().includes(productQuery) || item.name.toLowerCase().includes(productQuery))
+    .slice(0, 8);
+  const inventoryRows = inventory.filter((balance) => balance.quantity > 0);
+  const hasDistributionDraft = Object.values(distributionQuantities).some((value) => value.trim() !== "");
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -453,6 +576,61 @@ export default function App() {
                       <>
                         <TextInput style={styles.input} placeholder="Doctor call outcome" value={doctorOutcome} onChangeText={setDoctorOutcome} />
                         <TextInput style={[styles.input, styles.multiline]} multiline placeholder="Call remarks (optional)" value={doctorRemarks} onChangeText={setDoctorRemarks} />
+                        <TextInput style={styles.input} placeholder="Next action (optional)" value={doctorNextAction} onChangeText={setDoctorNextAction} />
+
+                        <Text style={styles.sectionTitle}>Products detailed</Text>
+                        <TextInput style={styles.input} placeholder="Search product code or name" value={productSearch} onChangeText={setProductSearch} />
+                        {visibleProducts.map((item) => {
+                          const selectedIndex = selectedProductIds.indexOf(item.id);
+                          const selected = selectedIndex >= 0;
+                          return (
+                            <Pressable
+                              key={item.id}
+                              style={[styles.choiceRow, selected && styles.choiceSelected]}
+                              onPress={() => setSelectedProductIds((current) => {
+                                if (current.includes(item.id)) return current.filter((id) => id !== item.id);
+                                if (current.length >= 20) {
+                                  setError("You can detail up to 20 products in one doctor call.");
+                                  return current;
+                                }
+                                setError(null);
+                                return [...current, item.id];
+                              })}
+                            >
+                              <Text style={styles.choiceText}>{item.code} · {item.name}</Text>
+                              <Text style={styles.small}>{selected ? `Selected #${selectedIndex + 1}` : "Tap to add"}</Text>
+                            </Pressable>
+                          );
+                        })}
+                        {products.length === 0 ? <Text style={styles.small}>No active products are available in your scope.</Text> : null}
+
+                        <Text style={styles.sectionTitle}>Samples & gifts</Text>
+                        {inventoryRows.map((balance) => {
+                          const item = (balance.itemType === "sample" ? samples : gifts).find((entry) => entry.id === balance.itemId);
+                          const key = distributionKey(balance);
+                          return (
+                            <View key={balance.id} style={styles.quantityRow}>
+                              <View style={styles.flex}>
+                                <Text style={styles.choiceText}>{item ? `${item.code} · ${item.name}` : balance.itemType}</Text>
+                                <Text style={styles.small}>{balance.itemType === "sample" ? "Sample" : "Gift"} · Available {balance.quantity}</Text>
+                              </View>
+                              <TextInput
+                                style={styles.quantityInput}
+                                keyboardType="number-pad"
+                                placeholder="0"
+                                value={distributionQuantities[key] ?? ""}
+                                onChangeText={(value) => setDistributionQuantities((current) => ({ ...current, [key]: value }))}
+                              />
+                            </View>
+                          );
+                        })}
+                        {inventoryRows.length === 0 ? <Text style={styles.small}>No sample/gift balance is available.</Text> : null}
+                        {visitDistributions.length > 0 ? <Text style={styles.small}>{visitDistributions.length} distribution line(s) already recorded for this visit.</Text> : null}
+                        <PrimaryButton
+                          label="Record Samples & Gifts"
+                          disabled={busy || !hasDistributionDraft}
+                          onPress={() => void handleRecordDistribution(openVisit)}
+                        />
                       </>
                     ) : null}
                     <PrimaryButton label="Check Out" disabled={busy} onPress={() => void handleCheckOut(stop, openVisit)} />
@@ -460,6 +638,28 @@ export default function App() {
                 ) : null}
               </View>
             ))}
+
+            {progress.pendingCount === 0 && progress.inProgressCount === 0 ? (
+              <View style={styles.card}>
+                <Text style={styles.eyebrow}>END OF DAY</Text>
+                <Text style={styles.cardTitle}>Submit Tour</Text>
+                <Text style={styles.muted}>All planned calls are completed. Submission closes field mutations for this tour.</Text>
+                {progress.remainingMinutes > 0 ? (
+                  <TextInput
+                    style={[styles.input, styles.multiline]}
+                    multiline
+                    placeholder="Short-day reason"
+                    value={shortDayReason}
+                    onChangeText={setShortDayReason}
+                  />
+                ) : null}
+                <PrimaryButton
+                  label="Submit Tour"
+                  disabled={busy || (progress.remainingMinutes > 0 && !shortDayReason.trim())}
+                  onPress={() => void handleSubmitTour(progress)}
+                />
+              </View>
+            ) : null}
           </>
         )}
 
@@ -551,6 +751,12 @@ const styles = StyleSheet.create({
   sequenceText: { color: "#1F5FE0", fontWeight: "800" },
   flex: { flex: 1 },
   actionArea: { gap: 10, marginTop: 4 },
+  sectionTitle: { fontSize: 14, fontWeight: "800", color: "#263A52", marginTop: 4 },
+  choiceRow: { borderWidth: 1, borderColor: "#CDD5DF", borderRadius: 10, padding: 11, gap: 3 },
+  choiceSelected: { borderColor: "#1F5FE0", backgroundColor: "#EDF4FF" },
+  choiceText: { fontSize: 14, fontWeight: "700", color: "#263A52" },
+  quantityRow: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderColor: "#E3E8EF", borderRadius: 10, padding: 10 },
+  quantityInput: { width: 64, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#CDD5DF", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, textAlign: "center", fontSize: 15, color: "#132238" },
   verifiedLine: { color: "#265D3D", fontSize: 13, fontWeight: "700" },
   spinner: { marginTop: 4 },
   privacy: { paddingHorizontal: 4, paddingTop: 4 },
