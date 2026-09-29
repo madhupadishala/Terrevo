@@ -887,6 +887,16 @@ export function createSupabaseAdapter(
       const r=await expectOk(await fetcher(`${base}/rest/v1/daily_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
       return (await r.json() as Array<Record<string,any>>).map(mapDailyTimesheet);
     },
+    async listSelf(tenantId,userId,accessToken){
+      const q=new URLSearchParams({
+        select:"*,employees!inner(user_id)",
+        tenant_id:`eq.${tenantId}`,
+        "employees.user_id":`eq.${userId}`,
+        order:"work_date.desc",
+      });
+      const r=await expectOk(await fetcher(`${base}/rest/v1/daily_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
+      return (await r.json() as Array<Record<string,any>>).map(mapDailyTimesheet);
+    },
     async getOwn(tenantId,id,accessToken){
       const q=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,id:`eq.${id}`,limit:"1"});
       const r=await expectOk(await fetcher(`${base}/rest/v1/daily_timesheets?${q}`,{headers:authHeaders(config,accessToken)}));
