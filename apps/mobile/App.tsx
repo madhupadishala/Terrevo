@@ -93,6 +93,7 @@ export default function App() {
   const analyticsDaysRef = useRef<7 | 30>(7);
   const analyticsRequestRef = useRef(0);
   const tenantIdRef = useRef<string | null>(null);
+  const sessionUserIdRef = useRef<string | null>(null);
   const [syncItems, setSyncItems] = useState<SyncQueueItem[]>([]);
   const [syncing, setSyncing] = useState(false);
   const syncInFlightRef = useRef(false);
@@ -109,6 +110,7 @@ export default function App() {
 
   useEffect(() => {
     tenantIdRef.current = tenantId;
+    sessionUserIdRef.current = session?.user.id ?? null;
     api.configure(session, tenantId);
   }, [api, session, tenantId]);
 
@@ -117,6 +119,7 @@ export default function App() {
       try {
         const [storedSession, storedTenant] = await Promise.all([loadSession(), loadTenantId()]);
         setSession(storedSession);
+        sessionUserIdRef.current = storedSession?.user.id ?? null;
         setTenantId(storedTenant);
         tenantIdRef.current = storedTenant;
         api.configure(storedSession, storedTenant);
@@ -386,22 +389,30 @@ export default function App() {
     }
   }
 
-  /** Replays eligible queue items once; a ref lock prevents overlapping foreground and resume passes. */
+  /** Replays eligible queue items once under the immutable user/tenant context that started the pass. */
   async function flushSyncQueue(
     force = false,
     currentSession = session,
     currentTenantId = tenantId,
-    client = api,
   ): Promise<{ synced: number; dead: number }> {
     if (!currentSession || !currentTenantId || syncInFlightRef.current) return { synced: 0, dead: 0 };
     syncInFlightRef.current = true;
+    const replayClient = new TerrevoApi(async (nextSession) => {
+      if (nextSession?.user.id === currentSession.user.id) {
+        setSession(nextSession);
+        sessionUserIdRef.current = nextSession.user.id;
+        await saveSession(nextSession);
+      }
+    });
+    replayClient.configure(currentSession, currentTenantId);
     try {
       const items = await listSyncQueue(currentSession.user.id, currentTenantId);
       let synced = 0;
       let dead = 0;
       for (const item of items) {
+        if (sessionUserIdRef.current !== currentSession.user.id || tenantIdRef.current !== currentTenantId) break;
         if (item.state !== "QUEUED" || item.mode !== "AUTO" || (!force && !isSyncDue(item))) continue;
-        const result = await replaySyncItem(item, client);
+        const result = await replaySyncItem(item, replayClient);
         if (result === "SYNCED") synced += 1;
         if (result === "DEAD") dead += 1;
       }
@@ -418,7 +429,7 @@ export default function App() {
     client = api,
   ): Promise<void> {
     try {
-      const result = await flushSyncQueue(false, currentSession, currentTenantId, client);
+      const result = await flushSyncQueue(false, currentSession, currentTenantId);
       if (result.synced > 0) {
         try {
           await refreshField(client);
@@ -576,6 +587,7 @@ export default function App() {
   async function handleLogin() {
     await run(async () => {
       const nextSession = await api.login(email, password);
+      sessionUserIdRef.current = nextSession.user.id;
       api.configure(nextSession, null);
       const accessible = await api.tenants();
       setTenants(accessible);
@@ -646,6 +658,7 @@ export default function App() {
   async function handleLogout() {
     await run(async () => {
       await api.logout();
+      sessionUserIdRef.current = null;
       await saveTenantId(null);
       tenantIdRef.current = null;
       setTenantId(null);
