@@ -10,8 +10,8 @@ knowledge_base:
       - "skills/karpathy-guidelines/SKILL.md"
       - "skills/warpath/SKILL.md"
 reviews:
-  profile: "chill"
-  request_changes_workflow: false
+  profile: "assertive"
+  request_changes_workflow: true
   high_level_summary: true
   changed_files_summary: true
   review_status: true
