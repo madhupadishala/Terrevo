@@ -245,22 +245,45 @@ export default function App() {
     await refreshSyncQueue();
   }
 
-  async function recordMutationFailure<T>(
-    scope: string,
-    action: SyncAction,
-    targetId: string | null,
-    pending: { operationId: string; payload: T },
-    cause: unknown,
-  ): Promise<void> {
+  function syncDescriptor(scope: string): { action: SyncAction; targetId: string | null } | null {
+    const businessScope = scope.split(".").slice(2).join(".");
+    const mappings: Array<[string, SyncAction]> = [
+      ["start.", "start-tour"],
+      ["check-in.", "check-in"],
+      ["distribution.", "distribution"],
+      ["doctor-call.", "doctor-call"],
+      ["trade-call.", "trade-call"],
+      ["rcpa.", "rcpa"],
+      ["order.", "order"],
+      ["check-out.", "check-out"],
+      ["submit-tour.", "submit-tour"],
+      ["daily-timesheet-review.", "daily-review"],
+      ["weekly-timesheet-submit.", "weekly-submit"],
+      ["expense-save.", "expense-save"],
+      ["expense-submit.", "expense-submit"],
+      ["joint-work-join.", "joint-work-join"],
+      ["joint-work-leave.", "joint-work-leave"],
+    ];
+    if (businessScope === "leave-submit") return { action: "leave-submit", targetId: null };
+    for (const [prefix, action] of mappings) {
+      if (businessScope.startsWith(prefix)) return { action, targetId: businessScope.slice(prefix.length) || null };
+    }
+    return null;
+  }
+
+  async function recordPendingFailure(scope: string, cause: unknown): Promise<void> {
     if (!session || !tenantId) return;
+    const descriptor = syncDescriptor(scope);
+    const pending = await loadPendingMutation<unknown>(scope);
+    if (!descriptor || !pending) return;
     try {
       await queuePendingMutation({
         scope,
         userId: session.user.id,
         tenantId,
-        action,
-        targetId,
-        pending: pending as { operationId: string; payload: unknown },
+        action: descriptor.action,
+        targetId: descriptor.targetId,
+        pending,
         error: toMessage(cause),
       });
       const item = (await listSyncQueue(session.user.id, tenantId)).find((candidate) => candidate.scope === scope);
@@ -592,12 +615,6 @@ export default function App() {
     }
   }
 
-  async function clearPendingOnDefinitiveFailure(scope: string, cause: unknown) {
-    if (cause instanceof ApiError && [400, 403, 404].includes(cause.status)) {
-      await clearPendingMutation(scope);
-    }
-  }
-
   async function handleStartTour(option: StartTourOption) {
     await run(async () => {
       const scope = mutationScope(`start.${option.planDayId}`);
@@ -616,9 +633,9 @@ export default function App() {
           planDayId: option.planDayId,
           ...pending.payload,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       await refreshField();
@@ -645,9 +662,9 @@ export default function App() {
           planStopId: stop.planStopId,
           ...pending.payload,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setOpenVisit(visit);
@@ -670,13 +687,13 @@ export default function App() {
           operationId: pending.operationId,
           items: pending.payload.items,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
         setVisitDistributions(distributions);
         setDistributionQuantities({});
         setInventory(await api.inventory());
         setMessage("Samples/gifts recorded against this doctor visit.");
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
     });
@@ -697,13 +714,13 @@ export default function App() {
           operationId: pending.operationId,
           shortDayReason: pending.payload.shortDayReason,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
         setShortDayReason("");
         await refreshField();
         await loadWorkRecords();
         setMessage(`Workday closed. Worked time: ${submitted.workedMinutes} minutes. Daily timesheet generated automatically.`);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
     });
@@ -720,9 +737,9 @@ export default function App() {
           operationId: pending.operationId,
           remarks: pending.payload.remarks,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setDailyRemarks("");
@@ -751,9 +768,9 @@ export default function App() {
           operationId: pending.operationId,
           comment: pending.payload.comment,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setWeeklyComment("");
@@ -777,9 +794,9 @@ export default function App() {
       }));
       try {
         await api.submitLeave({ operationId: pending.operationId, ...pending.payload });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setLeaveStart("");
@@ -819,9 +836,9 @@ export default function App() {
       }));
       try {
         await api.saveExpense(executionId, { operationId: pending.operationId, ...pending.payload });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setExpenseDraftLines([]);
@@ -838,9 +855,9 @@ export default function App() {
       }));
       try {
         await api.submitExpense(claim.id, { operationId: pending.operationId, comment: pending.payload.comment });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setExpenseSubmitComment("");
@@ -860,9 +877,9 @@ export default function App() {
       try {
         if (action === "join") await api.joinJointWork(assignment.id, { operationId: pending.operationId, location: pending.payload.location });
         else await api.leaveJointWork(assignment.id, { operationId: pending.operationId, location: pending.payload.location });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       await loadWorkRecords();
@@ -953,9 +970,9 @@ export default function App() {
             operationId: pendingCall.operationId,
             ...pendingCall.payload,
           });
-          await clearPendingMutation(callScope);
+          await completePendingMutation(callScope);
         } catch (cause) {
-          await clearPendingOnDefinitiveFailure(callScope, cause);
+          await recordPendingFailure(callScope, cause);
           throw cause;
         }
       }
@@ -970,9 +987,9 @@ export default function App() {
         }));
         try {
           await api.saveTradeCall(visit.id, { operationId: pendingTrade.operationId, ...pendingTrade.payload });
-          await clearPendingMutation(tradeScope);
+          await completePendingMutation(tradeScope);
         } catch (cause) {
-          await clearPendingOnDefinitiveFailure(tradeScope, cause);
+          await recordPendingFailure(tradeScope, cause);
           throw cause;
         }
 
@@ -982,9 +999,9 @@ export default function App() {
           const pendingRcpa = await getOrCreatePendingMutation(rcpaScope, async () => ({ lines }));
           try {
             await api.saveRcpa(visit.id, { operationId: pendingRcpa.operationId, lines: pendingRcpa.payload.lines });
-            await clearPendingMutation(rcpaScope);
+            await completePendingMutation(rcpaScope);
           } catch (cause) {
-            await clearPendingOnDefinitiveFailure(rcpaScope, cause);
+            await recordPendingFailure(rcpaScope, cause);
             throw cause;
           }
         }
@@ -1002,9 +1019,9 @@ export default function App() {
               remarks: pendingOrder.payload.remarks,
               lines: pendingOrder.payload.lines,
             });
-            await clearPendingMutation(orderScope);
+            await completePendingMutation(orderScope);
           } catch (cause) {
-            await clearPendingOnDefinitiveFailure(orderScope, cause);
+            await recordPendingFailure(orderScope, cause);
             throw cause;
           }
         }
@@ -1027,10 +1044,10 @@ export default function App() {
           ...pendingCheckout.payload,
         });
         checkoutRecorded = true;
-        await clearPendingMutation(checkoutScope);
+        await completePendingMutation(checkoutScope);
       } catch (cause) {
         const definitive = cause instanceof ApiError && [400, 403, 404].includes(cause.status);
-        await clearPendingOnDefinitiveFailure(checkoutScope, cause);
+        await recordPendingFailure(checkoutScope, cause);
         if (definitive) await clearPendingPresence();
         throw cause;
       }
