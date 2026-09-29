@@ -129,14 +129,25 @@ export async function getOrCreatePendingMutation<T>(
   createPayload: () => Promise<T>,
 ): Promise<PendingMutation<T>> {
   const existing = await loadPendingMutation<T>(scope);
-  if (existing) return existing;
+  const now = new Date().toISOString();
+  if (existing) {
+    const retry: PendingMutation<T> = {
+      ...existing,
+      attempts: existing.attempts + 1,
+      lastAttemptAt: now,
+      lastError: null,
+      status: "PENDING",
+    };
+    await savePendingMutation(scope, retry);
+    return retry;
+  }
 
   const pending: PendingMutation<T> = {
     operationId: Crypto.randomUUID(),
     payload: await createPayload(),
-    createdAt: new Date().toISOString(),
-    attempts: 0,
-    lastAttemptAt: null,
+    createdAt: now,
+    attempts: 1,
+    lastAttemptAt: now,
     lastError: null,
     status: "PENDING",
   };
