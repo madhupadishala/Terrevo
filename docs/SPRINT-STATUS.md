@@ -21,7 +21,7 @@
 | 16 | POB / Orders | CLOSED |
 | 17 | Attendance + Leave | CLOSED |
 | 18 | Expenses | CLOSED |
-| 19 | Joint Field Work | PLANNED |
+| 19 | Joint Field Work | CLOSED |
 | 20 | Manager Command Center | PLANNED |
 | 21 | Analytics + Reports | PLANNED |
 | 22 | Offline/Sync Hardening | PLANNED |
@@ -29,4 +29,4 @@
 | 24 | Regression + UAT + Closure | PLANNED |
 | 25 | Pilot Release | PLANNED |
 
-Completed through Sprint 18. Next planned sprint: 19 — Joint Field Work.
+Completed through Sprint 19. Next planned sprint: 20 — Manager Command Center.
