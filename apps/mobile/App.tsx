@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import { ApiError, TerrevoApi } from "./src/api";
-import { buildDistributionLines, buildDoctorProducts, distributionKey } from "./src/field";
+import { buildDistributionLines, buildDoctorProducts, distributionKey, projectedInventoryBalance, weekStartFromDate } from "./src/field";
 import { captureFreshLocation, collectDepartureSamples } from "./src/location";
 import { presenceStatusMessage, type DepartureIntegrity, type PresencePoint } from "./src/presence";
 import {
@@ -23,9 +23,9 @@ import {
   savePendingPresence,
 } from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
-import type { AuthSession, InventoryBalance, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution } from "./src/types";
+import type { AuthSession, DailyTimesheet, InventoryBalance, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
 
-const APP_VERSION = "0.21.0";
+const APP_VERSION = "0.22.0";
 
 export default function App() {
   const [booting, setBooting] = useState(true);
@@ -50,6 +50,10 @@ export default function App() {
   const [distributionQuantities, setDistributionQuantities] = useState<Record<string, string>>({});
   const [visitDistributions, setVisitDistributions] = useState<VisitDistribution[]>([]);
   const [shortDayReason, setShortDayReason] = useState("");
+  const [dailyTimesheets, setDailyTimesheets] = useState<DailyTimesheet[]>([]);
+  const [weeklyTimesheets, setWeeklyTimesheets] = useState<WeeklyTimesheet[]>([]);
+  const [dailyRemarks, setDailyRemarks] = useState("");
+  const [weeklyComment, setWeeklyComment] = useState("");
   const [departure, setDeparture] = useState<DepartureIntegrity | null>(null);
   const [departureSamples, setDepartureSamples] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -84,6 +88,7 @@ export default function App() {
           if (selected) {
             await loadFieldResources(api);
             await refreshField(api);
+            await loadWorkRecords(api);
             await tryResumePendingPresence(api, storedSession, selected);
           }
         }
@@ -116,6 +121,15 @@ export default function App() {
     setSamples(nextSamples.filter((item) => item.status === "active"));
     setGifts(nextGifts.filter((item) => item.status === "active"));
     setInventory(nextInventory);
+  }
+
+  async function loadWorkRecords(client = api) {
+    const [daily, weekly] = await Promise.all([
+      client.dailyTimesheets(),
+      client.weeklyTimesheets(),
+    ]);
+    setDailyTimesheets(daily);
+    setWeeklyTimesheets(weekly);
   }
 
   async function loadDoctorContext(client: TerrevoApi, nextProgress: TourProgress | null, nextOpenVisit: Visit | null) {
@@ -179,6 +193,7 @@ export default function App() {
     await saveTenantId(id);
     await loadFieldResources(api);
     await refreshField(api);
+    await loadWorkRecords(api);
     await tryResumePendingPresence(api, currentSession, id);
   }
 
@@ -241,6 +256,10 @@ export default function App() {
       setInventory([]);
       resetDoctorDraft();
       setShortDayReason("");
+      setDailyTimesheets([]);
+      setWeeklyTimesheets([]);
+      setDailyRemarks("");
+      setWeeklyComment("");
       setDeparture(null);
     });
   }
@@ -359,11 +378,65 @@ export default function App() {
         await clearPendingMutation(scope);
         setShortDayReason("");
         await refreshField();
-        setMessage(`Tour submitted. Worked time: ${submitted.workedMinutes} minutes.`);
+        await loadWorkRecords();
+        setMessage(`Workday closed. Worked time: ${submitted.workedMinutes} minutes. Daily timesheet generated automatically.`);
       } catch (cause) {
         await clearPendingOnDefinitiveFailure(scope, cause);
         throw cause;
       }
+    });
+  }
+
+  async function handleReviewDaily(timesheet: DailyTimesheet) {
+    await run(async () => {
+      const scope = `daily-timesheet-review.${timesheet.id}`;
+      const pending = await getOrCreatePendingMutation(scope, async () => ({
+        remarks: dailyRemarks.trim() || null,
+      }));
+      try {
+        await api.reviewDailyTimesheet(timesheet.id, {
+          operationId: pending.operationId,
+          remarks: pending.payload.remarks,
+        });
+        await clearPendingMutation(scope);
+      } catch (cause) {
+        await clearPendingOnDefinitiveFailure(scope, cause);
+        throw cause;
+      }
+      setDailyRemarks("");
+      await loadWorkRecords();
+      setMessage("Daily work record reviewed. Calculated field evidence remains unchanged.");
+    });
+  }
+
+  async function handleGenerateWeekly(workDate: string) {
+    await run(async () => {
+      const weekStart = weekStartFromDate(workDate);
+      await api.generateWeeklyTimesheet(weekStart);
+      await loadWorkRecords();
+      setMessage(`Weekly timesheet generated from reviewed daily evidence for week of ${weekStart}.`);
+    });
+  }
+
+  async function handleSubmitWeekly(timesheet: WeeklyTimesheet) {
+    await run(async () => {
+      const scope = `weekly-timesheet-submit.${timesheet.id}`;
+      const pending = await getOrCreatePendingMutation(scope, async () => ({
+        comment: weeklyComment.trim() || null,
+      }));
+      try {
+        await api.submitWeeklyTimesheet(timesheet.id, {
+          operationId: pending.operationId,
+          comment: pending.payload.comment,
+        });
+        await clearPendingMutation(scope);
+      } catch (cause) {
+        await clearPendingOnDefinitiveFailure(scope, cause);
+        throw cause;
+      }
+      setWeeklyComment("");
+      await loadWorkRecords();
+      setMessage("Weekly timesheet submitted from reviewed daily records.");
     });
   }
 
@@ -512,6 +585,10 @@ export default function App() {
     .slice(0, 8);
   const inventoryRows = inventory.filter((balance) => balance.quantity > 0);
   const hasDistributionDraft = Object.values(distributionQuantities).some((value) => value.trim() !== "");
+  const latestDaily = [...dailyTimesheets].sort((a, b) => b.workDate.localeCompare(a.workDate))[0] ?? null;
+  const sourceWeek = latestDaily ? weekStartFromDate(latestDaily.workDate) : null;
+  const sourceWeekly = sourceWeek ? weeklyTimesheets.find((item) => item.weekStart === sourceWeek) ?? null : null;
+  const latestWeekly = [...weeklyTimesheets].sort((a, b) => b.weekStart.localeCompare(a.weekStart))[0] ?? null;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -529,10 +606,10 @@ export default function App() {
 
         {!progress ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>No active tour</Text>
-            <Text style={styles.muted}>Start an approved tour before checking in to a customer.</Text>
+            <Text style={styles.cardTitle}>Workday ready</Text>
+            <Text style={styles.muted}>Start My Tour is your field-work clock-in. Server time becomes the trusted start of the day.</Text>
             {startOptions.map((option) => (
-              <PrimaryButton key={option.planDayId} label={`Start My Tour · ${option.workDate}`} disabled={busy} onPress={() => void handleStartTour(option)} />
+              <PrimaryButton key={option.planDayId} label={`Start My Tour · Clock In · ${option.workDate}`} disabled={busy} onPress={() => void handleStartTour(option)} />
             ))}
             {startOptions.length === 0 ? <Text style={styles.small}>No approved tour is available for today.</Text> : null}
           </View>
@@ -541,7 +618,7 @@ export default function App() {
             <View style={styles.card}>
               <Text style={styles.eyebrow}>TODAY'S TOUR</Text>
               <Text style={styles.cardTitle}>{progress.completedCount} of {progress.plannedCount} calls completed</Text>
-              <Text style={styles.muted}>{progress.remainingMinutes} of {progress.requiredMinutes} work minutes remaining</Text>
+              <Text style={styles.muted}>Workday in progress · {progress.remainingMinutes} of {progress.requiredMinutes} server-timed work minutes remaining</Text>
             </View>
 
             {progress.stops.map((stop) => (
@@ -608,11 +685,12 @@ export default function App() {
                         {inventoryRows.map((balance) => {
                           const item = (balance.itemType === "sample" ? samples : gifts).find((entry) => entry.id === balance.itemId);
                           const key = distributionKey(balance);
+                          const projected = projectedInventoryBalance(balance, distributionQuantities);
                           return (
                             <View key={balance.id} style={styles.quantityRow}>
                               <View style={styles.flex}>
                                 <Text style={styles.choiceText}>{item ? `${item.code} · ${item.name}` : balance.itemType}</Text>
-                                <Text style={styles.small}>{balance.itemType === "sample" ? "Sample" : "Gift"} · Available {balance.quantity}</Text>
+                                <Text style={styles.small}>{balance.itemType === "sample" ? "Sample" : "Gift"} · Available {balance.quantity} · After this call {projected ?? "—"}</Text>
                               </View>
                               <TextInput
                                 style={styles.quantityInput}
@@ -642,8 +720,8 @@ export default function App() {
             {progress.pendingCount === 0 && progress.inProgressCount === 0 ? (
               <View style={styles.card}>
                 <Text style={styles.eyebrow}>END OF DAY</Text>
-                <Text style={styles.cardTitle}>Submit Tour</Text>
-                <Text style={styles.muted}>All planned calls are completed. Submission closes field mutations for this tour.</Text>
+                <Text style={styles.cardTitle}>Close Workday</Text>
+                <Text style={styles.muted}>All planned calls are completed. Submit Tour closes field mutations and generates the daily timesheet from trusted field evidence.</Text>
                 {progress.remainingMinutes > 0 ? (
                   <TextInput
                     style={[styles.input, styles.multiline]}
@@ -654,7 +732,7 @@ export default function App() {
                   />
                 ) : null}
                 <PrimaryButton
-                  label="Submit Tour"
+                  label="Submit Tour · Clock Out Day"
                   disabled={busy || (progress.remainingMinutes > 0 && !shortDayReason.trim())}
                   onPress={() => void handleSubmitTour(progress)}
                 />
@@ -662,6 +740,57 @@ export default function App() {
             ) : null}
           </>
         )}
+
+        {latestDaily ? (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>DAILY WORK RECORD</Text>
+            <Text style={styles.cardTitle}>{latestDaily.workDate} · {latestDaily.status}</Text>
+            <Text style={styles.muted}>Worked {latestDaily.totalMinutes} min · Calls {latestDaily.callCount} · Visit time {latestDaily.visitMinutes} min</Text>
+            <Text style={styles.small}>Unclassified {latestDaily.unclassifiedMinutes} min. Calculated values come from trusted field events and cannot be edited.</Text>
+            {latestDaily.status === "GENERATED" ? (
+              <>
+                <TextInput
+                  style={[styles.input, styles.multiline]}
+                  multiline
+                  placeholder="Optional daily remark"
+                  value={dailyRemarks}
+                  onChangeText={setDailyRemarks}
+                />
+                <PrimaryButton label="Review Daily Record" disabled={busy} onPress={() => void handleReviewDaily(latestDaily)} />
+              </>
+            ) : null}
+          </View>
+        ) : null}
+
+        {latestDaily?.status === "REVIEWED" && sourceWeek && !sourceWeekly ? (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>WEEKLY RECORD</Text>
+            <Text style={styles.cardTitle}>Week of {sourceWeek}</Text>
+            <Text style={styles.muted}>Generate the weekly record from reviewed daily evidence. Missing days are not fabricated.</Text>
+            <PrimaryButton label="Generate Weekly Timesheet" disabled={busy} onPress={() => void handleGenerateWeekly(latestDaily.workDate)} />
+          </View>
+        ) : null}
+
+        {latestWeekly ? (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>WEEKLY TIMESHEET</Text>
+            <Text style={styles.cardTitle}>Week of {latestWeekly.weekStart} · {latestWeekly.status}</Text>
+            <Text style={styles.muted}>{latestWeekly.dailyCount} reviewed day(s) · {latestWeekly.totalMinutes} min · {latestWeekly.callCount} calls</Text>
+            <Text style={styles.small}>Visit {latestWeekly.visitMinutes} min · Unclassified {latestWeekly.unclassifiedMinutes} min</Text>
+            {latestWeekly.status === "DRAFT" || latestWeekly.status === "RETURNED" ? (
+              <>
+                <TextInput
+                  style={[styles.input, styles.multiline]}
+                  multiline
+                  placeholder="Optional weekly submission comment"
+                  value={weeklyComment}
+                  onChangeText={setWeeklyComment}
+                />
+                <PrimaryButton label="Submit Weekly Timesheet" disabled={busy} onPress={() => void handleSubmitWeekly(latestWeekly)} />
+              </>
+            ) : null}
+          </View>
+        ) : null}
 
         {busy && departureSamples > 0 ? (
           <View style={styles.card}>
