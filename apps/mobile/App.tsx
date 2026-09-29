@@ -23,9 +23,9 @@ import {
   savePendingPresence,
 } from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
-import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, ExpenseClaim, ExpenseLine, InventoryBalance, JointWork, LeaveRequest, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
+import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, ExpenseClaim, ExpenseLine, InventoryBalance, JointWork, LeaveRequest, ManagerCommandCenter, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
 
-const APP_VERSION = "0.24.0";
+const APP_VERSION = "0.25.0";
 const EXPENSE_CATEGORIES: ExpenseCategory[] = ["TRAVEL", "MEAL", "LODGING", "LOCAL_CONVEYANCE", "OTHER"];
 
 export default function App() {
@@ -84,6 +84,7 @@ export default function App() {
   const [expenseDraftLines, setExpenseDraftLines] = useState<ExpenseLine[]>([]);
   const [expenseSubmitComment, setExpenseSubmitComment] = useState("");
   const [jointWork, setJointWork] = useState<JointWork[]>([]);
+  const [managerCommand, setManagerCommand] = useState<ManagerCommandCenter | null>(null);
   const [departure, setDeparture] = useState<DepartureIntegrity | null>(null);
   const [departureSamples, setDepartureSamples] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -186,6 +187,10 @@ export default function App() {
     setLeaves(leaveRows);
     setExpenses(expenseRows);
     setJointWork(jointRows);
+    const access = await client.accessContext();
+    setManagerCommand(access.permissions.includes("MANAGER_DASHBOARD_VIEW")
+      ? await client.managerCommandCenter()
+      : null);
   }
 
   async function loadDoctorContext(client: TerrevoApi, nextProgress: TourProgress | null, nextOpenVisit: Visit | null) {
@@ -368,6 +373,7 @@ export default function App() {
       setExpenseDraftLines([]);
       setExpenseSubmitComment("");
       setJointWork([]);
+      setManagerCommand(null);
       setDeparture(null);
     });
   }
@@ -656,6 +662,13 @@ export default function App() {
     });
   }
 
+  async function handleRefreshManager() {
+    await run(async () => {
+      await loadWorkRecords();
+      setMessage("Manager command view refreshed from current scoped operational evidence.");
+    });
+  }
+
   function handleAddRcpaCompetitor() {
     const brand = competitorBrand.trim();
     if (!brand) {
@@ -917,6 +930,28 @@ export default function App() {
 
         {error ? <Notice text={error} error /> : null}
         {message ? <Notice text={message} /> : null}
+
+        {managerCommand ? (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>MANAGER COMMAND</Text>
+            <Text style={styles.cardTitle}>{managerCommand.teamMembers} team member(s) · {managerCommand.activeTours} active tour(s)</Text>
+            <Text style={styles.muted}>Operational snapshot for {managerCommand.localDate}. This view is read-only; approvals stay inside their scoped workflows.</Text>
+            <View style={styles.managerMetrics}>
+              <View style={styles.metricBox}><Text style={styles.metricValue}>{managerCommand.submittedToursToday}</Text><Text style={styles.small}>Submitted today</Text></View>
+              <View style={styles.metricBox}><Text style={styles.metricValue}>{managerCommand.shortDaysToday}</Text><Text style={styles.small}>Short days</Text></View>
+              <View style={styles.metricBox}><Text style={styles.metricValue}>{managerCommand.activeJointWork}</Text><Text style={styles.small}>Joint work</Text></View>
+            </View>
+            <Text style={styles.sectionTitle}>Pending action queues</Text>
+            <Text style={styles.small}>Tour approvals {managerCommand.pending.tourApprovals} · GPS exceptions {managerCommand.pending.gpsExceptions} · Weekly timesheets {managerCommand.pending.weeklyTimesheets}</Text>
+            <Text style={styles.small}>Leave {managerCommand.pending.leaves} · Expenses {managerCommand.pending.expenses}</Text>
+            {managerCommand.queues.tourApprovals.slice(0, 3).map((item) => <Text key={`tour-approval-${item.id}`} style={styles.small}>Tour approval · week {item.weekStart}</Text>)}
+            {managerCommand.queues.gpsExceptions.slice(0, 3).map((item) => <Text key={`gps-${item.id}`} style={styles.small}>GPS exception · {item.workDate}</Text>)}
+            {managerCommand.queues.weeklyTimesheets.slice(0, 3).map((item) => <Text key={`weekly-${item.id}`} style={styles.small}>Weekly timesheet · week {item.weekStart}</Text>)}
+            {managerCommand.queues.leaves.slice(0, 3).map((item) => <Text key={`leave-${item.id}`} style={styles.small}>Leave · {item.startDate} to {item.endDate}</Text>)}
+            {managerCommand.queues.expenses.slice(0, 3).map((item) => <Text key={`expense-${item.id}`} style={styles.small}>Expense · {item.workDate} · {item.currencyCode} {item.totalAmount.toFixed(2)}</Text>)}
+            <SecondaryButton label="Refresh Manager Command" onPress={() => void handleRefreshManager()} />
+          </View>
+        ) : null}
 
         {!progress ? (
           <View style={styles.card}>
@@ -1385,6 +1420,9 @@ const styles = StyleSheet.create({
   tripleInputs: { flexDirection: "row", gap: 8 },
   choiceButtons: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   compactChoice: { borderWidth: 1, borderColor: "#CDD5DF", borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8 },
+  managerMetrics: { flexDirection: "row", gap: 8 },
+  metricBox: { flex: 1, borderWidth: 1, borderColor: "#E3E8EF", borderRadius: 10, padding: 10, gap: 2 },
+  metricValue: { fontSize: 20, fontWeight: "800", color: "#132238" },
   metricInput: { flex: 1, minWidth: 0, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#CDD5DF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 9, textAlign: "center", fontSize: 14, color: "#132238" },
   verifiedLine: { color: "#265D3D", fontSize: 13, fontWeight: "700" },
   spinner: { marginTop: 4 },
