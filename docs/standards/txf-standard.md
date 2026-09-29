@@ -24,6 +24,8 @@ TXF is Terrevo's internal field-product standard. It combines proven field-force
 8. **Inventory truth.** MR sample/gift balances come from the authoritative ledger; the UI may preview a projected post-call balance but never mutate inventory locally.
 9. **Privacy-bounded presence.** Capture only the location evidence required around explicit field actions; no continuous tracking by default.
 10. **Compatibility before cleverness.** Reuse established contracts and preserve supported-client behavior unless a requirement explicitly changes them.
+11. **Self-service views stay owner-scoped.** A field-user screen must not reuse a broader team-visible manager feed when elevated permissions could expose another employee's record as the user's own.
+12. **Local retry state is identity-scoped.** Critical mutation retry state must be bound to the authenticated user and tenant; it must never cross an account or company boundary on a shared device.
 
 ## Mandatory engineering gates
 
