@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".vercel-api",
+    "rootDir": ".",
+    "declaration": false,
+    "sourceMap": false,
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": [
+    "apps/api/src/**/*.ts",
+    "modules/**/*.ts"
+  ]
+}

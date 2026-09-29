@@ -2,6 +2,7 @@ node_modules/
 dist/
 build/
 coverage/
+.vercel-api/
 .env
 .env.*
 !.env.example

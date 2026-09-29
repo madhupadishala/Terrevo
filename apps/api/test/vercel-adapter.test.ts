@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createVercelApiHandler } from "../../../api/[...path].ts";
+import { createVercelApiHandler } from "../src/vercel-runtime.ts";
 
 test("TRV-DEPLOY-001 health is reachable without provider secrets", async () => {
   const response = await createVercelApiHandler({}).fetch(

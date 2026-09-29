@@ -6,7 +6,10 @@
   "type": "module",
   "scripts": {
     "verify:foundation": "node scripts/verify-foundation.mjs",
-    "build": "vite build --config apps/web/vite.config.ts",
+    "build:api": "node -e \"require('fs').rmSync('.vercel-api',{recursive:true,force:true})\" && tsc -p tsconfig.vercel-api.json",
+    "build:web": "vite build --config apps/web/vite.config.ts",
+    "verify:vercel-runtime": "node scripts/verify-vercel-runtime.mjs",
+    "build": "npm run build:api && npm run build:web && npm run verify:vercel-runtime",
     "typecheck:web": "tsc -p apps/web/tsconfig.json",
     "typecheck": "tsc -p tsconfig.json && npm run typecheck:web",
     "test": "node --experimental-strip-types --test apps/api/test/*.test.ts",
