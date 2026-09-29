@@ -19,6 +19,7 @@ import {
   loadPendingMutation,
   loadPendingPresenceRef,
   rememberPendingPresenceRef,
+  savePendingMutation,
 } from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
 import type { AuthSession, StartTourOption, Tenant, TourProgress, TourStop, Visit } from "./src/types";
@@ -313,11 +314,18 @@ export default function App() {
       setDoctorRemarks("");
       setMessage("Check-out recorded. Keep Terrevo open while departure continuity is observed for about 2 minutes.");
 
-      const samples = await collectDepartureSamples((_point, count) => setDepartureSamples(count));
       const presenceScope = `presence.${visit.id}`;
       if (!session || !tenantId) throw new Error("Session context is unavailable for presence sync.");
       await rememberPendingPresenceRef({ userId: session.user.id, tenantId, visitId: visit.id });
-      const pendingPresence = await getOrCreatePendingMutation(presenceScope, async () => ({ samples }));
+      const pendingPresence = await getOrCreatePendingMutation<{ samples: PresencePoint[] }>(
+        presenceScope,
+        async () => ({ samples: [] }),
+      );
+      await collectDepartureSamples(async (point, count) => {
+        pendingPresence.payload.samples = [...pendingPresence.payload.samples, point];
+        await savePendingMutation(presenceScope, pendingPresence);
+        setDepartureSamples(count);
+      });
       let result: DepartureIntegrity;
       try {
         result = await api.recordPresence(visit.id, {
@@ -334,7 +342,16 @@ export default function App() {
       setMessage(presenceStatusMessage(result.status));
     } catch (cause) {
       if (checkoutRecorded) {
-        setMessage("Check-out is already recorded. Departure continuity could not complete, so no continuity conclusion was made.");
+        try {
+          const partial = await syncPendingPresence();
+          if (partial) {
+            setMessage(`Check-out is recorded. Incomplete departure evidence was retained for review: ${partial.status.replaceAll("_", " ")}.`);
+          } else {
+            setMessage("Check-out is recorded. Departure evidence is safely retained and waiting to sync.");
+          }
+        } catch {
+          setMessage("Check-out is recorded. Departure evidence is safely retained and waiting to sync.");
+        }
       } else {
         setError(toMessage(cause));
       }

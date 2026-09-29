@@ -8,7 +8,7 @@ create table public.visit_presence_integrity(
   operation_id uuid not null,
   request_hash bytea not null,
   status text not null check(status in('CONSISTENT','REVIEW_REQUIRED','SPOOF_SUSPECTED')),
-  sample_count integer not null check(sample_count between 3 and 10),
+  sample_count integer not null check(sample_count between 0 and 10),
   total_distance_meters double precision not null check(total_distance_meters>=0),
   max_segment_speed_kph double precision not null check(max_segment_speed_kph>=0),
   mocked_detected boolean not null,
@@ -101,7 +101,7 @@ declare
 begin
   if jsonb_typeof(p_samples)<>'array' then raise exception 'samples must be an array'; end if;
   v_count:=jsonb_array_length(p_samples);
-  if v_count<3 or v_count>10 then raise exception 'samples must contain 3 to 10 location points'; end if;
+  if v_count>10 then raise exception 'samples must contain at most 10 location points'; end if;
 
   v_request_hash:=extensions.digest(
     jsonb_build_object('visitId',p_visit_id,'samples',p_samples)::text,
@@ -204,6 +204,9 @@ begin
   if v_mocked_detected then
     v_status:='SPOOF_SUSPECTED';
     v_reason:='Device reported mocked location in departure evidence.';
+  elsif v_count<3 then
+    v_status:='REVIEW_REQUIRED';
+    v_reason:='Fewer than three post-checkout location samples were captured.';
   elsif v_invalid_time then
     v_status:='REVIEW_REQUIRED';
     v_reason:='Departure sample timing is not sequential.';

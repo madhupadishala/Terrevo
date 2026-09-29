@@ -32,6 +32,12 @@ export async function loadPendingMutation<T>(scope: string): Promise<PendingMuta
   return null;
 }
 
+export async function savePendingMutation<T>(scope: string, pending: PendingMutation<T>): Promise<void> {
+  await SecureStore.setItemAsync(storageKey(scope), JSON.stringify(pending), {
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+  });
+}
+
 export async function getOrCreatePendingMutation<T>(
   scope: string,
   createPayload: () => Promise<T>,
@@ -44,9 +50,7 @@ export async function getOrCreatePendingMutation<T>(
     operationId: Crypto.randomUUID(),
     payload: await createPayload(),
   };
-  await SecureStore.setItemAsync(key, JSON.stringify(pending), {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-  });
+  await savePendingMutation(scope, pending);
   return pending;
 }
 

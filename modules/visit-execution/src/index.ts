@@ -117,7 +117,7 @@ function num(value:unknown,field:string,min:number,max:number){if(typeof value!=
 function reason(value:unknown,max=1000){if(value==null||value==="")return null;if(typeof value!=="string")throw new VisitInputError("Invalid reason");const v=value.trim();if(!v||v.length>max)throw new VisitInputError("Invalid reason");return v}
 function timestamp(value:unknown,field:string){if(typeof value!=="string")throw new VisitInputError(`Invalid ${field}`);const parsed=new Date(value);if(Number.isNaN(parsed.getTime()))throw new VisitInputError(`Invalid ${field}`);return parsed.toISOString()}
 function presenceSamples(value:unknown):PresenceSampleInput[]{
-  if(!Array.isArray(value)||value.length<3||value.length>10)throw new VisitInputError("samples must contain 3 to 10 location points");
+  if(!Array.isArray(value)||value.length>10)throw new VisitInputError("samples must contain at most 10 location points");
   return value.map((raw,index)=>{
     if(!raw||typeof raw!=="object"||Array.isArray(raw))throw new VisitInputError(`Invalid sample at index ${index}`);
     const sample=raw as Record<string,unknown>;
