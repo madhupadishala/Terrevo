@@ -9,6 +9,7 @@ import type { TourProgress, TourProgressRepository } from "../../../modules/tour
 import type { FieldSettings, Visit, VisitRepository } from "../../../modules/visit-execution/src/index.ts";
 import type { Dcr, DcrSummary, DoctorCall, DoctorCallRepository } from "../../../modules/doctor-call/src/index.ts";
 import type { InventoryBalance, InventoryRepository, VisitDistribution } from "../../../modules/inventory/src/index.ts";
+import type { SubmitTourRepository, SubmitTourResult } from "../../../modules/tour-submit/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -128,6 +129,7 @@ export function createSupabaseAdapter(
   visits: VisitRepository;
   doctorCalls: DoctorCallRepository;
   inventory: InventoryRepository;
+  tourSubmit: SubmitTourRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -795,5 +797,30 @@ export function createSupabaseAdapter(
     },
   };
 
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory };
+  const tourSubmit:SubmitTourRepository={
+    async submit(tenantId,userId,input){
+      const response=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_submit_tour_execution`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_user_id:userId,p_operation_id:input.operationId,
+          p_short_day_reason:input.shortDayReason,
+        }),
+      }));
+      return await response.json() as string;
+    },
+    async getSubmitted(tenantId,executionId,accessToken){
+      const q=new URLSearchParams({
+        select:"id,status,started_at,submitted_at,required_minutes,worked_minutes,short_day_reason",
+        tenant_id:`eq.${tenantId}`,id:`eq.${executionId}`,status:"eq.SUBMITTED",limit:"1",
+      });
+      const r=await expectOk(await fetcher(`${base}/rest/v1/tour_executions?${q}`,{headers:authHeaders(config,accessToken)}));
+      const row=(await r.json() as Array<Record<string,any>>)[0];
+      if(!row)return null;
+      return {
+        id:row.id,status:row.status,startedAt:row.started_at,submittedAt:row.submitted_at,
+        requiredMinutes:row.required_minutes,workedMinutes:row.worked_minutes,shortDayReason:row.short_day_reason,
+      } as SubmitTourResult;
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit };
 }

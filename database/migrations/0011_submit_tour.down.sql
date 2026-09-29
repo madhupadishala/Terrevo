@@ -1,0 +1,10 @@
+begin;
+drop function if exists public.admin_submit_tour_execution(uuid,uuid,uuid,text);
+drop index if exists public.tour_executions_submit_operation_unique;
+alter table public.tour_executions drop column if exists short_day_reason;
+alter table public.tour_executions drop column if exists worked_minutes;
+alter table public.tour_executions drop column if exists submit_operation_id;
+alter table public.tour_executions drop column if exists submitted_at;
+alter table public.tour_executions drop constraint if exists tour_executions_status_check;
+alter table public.tour_executions add constraint tour_executions_status_check check(status='ACTIVE');
+commit;
