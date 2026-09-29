@@ -18,10 +18,17 @@ import {
   clearPendingPresence,
   getOrCreatePendingMutation,
   getOrCreatePendingPresence,
+  listPendingMutations,
   loadPendingMutation,
   loadPendingPresence,
+  markPendingMutationAttempt,
+  markPendingMutationFailure,
+  revivePendingMutation,
   savePendingPresence,
+  type PendingMutationSummary,
 } from "./src/pending";
+import { replayPendingMutation } from "./src/replay";
+import { isDefinitiveSyncFailure, parseSyncOperation, shouldStopSyncAfterFailure } from "./src/sync";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
 import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, ExpenseClaim, ExpenseLine, InventoryBalance, JointWork, LeaveRequest, ManagerAnalytics, ManagerCommandCenter, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
 
@@ -93,6 +100,9 @@ export default function App() {
   const tenantIdRef = useRef<string | null>(null);
   const [departure, setDeparture] = useState<DepartureIntegrity | null>(null);
   const [departureSamples, setDepartureSamples] = useState(0);
+  const [syncItems, setSyncItems] = useState<PendingMutationSummary[]>([]);
+  const [syncPresencePending, setSyncPresencePending] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -210,6 +220,9 @@ export default function App() {
     setAnalyticsDays(7);
     setDeparture(null);
     setDepartureSamples(0);
+    setSyncItems([]);
+    setSyncPresencePending(false);
+    setSyncing(false);
   }
 
   function mutationScope(scope: string): string {
