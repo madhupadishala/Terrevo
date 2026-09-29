@@ -194,3 +194,62 @@ export type SalesOrder = {
   lines: Array<OrderLine & { productCode: string; productName: string }>;
   updatedAt: string;
 };
+
+export type AttendanceRow = {
+  workDate: string;
+  status: "WORKING" | "PRESENT" | "SHORT_DAY" | "LEAVE" | "HALF_DAY_LEAVE";
+  workedMinutes: number | null;
+  requiredMinutes: number | null;
+  shortDayReason: string | null;
+  leaveRequestId: string | null;
+};
+
+export type LeaveRequest = {
+  id: string;
+  employeeId: string;
+  orgUnitId: string;
+  leaveType: "FULL_DAY" | "HALF_DAY";
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: "SUBMITTED" | "APPROVED" | "REJECTED";
+  managerComment: string | null;
+  reviewedAt: string | null;
+};
+
+export type ExpenseCategory = "TRAVEL" | "MEAL" | "LODGING" | "LOCAL_CONVEYANCE" | "OTHER";
+
+export type ExpenseLine = {
+  sequence: number;
+  category: ExpenseCategory;
+  amount: number;
+  remarks: string | null;
+  receiptReference: string | null;
+};
+
+export type ExpenseClaim = {
+  id: string;
+  executionId: string;
+  employeeId: string;
+  orgUnitId: string;
+  workDate: string;
+  currencyCode: string;
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "RETURNED";
+  totalAmount: number;
+  submissionComment: string | null;
+  reviewComment: string | null;
+  lines: ExpenseLine[];
+};
+
+export type JointWork = {
+  id: string;
+  targetEmployeeId: string;
+  targetOrgUnitId: string;
+  participantEmployeeId: string;
+  workDate: string;
+  status: "PLANNED" | "ACTIVE" | "COMPLETED";
+  executionId: string | null;
+  joinedAt: string | null;
+  leftAt: string | null;
+  selfRole: "TARGET" | "PARTICIPANT" | null;
+};
