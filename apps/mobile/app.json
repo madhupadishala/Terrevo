@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Terrevo Field",
+    "slug": "terrevo-field",
+    "version": "0.20.0",
+    "orientation": "portrait",
+    "scheme": "terrevo",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.theclinixai.terrevo",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.theclinixai.terrevo"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Terrevo uses your location only for active field actions such as tour start, customer check-in, check-out, and the short departure continuity check."
+        }
+      ],
+      "expo-secure-store"
+    ]
+  }
+}
