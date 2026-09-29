@@ -88,6 +88,7 @@ export default function App() {
   const [managerCommand, setManagerCommand] = useState<ManagerCommandCenter | null>(null);
   const [managerAnalytics, setManagerAnalytics] = useState<ManagerAnalytics | null>(null);
   const [analyticsDays, setAnalyticsDays] = useState<7 | 30>(7);
+  const analyticsDaysRef = useRef<7 | 30>(7);
   const analyticsRequestRef = useRef(0);
   const tenantIdRef = useRef<string | null>(null);
   const [departure, setDeparture] = useState<DepartureIntegrity | null>(null);
@@ -180,6 +181,7 @@ export default function App() {
     setExpenseSubmitComment("");
   }
 
+  /** Clears tenant-derived UI state and invalidates in-flight analytics before a tenant/session boundary changes. */
   function clearTenantViewState() {
     setProgress(null);
     setOpenVisit(null);
@@ -204,6 +206,7 @@ export default function App() {
     setManagerCommand(null);
     analyticsRequestRef.current += 1;
     setManagerAnalytics(null);
+    analyticsDaysRef.current = 7;
     setAnalyticsDays(7);
     setDeparture(null);
     setDepartureSamples(0);
@@ -246,12 +249,13 @@ export default function App() {
     const access = await client.accessContext();
     if (access.permissions.includes("MANAGER_DASHBOARD_VIEW")) {
       setManagerCommand(await client.managerCommandCenter());
-      const requestedDays = analyticsDays;
+      const requestedDays = analyticsDaysRef.current;
       const requestedTenant = tenantIdRef.current;
       const requestId = ++analyticsRequestRef.current;
       try {
         const report = await client.managerAnalytics(requestedDays);
         if (requestId === analyticsRequestRef.current && tenantIdRef.current === requestedTenant) {
+          setAnalyticsDays(requestedDays);
           setManagerAnalytics(report);
         }
       } catch {
@@ -265,6 +269,7 @@ export default function App() {
     }
   }
 
+  /** Restores doctor-call draft context for the currently open doctor visit. */
   async function loadDoctorContext(client: TerrevoApi, nextProgress: TourProgress | null, nextOpenVisit: Visit | null) {
     const stop = nextProgress?.stops.find((item) => item.planStopId === nextOpenVisit?.planStopId);
     if (!nextOpenVisit || stop?.type !== "doctor") {
@@ -338,6 +343,7 @@ export default function App() {
     ]);
   }
 
+  /** Runs one foreground UI action with shared busy, error, and message state handling. */
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setError(null);
@@ -362,6 +368,7 @@ export default function App() {
     });
   }
 
+  /** Switches the active tenant after clearing prior tenant state and then reloads tenant-scoped resources. */
   async function selectTenant(id: string, currentSession = session) {
     clearTenantViewState();
     tenantIdRef.current = id;
@@ -713,6 +720,7 @@ export default function App() {
     });
   }
 
+  /** Refreshes manager operational and analytics views using the latest selected analytics window. */
   async function handleRefreshManager() {
     await run(async () => {
       await loadWorkRecords();
@@ -722,12 +730,14 @@ export default function App() {
 
   /** Reloads the manager analytics card and discards responses from superseded windows or tenants. */
   async function handleAnalyticsWindow(days: 7 | 30) {
+    analyticsDaysRef.current = days;
+    setAnalyticsDays(days);
+    setManagerAnalytics(null);
     await run(async () => {
       const requestedTenant = tenantIdRef.current;
       const requestId = ++analyticsRequestRef.current;
       const report = await api.managerAnalytics(days);
       if (requestId !== analyticsRequestRef.current || tenantIdRef.current !== requestedTenant) return;
-      setAnalyticsDays(days);
       setManagerAnalytics(report);
       setMessage(`Manager analytics refreshed for the last ${days} tenant-local day(s).`);
     });
