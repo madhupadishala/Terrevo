@@ -1,4 +1,5 @@
 import { createHandler, type ApiEnv } from "./handler.ts";
+import { hardenApiResponse, resolveRequestId } from "../../../modules/security/src/index.ts";
 
 export type VercelRuntimeHealth = {
   status: "ok" | "degraded";
@@ -45,23 +46,24 @@ function internalRequest(request: Request): Request {
 export function createVercelApiHandler(env: ApiEnv) {
   return {
     async fetch(request: Request): Promise<Response> {
+      const requestId = resolveRequestId(request.headers.get("x-request-id"));
       const url = new URL(request.url);
       const path = internalPath(url);
 
       if (request.method === "GET" && path === "/health") {
-        return Response.json(health(env), {
+        return hardenApiResponse(Response.json(health(env), {
           headers: { "cache-control": "no-store" },
-        });
+        }), requestId);
       }
 
       if (!env.SUPABASE_URL || !(env.SUPABASE_PUBLISHABLE_KEY ?? env.SUPABASE_ANON_KEY)) {
-        return Response.json(
+        return hardenApiResponse(Response.json(
           { error: "API provider configuration is missing" },
           { status: 503, headers: { "cache-control": "no-store" } },
-        );
+        ), requestId);
       }
 
-      return createHandler(env)(internalRequest(request));
+      return hardenApiResponse(await createHandler(env)(internalRequest(request)), requestId);
     },
   };
 }
