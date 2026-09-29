@@ -24,6 +24,8 @@ import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./sup
 
 export type ApiEnv = {
   SUPABASE_URL?: string;
+  SUPABASE_PUBLISHABLE_KEY?: string;
+  SUPABASE_SECRET_KEY?: string;
   SUPABASE_ANON_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
 };
@@ -63,13 +65,15 @@ async function readJsonObject(request: Request, maxBytes = 8_192): Promise<Recor
 }
 
 function requireConfig(env: ApiEnv): SupabaseConfig {
-  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+  const publishableKey = env.SUPABASE_PUBLISHABLE_KEY ?? env.SUPABASE_ANON_KEY;
+  const secretKey = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!env.SUPABASE_URL || !publishableKey) {
     throw new ApiError(500, "Identity provider is not configured");
   }
   return {
     url: env.SUPABASE_URL,
-    anonKey: env.SUPABASE_ANON_KEY,
-    serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+    anonKey: publishableKey,
+    serviceRoleKey: secretKey,
   };
 }
 

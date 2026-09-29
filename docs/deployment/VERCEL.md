@@ -23,11 +23,13 @@ The current web UI is intentionally a deployment-verification shell. Product wor
 
 ## Environment variables
 
-Authenticated/business API routes require:
+Authenticated/business API routes require the modern Supabase keys:
 
 - `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` for privileged server mutations
+- `SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SECRET_KEY` for privileged server mutations
+
+Legacy `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` remain temporary fallback names only.
 
 The health endpoint reports only whether configuration is present. It never returns secret values.
 
