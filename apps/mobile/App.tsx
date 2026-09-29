@@ -807,7 +807,7 @@ export default function App() {
         reason: leaveReason.trim(),
       }));
       try {
-        await client.submitLeave({ operationId: pending.operationId, ...pending.payload });
+        await api.submitLeave({ operationId: pending.operationId, ...pending.payload });
         await completePendingMutation(scope);
       } catch (cause) {
         await recordPendingFailure(scope, cause);
@@ -1102,7 +1102,7 @@ export default function App() {
         checkoutRecorded = true;
         await completePendingMutation(checkoutScope);
       } catch (cause) {
-        const definitive = cause instanceof ApiError && [400, 403, 404].includes(cause.status);
+        const definitive = cause instanceof ApiError && [400, 403, 404, 409].includes(cause.status);
         await recordPendingFailure(checkoutScope, cause);
         if (definitive) await clearPendingPresence();
         throw cause;
