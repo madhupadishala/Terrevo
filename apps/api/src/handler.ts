@@ -12,6 +12,7 @@ import { createDoctorCallService, DoctorCallConflictError, DoctorCallInputError,
 import { createInventoryService, InventoryInputError, InventoryNotFoundError } from "../../../modules/inventory/src/index.ts";
 import { createSubmitTourService, SubmitTourConflictError, SubmitTourInputError } from "../../../modules/tour-submit/src/index.ts";
 import { createDailyTimesheetService, DailyTimesheetConflictError, DailyTimesheetInputError, DailyTimesheetNotFoundError } from "../../../modules/timesheet-daily/src/index.ts";
+import { createWeeklyTimesheetService, WeeklyTimesheetConflictError, WeeklyTimesheetInputError, WeeklyTimesheetNotFoundError } from "../../../modules/timesheet-weekly/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 
 export type ApiEnv = {
@@ -76,11 +77,11 @@ function mapError(error: unknown): Response {
     return json(status, { error: error.message });
   }
   if (error instanceof AuthorizationError) return json(403, { error: "Permission denied" });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError) {
     return json(400, { error: error.message });
   }
-  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError) return json(404, { error: error.message });
-  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError) return json(409, { error: error.message });
+  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError) return json(404, { error: error.message });
+  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
     if (error.status === 400) return json(400, { error: "Provider rejected request" });
@@ -107,6 +108,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const inventory = createInventoryService(adapter.inventory, adapter.masters, rbac);
   const tourSubmit = createSubmitTourService(adapter.tourSubmit);
   const dailyTimesheets = createDailyTimesheetService(adapter.dailyTimesheets);
+  const weeklyTimesheets = createWeeklyTimesheetService(adapter.weeklyTimesheets, rbac);
 
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -184,6 +186,35 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         return json(200, {
           context: await rbac.accessContext(context.tenantId, user.id, accessToken),
         });
+      }
+
+      if(request.method==="GET"&&path==="/v1/timesheets/weekly"){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{timesheets:await weeklyTimesheets.list(context.tenantId,accessToken)});
+      }
+      if(request.method==="POST"&&path==="/v1/timesheets/weekly/generate"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(201,{timesheet:await weeklyTimesheets.generate(context.tenantId,user.id,accessToken,await readJsonObject(request))});
+      }
+      if(request.method==="GET"&&path==="/v1/timesheet-approvals"){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{timesheets:await weeklyTimesheets.listPending(context.tenantId,accessToken)});
+      }
+      const weeklyDecision=/^\/v1\/timesheet-approvals\/([^/]+)\/decision$/.exec(path);
+      if(request.method==="POST"&&weeklyDecision){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        await weeklyTimesheets.decide(context.tenantId,user.id,accessToken,weeklyDecision[1],await readJsonObject(request));
+        return new Response(null,{status:204});
+      }
+      const weeklySubmit=/^\/v1\/timesheets\/weekly\/([^/]+)\/submit$/.exec(path);
+      if(request.method==="POST"&&weeklySubmit){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(200,{timesheet:await weeklyTimesheets.submit(context.tenantId,user.id,accessToken,weeklySubmit[1],await readJsonObject(request))});
+      }
+      const weeklyOne=/^\/v1\/timesheets\/weekly\/([^/]+)$/.exec(path);
+      if(request.method==="GET"&&weeklyOne){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{timesheet:await weeklyTimesheets.get(context.tenantId,accessToken,weeklyOne[1])});
       }
 
       if(request.method==="GET"&&path==="/v1/timesheets/daily"){

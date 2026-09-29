@@ -25,6 +25,7 @@
     "modules/doctor-call/src/**/*.ts",
     "modules/inventory/src/**/*.ts",
     "modules/tour-submit/src/**/*.ts",
-    "modules/timesheet-daily/src/**/*.ts"
+    "modules/timesheet-daily/src/**/*.ts",
+    "modules/timesheet-weekly/src/**/*.ts"
   ]
 }

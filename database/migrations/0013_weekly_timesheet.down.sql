@@ -1,0 +1,12 @@
+begin;
+drop policy if exists weekly_timesheet_decisions_visible on public.weekly_timesheet_decisions;
+drop policy if exists weekly_timesheet_days_visible on public.weekly_timesheet_days;
+drop policy if exists weekly_timesheets_owner_or_team_read on public.weekly_timesheets;
+drop function if exists public.admin_decide_weekly_timesheet(uuid,uuid,uuid,text,text);
+drop function if exists public.admin_submit_weekly_timesheet(uuid,uuid,uuid,uuid,text);
+drop function if exists public.admin_generate_weekly_timesheet(uuid,uuid,date);
+drop table if exists public.weekly_timesheet_decisions;
+drop table if exists public.weekly_timesheet_days;
+drop table if exists public.weekly_timesheets;
+delete from public.role_permissions where permission_key in('TIMESHEET_VIEW_TEAM','TIMESHEET_APPROVE');
+commit;
