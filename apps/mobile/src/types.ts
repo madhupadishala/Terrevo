@@ -57,3 +57,61 @@ export type Visit = {
   checkinAt: string;
   checkoutAt: string | null;
 };
+
+export type FieldMasterKind = "products" | "samples" | "gifts";
+
+export type MasterItem = {
+  id: string;
+  code: string;
+  name: string;
+  status: "active" | "inactive";
+};
+
+export type DoctorCallProductInput = {
+  sequence: number;
+  productId: string;
+  detailNotes: string | null;
+};
+
+export type DoctorCall = {
+  id: string;
+  visitId: string;
+  doctorId: string;
+  callOutcome: string;
+  remarks: string | null;
+  nextAction: string | null;
+  products: DoctorCallProductInput[];
+  updatedAt: string;
+};
+
+export type InventoryItemType = "sample" | "gift";
+
+export type InventoryBalance = {
+  id: string;
+  employeeId: string;
+  itemType: InventoryItemType;
+  itemId: string;
+  quantity: number;
+};
+
+export type DistributionLine = {
+  itemType: InventoryItemType;
+  itemId: string;
+  quantity: number;
+};
+
+export type VisitDistribution = DistributionLine & {
+  id: string;
+  visitId: string;
+  createdAt: string;
+};
+
+export type SubmitTourResult = {
+  id: string;
+  status: "SUBMITTED";
+  startedAt: string;
+  submittedAt: string;
+  requiredMinutes: number;
+  workedMinutes: number;
+  shortDayReason: string | null;
+};
