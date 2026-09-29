@@ -70,3 +70,20 @@ export function shouldStopSyncAfterFailure(error: unknown): boolean {
   if (status === null) return true;
   return status === 401 || status === 408 || status === 425 || status === 429 || status >= 500;
 }
+
+const AUTO_REPLAY_SAFE = new Set<SyncOperationKind>([
+  "distribution",
+  "daily-timesheet-review",
+  "weekly-timesheet-submit",
+  "leave-submit",
+  "expense-save",
+  "expense-submit",
+  "doctor-call",
+  "trade-call",
+  "rcpa",
+  "order",
+]);
+
+export function isAutoReplaySafe(kind: SyncOperationKind): boolean {
+  return AUTO_REPLAY_SAFE.has(kind);
+}
