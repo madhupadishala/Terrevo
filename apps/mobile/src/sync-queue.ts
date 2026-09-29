@@ -1,15 +1,26 @@
 import * as SecureStore from "expo-secure-store";
 import type { PendingMutation } from "./pending";
-import { nextRetryAt, syncModeFor, type SyncAction, type SyncQueueItem } from "./sync";
+import { isSyncQueueItem, nextRetryAt, syncModeFor, type SyncAction, type SyncQueueItem } from "./sync";
 
 const MANIFEST_KEY = "terrevo.sync.manifest.v1";
 const ITEM_PREFIX = "terrevo.sync.item.v1.";
+let manifestLock: Promise<unknown> = Promise.resolve();
 
-function itemKey(scope: string): string {
-  return ITEM_PREFIX + scope.replace(/[^A-Za-z0-9._-]/g, "_");
+function withManifestLock<T>(work: () => Promise<T>): Promise<T> {
+  const next = manifestLock.then(work, work);
+  manifestLock = next.catch(() => undefined);
+  return next;
 }
 
-async function loadManifest(): Promise<string[]> {
+function entryId(scope: string, operationId: string): string {
+  return `${scope}::${operationId}`;
+}
+
+function itemKey(id: string): string {
+  return ITEM_PREFIX + id.replace(/[^A-Za-z0-9._-]/g, "_");
+}
+
+async function loadManifestUnlocked(): Promise<string[]> {
   const raw = await SecureStore.getItemAsync(MANIFEST_KEY);
   if (!raw) return [];
   try {
@@ -22,44 +33,52 @@ async function loadManifest(): Promise<string[]> {
   return [];
 }
 
-async function saveManifest(scopes: string[]): Promise<void> {
-  if (scopes.length === 0) {
+async function saveManifestUnlocked(ids: string[]): Promise<void> {
+  if (ids.length === 0) {
     await SecureStore.deleteItemAsync(MANIFEST_KEY);
     return;
   }
-  await SecureStore.setItemAsync(MANIFEST_KEY, JSON.stringify([...new Set(scopes)]), {
+  await SecureStore.setItemAsync(MANIFEST_KEY, JSON.stringify([...new Set(ids)]), {
     keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   });
 }
 
+/** Persists one queue item and its manifest entry atomically with respect to other queue operations. */
 async function saveItem(item: SyncQueueItem): Promise<void> {
-  await SecureStore.setItemAsync(itemKey(item.scope), JSON.stringify(item), {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+  await withManifestLock(async () => {
+    const id = entryId(item.scope, item.operationId);
+    await SecureStore.setItemAsync(itemKey(id), JSON.stringify(item), {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
+    const manifest = await loadManifestUnlocked();
+    if (!manifest.includes(id)) await saveManifestUnlocked([...manifest, id]);
   });
-  const manifest = await loadManifest();
-  if (!manifest.includes(item.scope)) await saveManifest([...manifest, item.scope]);
 }
 
+/** Lists only valid queue items belonging to the supplied authenticated identity and tenant. */
 export async function listSyncQueue(userId: string, tenantId: string): Promise<SyncQueueItem[]> {
-  const manifest = await loadManifest();
-  const validScopes: string[] = [];
-  const items: SyncQueueItem[] = [];
-  for (const scope of manifest) {
-    const raw = await SecureStore.getItemAsync(itemKey(scope));
-    if (!raw) continue;
-    try {
-      const item = JSON.parse(raw) as SyncQueueItem;
-      if (!item.scope || !item.userId || !item.tenantId || !item.operationId || !item.action) throw new Error("invalid");
-      validScopes.push(scope);
-      if (item.userId === userId && item.tenantId === tenantId) items.push(item);
-    } catch {
-      await SecureStore.deleteItemAsync(itemKey(scope));
+  return withManifestLock(async () => {
+    const manifest = await loadManifestUnlocked();
+    const validIds: string[] = [];
+    const items: SyncQueueItem[] = [];
+    for (const id of manifest) {
+      const raw = await SecureStore.getItemAsync(itemKey(id));
+      if (!raw) continue;
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        if (!isSyncQueueItem(parsed) || entryId(parsed.scope, parsed.operationId) !== id) throw new Error("invalid");
+        validIds.push(id);
+        if (parsed.userId === userId && parsed.tenantId === tenantId) items.push(parsed);
+      } catch {
+        await SecureStore.deleteItemAsync(itemKey(id));
+      }
     }
-  }
-  if (validScopes.length !== manifest.length) await saveManifest(validScopes);
-  return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    if (validIds.length !== manifest.length) await saveManifestUnlocked(validIds);
+    return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  });
 }
 
+/** Stores a failed mutation without overwriting a dead letter from an older operation on the same business scope. */
 export async function queuePendingMutation(input: {
   scope: string;
   userId: string;
@@ -69,9 +88,12 @@ export async function queuePendingMutation(input: {
   pending: PendingMutation<unknown>;
   error?: string | null;
 }): Promise<void> {
-  const existing = (await listSyncQueue(input.userId, input.tenantId)).find((item) => item.scope === input.scope);
+  const existing = (await listSyncQueue(input.userId, input.tenantId)).find(
+    (item) => item.scope === input.scope && item.operationId === input.pending.operationId,
+  );
   const now = new Date();
   const attempts = (existing?.attempts ?? 0) + 1;
+  const mode = syncModeFor(input.action);
   await saveItem({
     scope: input.scope,
     userId: input.userId,
@@ -80,16 +102,17 @@ export async function queuePendingMutation(input: {
     targetId: input.targetId ?? null,
     operationId: input.pending.operationId,
     payload: input.pending.payload,
-    mode: syncModeFor(input.action),
-    state: "QUEUED",
+    mode,
+    state: existing?.state === "DEAD_LETTER" ? "DEAD_LETTER" : "QUEUED",
     attempts,
     createdAt: existing?.createdAt ?? now.toISOString(),
     updatedAt: now.toISOString(),
-    nextAttemptAt: syncModeFor(input.action) === "AUTO" ? nextRetryAt(now, attempts) : null,
+    nextAttemptAt: existing?.state === "DEAD_LETTER" ? null : mode === "AUTO" ? nextRetryAt(now, attempts) : null,
     lastError: input.error ?? null,
   });
 }
 
+/** Updates retry metadata while preserving the original operation ID and queue identity. */
 export async function markSyncAttempt(item: SyncQueueItem, error: string | null): Promise<void> {
   const attempts = item.attempts + 1;
   const now = new Date();
@@ -102,6 +125,7 @@ export async function markSyncAttempt(item: SyncQueueItem, error: string | null)
   });
 }
 
+/** Moves one exact operation to dead-letter state for explicit user attention. */
 export async function deadLetterSyncItem(item: SyncQueueItem, error: string): Promise<void> {
   await saveItem({
     ...item,
@@ -112,8 +136,12 @@ export async function deadLetterSyncItem(item: SyncQueueItem, error: string): Pr
   });
 }
 
-export async function removeSyncItem(scope: string): Promise<void> {
-  await SecureStore.deleteItemAsync(itemKey(scope));
-  const manifest = await loadManifest();
-  if (manifest.includes(scope)) await saveManifest(manifest.filter((value) => value !== scope));
+/** Removes one exact operation without deleting another operation or dead letter sharing the same business scope. */
+export async function removeSyncItem(scope: string, operationId: string): Promise<void> {
+  await withManifestLock(async () => {
+    const id = entryId(scope, operationId);
+    await SecureStore.deleteItemAsync(itemKey(id));
+    const manifest = await loadManifestUnlocked();
+    if (manifest.includes(id)) await saveManifestUnlocked(manifest.filter((value) => value !== id));
+  });
 }
