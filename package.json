@@ -6,14 +6,24 @@
   "type": "module",
   "scripts": {
     "verify:foundation": "node scripts/verify-foundation.mjs",
-    "typecheck": "tsc -p tsconfig.json",
+    "build": "vite build --config apps/web/vite.config.ts",
+    "typecheck:web": "tsc -p apps/web/tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && npm run typecheck:web",
     "test": "node --experimental-strip-types --test apps/api/test/*.test.ts",
-    "verify": "npm run verify:foundation && npm run typecheck && npm test"
+    "verify": "npm run verify:foundation && npm run typecheck && npm test && npm run build"
   },
   "engines": {
     "node": ">=22"
   },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
   "devDependencies": {
-    "typescript": "5.8.3"
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "5.8.3",
+    "vite": "^7.0.0"
   }
 }
