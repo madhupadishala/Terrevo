@@ -33,7 +33,7 @@ export async function captureFreshLocation(): Promise<PresencePoint> {
 const wait = (milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
 export async function collectDepartureSamples(
-  onSample: (point: PresencePoint, sampleNumber: number) => void,
+  onSample: (point: PresencePoint, sampleNumber: number) => void | Promise<void>,
   sampleCount = 4,
 ): Promise<PresencePoint[]> {
   const samples: PresencePoint[] = [];
@@ -41,7 +41,7 @@ export async function collectDepartureSamples(
     await wait(index === 0 ? 15_000 : 30_000);
     const point = await captureFreshLocation();
     samples.push(point);
-    onSample(point, index + 1);
+    await onSample(point, index + 1);
   }
   return samples;
 }

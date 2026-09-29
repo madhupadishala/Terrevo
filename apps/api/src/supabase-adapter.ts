@@ -6,7 +6,7 @@ import type { TourPlan, TourPlanningRepository, TourPlanStop, TourPlanSummary } 
 import type { TourApprovalRepository } from "../../../modules/tour-approval/src/index.ts";
 import type { StartTourOption, TourExecution, TourExecutionRepository } from "../../../modules/tour-execution/src/index.ts";
 import type { TourProgress, TourProgressRepository } from "../../../modules/tour-progress/src/index.ts";
-import type { FieldSettings, Visit, VisitRepository } from "../../../modules/visit-execution/src/index.ts";
+import type { FieldSettings, PresenceIntegrity, PresenceIntegritySample, Visit, VisitRepository } from "../../../modules/visit-execution/src/index.ts";
 import type { Dcr, DcrSummary, DoctorCall, DoctorCallRepository } from "../../../modules/doctor-call/src/index.ts";
 import type { InventoryBalance, InventoryRepository, VisitDistribution } from "../../../modules/inventory/src/index.ts";
 import type { SubmitTourRepository, SubmitTourResult } from "../../../modules/tour-submit/src/index.ts";
@@ -643,6 +643,19 @@ export function createSupabaseAdapter(
     checkinAt:row.checkin_at,checkoutAt:row.checkout_at,
   });
 
+  const mapPresenceSample=(row:Record<string,any>):PresenceIntegritySample=>({
+    sequence:row.sequence_no,capturedAt:row.captured_at,latitude:row.latitude,longitude:row.longitude,
+    accuracyMeters:row.accuracy_meters,mocked:row.mocked,
+    distanceFromPreviousMeters:row.distance_from_previous_meters,speedFromPreviousKph:row.speed_from_previous_kph,
+  });
+  const mapPresence=(row:Record<string,any>,samples:PresenceIntegritySample[]):PresenceIntegrity=>({
+    id:row.id,visitId:row.visit_id,executionId:row.execution_id,status:row.status,
+    sampleCount:row.sample_count,totalDistanceMeters:row.total_distance_meters,
+    maxSegmentSpeedKph:row.max_segment_speed_kph,mockedDetected:row.mocked_detected,
+    reason:row.reason,deviceId:row.device_id,serverDelaySeconds:row.server_delay_seconds,
+    recordedAt:row.recorded_at,samples,
+  });
+
   const visits:VisitRepository={
     async getSettings(tenantId,accessToken){
       const query=new URLSearchParams({select:"geofence_radius_meters,max_gps_accuracy_meters",id:`eq.${tenantId}`,limit:"1"});
@@ -685,6 +698,28 @@ export function createSupabaseAdapter(
           p_latitude:input.latitude,p_longitude:input.longitude,p_accuracy_meters:input.accuracyMeters,
         }),
       }));
+    },
+    async recordDeparture(tenantId,userId,visitId,input){
+      const response=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_record_departure_presence`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_user_id:userId,p_visit_id:visitId,p_operation_id:input.operationId,
+          p_samples:input.samples,
+        }),
+      }));
+      return await response.json() as string;
+    },
+    async getPresence(tenantId,visitId,accessToken){
+      const q=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,visit_id:`eq.${visitId}`,limit:"1"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/visit_presence_integrity?${q}`,{headers:authHeaders(config,accessToken)}));
+      const rows=await r.json() as Array<Record<string,any>>;
+      if(!rows[0])return null;
+      const sq=new URLSearchParams({
+        select:"sequence_no,captured_at,latitude,longitude,accuracy_meters,mocked,distance_from_previous_meters,speed_from_previous_kph",
+        tenant_id:`eq.${tenantId}`,presence_id:`eq.${rows[0].id}`,order:"sequence_no.asc",
+      });
+      const sr=await expectOk(await fetcher(`${base}/rest/v1/visit_presence_samples?${sq}`,{headers:authHeaders(config,accessToken)}));
+      const samples=(await sr.json() as Array<Record<string,any>>).map(mapPresenceSample);
+      return mapPresence(rows[0],samples);
     },
     async listPendingExceptions(tenantId,accessToken){
       const q=new URLSearchParams({select:"*,tour_executions!inner(tour_plan_id)",tenant_id:`eq.${tenantId}`,exception_status:"eq.PENDING"});

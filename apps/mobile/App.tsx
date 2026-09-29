@@ -11,8 +11,15 @@ import {
 } from "react-native";
 import { ApiError, TerrevoApi } from "./src/api";
 import { captureFreshLocation, collectDepartureSamples } from "./src/location";
-import { evaluateDeparture, type DepartureIntegrity } from "./src/presence";
-import { clearPendingMutation, getOrCreatePendingMutation } from "./src/pending";
+import { presenceStatusMessage, type DepartureIntegrity, type PresencePoint } from "./src/presence";
+import {
+  clearPendingMutation,
+  clearPendingPresence,
+  getOrCreatePendingMutation,
+  getOrCreatePendingPresence,
+  loadPendingPresence,
+  savePendingPresence,
+} from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
 import type { AuthSession, StartTourOption, Tenant, TourProgress, TourStop, Visit } from "./src/types";
 
@@ -62,7 +69,10 @@ export default function App() {
           setTenantId(selected);
           api.setTenant(selected);
           await saveTenantId(selected);
-          if (selected) await refreshField(api);
+          if (selected) {
+            await refreshField(api);
+            await tryResumePendingPresence(api, storedSession, selected);
+          }
         }
       } catch (cause) {
         setError(toMessage(cause));
@@ -112,6 +122,51 @@ export default function App() {
     api.configure(currentSession, id);
     await saveTenantId(id);
     await refreshField(api);
+    await tryResumePendingPresence(api, currentSession, id);
+  }
+
+  async function syncPendingPresence(
+    client = api,
+    currentSession = session,
+    currentTenantId = tenantId,
+  ): Promise<DepartureIntegrity | null> {
+    const pending = await loadPendingPresence<{ samples: PresencePoint[] }>();
+    if (!pending || !currentSession || !currentTenantId) return null;
+    if (pending.userId !== currentSession.user.id || pending.tenantId !== currentTenantId) return null;
+
+    const result = await client.recordPresence(pending.visitId, {
+      operationId: pending.operationId,
+      samples: pending.payload.samples,
+    });
+    await clearPendingPresence();
+    setDeparture(result);
+    return result;
+  }
+
+  async function tryResumePendingPresence(
+    client = api,
+    currentSession = session,
+    currentTenantId = tenantId,
+  ): Promise<void> {
+    try {
+      const result = await syncPendingPresence(client, currentSession, currentTenantId);
+      if (result) setMessage(`Pending presence evidence synced: ${result.status.replaceAll("_", " ")}.`);
+    } catch {
+      setMessage("Presence evidence is safely stored on this device and is waiting to sync.");
+    }
+  }
+
+  async function requirePendingPresenceSynced(): Promise<void> {
+    const pending = await loadPendingPresence<{ samples: PresencePoint[] }>();
+    if (!pending) return;
+    if (!session || !tenantId || pending.userId !== session.user.id || pending.tenantId !== tenantId) {
+      throw new Error("Unsynced presence evidence exists for another account or company on this device.");
+    }
+    try {
+      await syncPendingPresence();
+    } catch {
+      throw new Error("Previous visit presence evidence is waiting to sync. Reconnect before starting another field visit.");
+    }
   }
 
   async function handleLogout() {
@@ -169,6 +224,7 @@ export default function App() {
 
   async function handleCheckIn(stop: TourStop) {
     await run(async () => {
+      await requirePendingPresenceSynced();
       const scope = `check-in.${stop.planStopId}`;
       const pending = await getOrCreatePendingMutation(scope, async () => {
         const location = await captureFreshLocation();
@@ -232,6 +288,11 @@ export default function App() {
         rejectMocked(location);
         return { location };
       });
+      if (!session || !tenantId) throw new Error("Session context is unavailable for presence sync.");
+      const pendingPresence = await getOrCreatePendingPresence<{ samples: PresencePoint[] }>(
+        { userId: session.user.id, tenantId, visitId: visit.id },
+        async () => ({ samples: [] }),
+      );
       try {
         await api.checkOut(visit.id, {
           operationId: pendingCheckout.operationId,
@@ -240,7 +301,9 @@ export default function App() {
         checkoutRecorded = true;
         await clearPendingMutation(checkoutScope);
       } catch (cause) {
+        const definitive = cause instanceof ApiError && [400, 403, 404].includes(cause.status);
         await clearPendingOnDefinitiveFailure(checkoutScope, cause);
+        if (definitive) await clearPendingPresence();
         throw cause;
       }
       const checkoutLocation = pendingCheckout.payload.location;
@@ -248,18 +311,35 @@ export default function App() {
       setDoctorOutcome("");
       setDoctorRemarks("");
       setMessage("Check-out recorded. Keep Terrevo open while departure continuity is observed for about 2 minutes.");
-
-      const samples = await collectDepartureSamples((_point, count) => setDepartureSamples(count));
-      const result = evaluateDeparture(checkoutLocation, samples);
+      await collectDepartureSamples(async (point, count) => {
+        pendingPresence.payload.samples = [...pendingPresence.payload.samples, point];
+        await savePendingPresence(pendingPresence);
+        setDepartureSamples(count);
+      });
+      let result: DepartureIntegrity;
+      try {
+        result = await api.recordPresence(visit.id, {
+          operationId: pendingPresence.operationId,
+          samples: pendingPresence.payload.samples,
+        });
+        await clearPendingPresence();
+      } catch (cause) {
+        throw cause;
+      }
       setDeparture(result);
-      setMessage(result.status === "CONSISTENT"
-        ? "Check-out complete. Departure movement is physically consistent."
-        : result.status === "SPOOF_SUSPECTED"
-          ? "Check-out retained, but location integrity requires investigation."
-          : "Check-out complete. Departure movement requires review.");
+      setMessage(presenceStatusMessage(result.status));
     } catch (cause) {
       if (checkoutRecorded) {
-        setMessage("Check-out is already recorded. Departure continuity could not complete, so no continuity conclusion was made.");
+        try {
+          const partial = await syncPendingPresence();
+          if (partial) {
+            setMessage(`Check-out is recorded. Incomplete departure evidence was retained for review: ${partial.status.replaceAll("_", " ")}.`);
+          } else {
+            setMessage("Check-out is recorded. Departure evidence is safely retained and waiting to sync.");
+          }
+        } catch {
+          setMessage("Check-out is recorded. Departure evidence is safely retained and waiting to sync.");
+        }
       } else {
         setError(toMessage(cause));
       }
@@ -401,7 +481,7 @@ export default function App() {
         ) : null}
 
         <View style={styles.privacy}>
-          <Text style={styles.small}>Presence verification uses fresh GPS only around field actions. Departure continuity observes four samples for about two minutes after check-out. This build does not perform 24/7 tracking.</Text>
+          <Text style={styles.small}>Presence verification uses fresh GPS only around field actions. Departure continuity observes four samples for about two minutes after check-out and the server derives the integrity result. This build does not perform 24/7 tracking.</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

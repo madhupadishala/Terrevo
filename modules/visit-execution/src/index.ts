@@ -25,6 +25,43 @@ export type FieldSettings = {
   maxGpsAccuracyMeters: number;
 };
 
+export type PresenceIntegrityStatus = "CONSISTENT" | "REVIEW_REQUIRED" | "SPOOF_SUSPECTED";
+
+export type PresenceIntegritySample = {
+  sequence: number;
+  capturedAt: string;
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number;
+  mocked: boolean | null;
+  distanceFromPreviousMeters: number;
+  speedFromPreviousKph: number | null;
+};
+
+export type PresenceIntegrity = {
+  id: string;
+  visitId: string;
+  executionId: string;
+  status: PresenceIntegrityStatus;
+  sampleCount: number;
+  totalDistanceMeters: number;
+  maxSegmentSpeedKph: number;
+  mockedDetected: boolean;
+  reason: string;
+  deviceId: string | null;
+  serverDelaySeconds: number;
+  recordedAt: string;
+  samples: PresenceIntegritySample[];
+};
+
+export type PresenceSampleInput = {
+  capturedAt: string;
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number;
+  mocked: boolean | null;
+};
+
 export type VisitRepository = {
   getSettings(tenantId: string, accessToken: string): Promise<FieldSettings>;
   updateSettings(tenantId: string, settings: FieldSettings): Promise<void>;
@@ -53,6 +90,13 @@ export type VisitRepository = {
       accuracyMeters: number;
     },
   ): Promise<void>;
+  recordDeparture(
+    tenantId: string,
+    userId: string,
+    visitId: string,
+    input: { operationId: string; samples: PresenceSampleInput[] },
+  ): Promise<string>;
+  getPresence(tenantId: string, visitId: string, accessToken: string): Promise<PresenceIntegrity | null>;
   listPendingExceptions(tenantId: string, accessToken: string): Promise<Array<Visit & { planId: string }>>;
   decideException(
     tenantId: string,
@@ -71,6 +115,23 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 function uuid(value:unknown,field:string){if(typeof value!=="string"||!UUID.test(value))throw new VisitInputError(`${field} must be a UUID`);return value}
 function num(value:unknown,field:string,min:number,max:number){if(typeof value!=="number"||!Number.isFinite(value)||value<min||value>max)throw new VisitInputError(`Invalid ${field}`);return value}
 function reason(value:unknown,max=1000){if(value==null||value==="")return null;if(typeof value!=="string")throw new VisitInputError("Invalid reason");const v=value.trim();if(!v||v.length>max)throw new VisitInputError("Invalid reason");return v}
+function timestamp(value:unknown,field:string){if(typeof value!=="string")throw new VisitInputError(`Invalid ${field}`);const parsed=new Date(value);if(Number.isNaN(parsed.getTime()))throw new VisitInputError(`Invalid ${field}`);return parsed.toISOString()}
+function presenceSamples(value:unknown):PresenceSampleInput[]{
+  if(!Array.isArray(value)||value.length>10)throw new VisitInputError("samples must contain at most 10 location points");
+  return value.map((raw,index)=>{
+    if(!raw||typeof raw!=="object"||Array.isArray(raw))throw new VisitInputError(`Invalid sample at index ${index}`);
+    const sample=raw as Record<string,unknown>;
+    const mocked=sample.mocked;
+    if(mocked!==null&&mocked!==undefined&&typeof mocked!=="boolean")throw new VisitInputError("Invalid mocked flag");
+    return {
+      capturedAt:timestamp(sample.capturedAt,"capturedAt"),
+      latitude:num(sample.latitude,"latitude",-90,90),
+      longitude:num(sample.longitude,"longitude",-180,180),
+      accuracyMeters:num(sample.accuracyMeters,"accuracyMeters",0,1000),
+      mocked:mocked==null?null:mocked,
+    };
+  });
+}
 
 export function createVisitService(repository:VisitRepository,rbac:RbacService){
   return {
@@ -113,6 +174,23 @@ export function createVisitService(repository:VisitRepository,rbac:RbacService){
       const closed=await repository.getById(tenantId,visitId,accessToken);
       if(!closed||closed.status!=="CHECKED_OUT")throw new VisitConflictError("Visit checkout could not be confirmed");
       return closed;
+    },
+    async recordDeparture(tenantId:string,userId:string,accessToken:string,visitIdValue:unknown,value:Record<string,unknown>){
+      const visitId=uuid(visitIdValue,"visitId");
+      const existing=await repository.getById(tenantId,visitId,accessToken);
+      if(!existing)throw new VisitNotFoundError("Visit not found");
+      if(existing.status!=="CHECKED_OUT")throw new VisitConflictError("Visit must be checked out before presence evidence is recorded");
+      const input={operationId:uuid(value.operationId,"operationId"),samples:presenceSamples(value.samples)};
+      const id=await repository.recordDeparture(tenantId,userId,visitId,input);
+      const presence=await repository.getPresence(tenantId,visitId,accessToken);
+      if(!presence||presence.id!==id)throw new VisitConflictError("Presence evidence could not be confirmed");
+      return presence;
+    },
+    async getPresence(tenantId:string,accessToken:string,visitIdValue:unknown){
+      const visitId=uuid(visitIdValue,"visitId");
+      const presence=await repository.getPresence(tenantId,visitId,accessToken);
+      if(!presence)throw new VisitNotFoundError("Presence evidence not found");
+      return presence;
     },
     listPendingExceptions(tenantId:string,accessToken:string){return repository.listPendingExceptions(tenantId,accessToken)},
     async decideException(tenantId:string,actorUserId:string,accessToken:string,visitIdValue:unknown,value:Record<string,unknown>){
