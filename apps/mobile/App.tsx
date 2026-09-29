@@ -95,6 +95,7 @@ export default function App() {
   const tenantIdRef = useRef<string | null>(null);
   const [syncItems, setSyncItems] = useState<SyncQueueItem[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const syncInFlightRef = useRef(false);
   const [departure, setDeparture] = useState<DepartureIntegrity | null>(null);
   const [departureSamples, setDepartureSamples] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -242,16 +243,17 @@ export default function App() {
     return cause instanceof ApiError && [400, 403, 404, 409].includes(cause.status);
   }
 
+  /** Cleans local retry state after the server has already committed an idempotent mutation. */
   async function completePendingMutation(scope: string): Promise<void> {
-    // The server mutation has already succeeded. Local cleanup is best-effort:
-    // a stale retry remains safe because the original operation ID is preserved.
+    const pending = await loadPendingMutation<unknown>(scope);
     try {
       await clearPendingMutation(scope);
     } catch {
-      // Keep going so a local storage error cannot turn a committed server write into a false failure.
+      // Keep going so local storage failure cannot turn a committed server write into a false failure.
     }
+    if (!pending) return;
     try {
-      await removeSyncItem(scope);
+      await removeSyncItem(scope, pending.operationId);
       await refreshSyncQueue();
     } catch {
       // A stale queue entry may replay idempotently and can be cleaned on the next sync pass.
@@ -368,7 +370,7 @@ export default function App() {
       }
       try {
         await clearPendingMutation(item.scope);
-        await removeSyncItem(item.scope);
+        await removeSyncItem(item.scope, item.operationId);
       } catch {
         // The server accepted the original operation ID; any stale local entry can replay idempotently.
       }
@@ -384,24 +386,30 @@ export default function App() {
     }
   }
 
+  /** Replays eligible queue items once; a ref lock prevents overlapping foreground and resume passes. */
   async function flushSyncQueue(
     force = false,
     currentSession = session,
     currentTenantId = tenantId,
     client = api,
   ): Promise<{ synced: number; dead: number }> {
-    if (!currentSession || !currentTenantId) return { synced: 0, dead: 0 };
-    const items = await listSyncQueue(currentSession.user.id, currentTenantId);
-    let synced = 0;
-    let dead = 0;
-    for (const item of items) {
-      if (item.state !== "QUEUED" || item.mode !== "AUTO" || (!force && !isSyncDue(item))) continue;
-      const result = await replaySyncItem(item, client);
-      if (result === "SYNCED") synced += 1;
-      if (result === "DEAD") dead += 1;
+    if (!currentSession || !currentTenantId || syncInFlightRef.current) return { synced: 0, dead: 0 };
+    syncInFlightRef.current = true;
+    try {
+      const items = await listSyncQueue(currentSession.user.id, currentTenantId);
+      let synced = 0;
+      let dead = 0;
+      for (const item of items) {
+        if (item.state !== "QUEUED" || item.mode !== "AUTO" || (!force && !isSyncDue(item))) continue;
+        const result = await replaySyncItem(item, client);
+        if (result === "SYNCED") synced += 1;
+        if (result === "DEAD") dead += 1;
+      }
+      await refreshSyncQueue(currentSession, currentTenantId);
+      return { synced, dead };
+    } finally {
+      syncInFlightRef.current = false;
     }
-    await refreshSyncQueue(currentSession, currentTenantId);
-    return { synced, dead };
   }
 
   async function tryResumeSyncQueue(
@@ -924,8 +932,12 @@ export default function App() {
     });
   }
 
+  /** Explicitly retries currently queued automatic writes without overlapping another replay pass. */
   async function handleSyncNow() {
-    if (syncing) return;
+    if (syncing || syncInFlightRef.current) {
+      setMessage("Sync is already in progress.");
+      return;
+    }
     setSyncing(true);
     setError(null);
     try {
@@ -960,7 +972,7 @@ export default function App() {
   async function handleDismissDeadLetter(item: SyncQueueItem) {
     if (item.state !== "DEAD_LETTER") return;
     await run(async () => {
-      await removeSyncItem(item.scope);
+      await removeSyncItem(item.scope, item.operationId);
       await refreshSyncQueue();
       setMessage("Resolved sync item dismissed. Re-enter corrected data if the business action is still required.");
     });
@@ -1125,7 +1137,7 @@ export default function App() {
         checkoutRecorded = true;
         await completePendingMutation(checkoutScope);
       } catch (cause) {
-        const definitive = cause instanceof ApiError && [400, 403, 404, 409].includes(cause.status);
+        const definitive = isDefinitiveSyncFailure(cause);
         await recordPendingFailure(checkoutScope, cause);
         if (definitive) await clearPendingPresence();
         throw cause;
@@ -1246,7 +1258,7 @@ export default function App() {
             <Text style={styles.brand}>Terrevo</Text>
             <Text style={styles.muted}>{selectedTenant?.name ?? "Field operations"}</Text>
           </View>
-          <Pressable onPress={() => void handleLogout()}><Text style={styles.link}>Sign out</Text></Pressable>
+          <Pressable disabled={busy || syncing} onPress={() => void handleLogout()}><Text style={[styles.link, (busy || syncing) && styles.disabled]}>Sign out</Text></Pressable>
         </View>
 
         {error ? <Notice text={error} error /> : null}
