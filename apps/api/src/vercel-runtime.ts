@@ -11,8 +11,10 @@ export type VercelRuntimeHealth = {
 };
 
 function health(env: ApiEnv): VercelRuntimeHealth {
-  const identityConfigured = Boolean(env.SUPABASE_URL && env.SUPABASE_ANON_KEY);
-  const serverConfigured = identityConfigured && Boolean(env.SUPABASE_SERVICE_ROLE_KEY);
+  const publishableKey = env.SUPABASE_PUBLISHABLE_KEY ?? env.SUPABASE_ANON_KEY;
+  const secretKey = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
+  const identityConfigured = Boolean(env.SUPABASE_URL && publishableKey);
+  const serverConfigured = identityConfigured && Boolean(secretKey);
   return {
     status: serverConfigured ? "ok" : "degraded",
     web: "ready",
@@ -52,7 +54,7 @@ export function createVercelApiHandler(env: ApiEnv) {
         });
       }
 
-      if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+      if (!env.SUPABASE_URL || !(env.SUPABASE_PUBLISHABLE_KEY ?? env.SUPABASE_ANON_KEY)) {
         return Response.json(
           { error: "API provider configuration is missing" },
           { status: 503, headers: { "cache-control": "no-store" } },
