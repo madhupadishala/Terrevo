@@ -32,7 +32,7 @@ import { isAutoReplaySafe, isDefinitiveSyncFailure, parseSyncOperation, shouldSt
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
 import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, ExpenseClaim, ExpenseLine, InventoryBalance, JointWork, LeaveRequest, ManagerAnalytics, ManagerCommandCenter, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
 
-const APP_VERSION = "0.27.0";
+const APP_VERSION = "0.28.0";
 const EXPENSE_CATEGORIES: ExpenseCategory[] = ["TRAVEL", "MEAL", "LODGING", "LOCAL_CONVEYANCE", "OTHER"];
 
 /** Renders the Terrevo field application and coordinates tenant-scoped field state. */
@@ -351,8 +351,8 @@ export default function App() {
       await refreshSyncStatus();
       const result = await syncPendingQueue();
       setMessage(result.stopped
-        ? "Failed actions were reopened, but sync paused because the server or network is unavailable."
-        : `${result.synced} recovered action(s) synced after retry.`);
+        ? `${dead.length} failed action(s) reopened, but sync paused because the server or network is unavailable.`
+        : `${dead.length} failed action(s) reopened. ${result.synced} synced now.${result.manual ? ` ${result.manual} require controlled field retry.` : ""}`);
     });
   }
 
@@ -543,19 +543,6 @@ export default function App() {
     await clearPendingPresence();
     setDeparture(result);
     return result;
-  }
-
-  async function tryResumePendingPresence(
-    client = api,
-    currentSession = session,
-    currentTenantId = tenantId,
-  ): Promise<void> {
-    try {
-      const result = await syncPendingPresence(client, currentSession, currentTenantId);
-      if (result) setMessage(`Pending presence evidence synced: ${result.status.replaceAll("_", " ")}.`);
-    } catch {
-      setMessage("Presence evidence is safely stored on this device and is waiting to sync.");
-    }
   }
 
   async function requirePendingPresenceSynced(): Promise<void> {
@@ -1130,6 +1117,13 @@ export default function App() {
   const latestExpense = expenses[0] ?? null;
   const expenseExecutionId = progress?.executionId ?? latestDaily?.executionId ?? null;
   const recentJointWork = jointWork.slice(0, 5);
+  const pendingSyncCount = syncItems.filter((item) => item.status === "PENDING").length;
+  const deadLetterSyncCount = syncItems.filter((item) => item.status === "DEAD_LETTER").length;
+  const manualRetryCount = syncItems.filter((item) => {
+    if (item.status !== "PENDING") return false;
+    const operation = parseSyncOperation(item.scope, session.user.id, tenantId);
+    return Boolean(operation && !isAutoReplaySafe(operation.kind));
+  }).length;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -1144,6 +1138,30 @@ export default function App() {
 
         {error ? <Notice text={error} error /> : null}
         {message ? <Notice text={message} /> : null}
+
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>SYNC STATUS</Text>
+          <Text style={styles.cardTitle}>
+            {syncItems.length === 0 && !syncPresencePending
+              ? "All field actions synced"
+              : `${pendingSyncCount} pending · ${deadLetterSyncCount} failed`}
+          </Text>
+          <Text style={styles.muted}>Foreground sync only. Terrevo keeps the original operation ID and payload so server idempotency remains authoritative.</Text>
+          {manualRetryCount > 0 ? <Text style={styles.small}>{manualRetryCount} time/location-sensitive action(s) require controlled retry in the original field workflow; stale GPS is never silently replayed.</Text> : null}
+          {syncPresencePending ? <Text style={styles.small}>Departure presence evidence is safely stored separately and waiting to sync.</Text> : null}
+          {syncItems.slice(0, 5).map((item) => {
+            const operation = parseSyncOperation(item.scope, session.user.id, tenantId);
+            const manual = Boolean(operation && !isAutoReplaySafe(operation.kind));
+            return (
+              <View key={item.scope} style={styles.syncRow}>
+                <Text style={styles.small}>{syncItemLabel(item)} · {item.status === "DEAD_LETTER" ? "failed" : manual ? "controlled retry" : "pending"} · attempt {item.attempts}</Text>
+                {item.lastError ? <Text style={styles.errorText}>{item.lastError}</Text> : null}
+              </View>
+            );
+          })}
+          <PrimaryButton label={syncing ? "Syncing…" : "Sync Now"} disabled={busy || syncing} onPress={() => void handleSyncNow()} />
+          {deadLetterSyncCount > 0 ? <SecondaryButton label="Retry Failed Actions" disabled={busy || syncing} onPress={() => void handleRetryDeadLetters()} /> : null}
+        </View>
 
         {managerCommand ? (
           <View style={styles.card}>
@@ -1600,8 +1618,8 @@ function PrimaryButton({ label, disabled, onPress }: { label: string; disabled?:
   );
 }
 
-function SecondaryButton({ label, onPress }: { label: string; onPress: () => void }) {
-  return <Pressable style={styles.secondaryButton} onPress={onPress}><Text style={styles.secondaryButtonText}>{label}</Text></Pressable>;
+function SecondaryButton({ label, disabled, onPress }: { label: string; disabled?: boolean; onPress: () => void }) {
+  return <Pressable style={[styles.secondaryButton, disabled && styles.disabled]} disabled={disabled} onPress={onPress}><Text style={styles.secondaryButtonText}>{label}</Text></Pressable>;
 }
 
 function Notice({ text, error: isError = false }: { text: string; error?: boolean }) {
@@ -1670,6 +1688,7 @@ const styles = StyleSheet.create({
   metricValue: { fontSize: 20, fontWeight: "800", color: "#132238" },
   metricInput: { flex: 1, minWidth: 0, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#CDD5DF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 9, textAlign: "center", fontSize: 14, color: "#132238" },
   verifiedLine: { color: "#265D3D", fontSize: 13, fontWeight: "700" },
+  syncRow: { borderTopWidth: 1, borderTopColor: "#E3E8EF", paddingTop: 8, gap: 3 },
   spinner: { marginTop: 4 },
   privacy: { paddingHorizontal: 4, paddingTop: 4 },
 });
