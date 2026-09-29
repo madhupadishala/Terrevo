@@ -53,13 +53,17 @@ export async function getOrCreatePendingMutation<T>(
   scope: string,
   createPayload: () => Promise<T>,
 ): Promise<PendingMutation<T>> {
+  const existing = await withMutationLock(() => loadPendingMutationUnlocked<T>(scope));
+  if (existing) return existing;
+
+  const payload = await createPayload();
   return withMutationLock(async () => {
-    const existing = await loadPendingMutationUnlocked<T>(scope);
-    if (existing) return existing;
+    const raced = await loadPendingMutationUnlocked<T>(scope);
+    if (raced) return raced;
 
     const pending: PendingMutation<T> = {
       operationId: Crypto.randomUUID(),
-      payload: await createPayload(),
+      payload,
     };
     await savePendingMutationUnlocked(scope, pending);
     return pending;
