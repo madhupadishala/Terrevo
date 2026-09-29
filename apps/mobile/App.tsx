@@ -14,12 +14,11 @@ import { captureFreshLocation, collectDepartureSamples } from "./src/location";
 import { presenceStatusMessage, type DepartureIntegrity, type PresencePoint } from "./src/presence";
 import {
   clearPendingMutation,
-  clearPendingPresenceRef,
+  clearPendingPresence,
   getOrCreatePendingMutation,
-  loadPendingMutation,
-  loadPendingPresenceRef,
-  rememberPendingPresenceRef,
-  savePendingMutation,
+  getOrCreatePendingPresence,
+  loadPendingPresence,
+  savePendingPresence,
 } from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
 import type { AuthSession, StartTourOption, Tenant, TourProgress, TourStop, Visit } from "./src/types";
@@ -131,23 +130,15 @@ export default function App() {
     currentSession = session,
     currentTenantId = tenantId,
   ): Promise<DepartureIntegrity | null> {
-    const ref = await loadPendingPresenceRef();
-    if (!ref || !currentSession || !currentTenantId) return null;
-    if (ref.userId !== currentSession.user.id || ref.tenantId !== currentTenantId) return null;
+    const pending = await loadPendingPresence<{ samples: PresencePoint[] }>();
+    if (!pending || !currentSession || !currentTenantId) return null;
+    if (pending.userId !== currentSession.user.id || pending.tenantId !== currentTenantId) return null;
 
-    const scope = `presence.${ref.visitId}`;
-    const pending = await loadPendingMutation<{ samples: PresencePoint[] }>(scope);
-    if (!pending) {
-      await clearPendingPresenceRef();
-      return null;
-    }
-
-    const result = await client.recordPresence(ref.visitId, {
+    const result = await client.recordPresence(pending.visitId, {
       operationId: pending.operationId,
       samples: pending.payload.samples,
     });
-    await clearPendingMutation(scope);
-    await clearPendingPresenceRef();
+    await clearPendingPresence();
     setDeparture(result);
     return result;
   }
@@ -166,9 +157,9 @@ export default function App() {
   }
 
   async function requirePendingPresenceSynced(): Promise<void> {
-    const ref = await loadPendingPresenceRef();
-    if (!ref) return;
-    if (!session || !tenantId || ref.userId !== session.user.id || ref.tenantId !== tenantId) {
+    const pending = await loadPendingPresence<{ samples: PresencePoint[] }>();
+    if (!pending) return;
+    if (!session || !tenantId || pending.userId !== session.user.id || pending.tenantId !== tenantId) {
       throw new Error("Unsynced presence evidence exists for another account or company on this device.");
     }
     try {
@@ -314,16 +305,14 @@ export default function App() {
       setDoctorRemarks("");
       setMessage("Check-out recorded. Keep Terrevo open while departure continuity is observed for about 2 minutes.");
 
-      const presenceScope = `presence.${visit.id}`;
       if (!session || !tenantId) throw new Error("Session context is unavailable for presence sync.");
-      await rememberPendingPresenceRef({ userId: session.user.id, tenantId, visitId: visit.id });
-      const pendingPresence = await getOrCreatePendingMutation<{ samples: PresencePoint[] }>(
-        presenceScope,
+      const pendingPresence = await getOrCreatePendingPresence<{ samples: PresencePoint[] }>(
+        { userId: session.user.id, tenantId, visitId: visit.id },
         async () => ({ samples: [] }),
       );
       await collectDepartureSamples(async (point, count) => {
         pendingPresence.payload.samples = [...pendingPresence.payload.samples, point];
-        await savePendingMutation(presenceScope, pendingPresence);
+        await savePendingPresence(pendingPresence);
         setDepartureSamples(count);
       });
       let result: DepartureIntegrity;
@@ -332,10 +321,8 @@ export default function App() {
           operationId: pendingPresence.operationId,
           samples: pendingPresence.payload.samples,
         });
-        await clearPendingMutation(presenceScope);
-        await clearPendingPresenceRef();
+        await clearPendingPresence();
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(presenceScope, cause);
         throw cause;
       }
       setDeparture(result);
