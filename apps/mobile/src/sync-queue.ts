@@ -43,16 +43,27 @@ async function saveManifestUnlocked(ids: string[]): Promise<void> {
   });
 }
 
-/** Persists one queue item and its manifest entry atomically with respect to other queue operations. */
-async function saveItem(item: SyncQueueItem): Promise<void> {
-  await withManifestLock(async () => {
-    const id = entryId(item.scope, item.operationId);
-    await SecureStore.setItemAsync(itemKey(id), JSON.stringify(item), {
-      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-    });
-    const manifest = await loadManifestUnlocked();
-    if (!manifest.includes(id)) await saveManifestUnlocked([...manifest, id]);
+async function loadItemUnlocked(scope: string, operationId: string): Promise<SyncQueueItem | null> {
+  const id = entryId(scope, operationId);
+  const raw = await SecureStore.getItemAsync(itemKey(id));
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (isSyncQueueItem(parsed) && entryId(parsed.scope, parsed.operationId) === id) return parsed;
+  } catch {
+    // Invalid item is removed below.
+  }
+  await SecureStore.deleteItemAsync(itemKey(id));
+  return null;
+}
+
+async function saveItemUnlocked(item: SyncQueueItem): Promise<void> {
+  const id = entryId(item.scope, item.operationId);
+  await SecureStore.setItemAsync(itemKey(id), JSON.stringify(item), {
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   });
+  const manifest = await loadManifestUnlocked();
+  if (!manifest.includes(id)) await saveManifestUnlocked([...manifest, id]);
 }
 
 /** Lists only valid queue items belonging to the supplied authenticated identity and tenant. */
@@ -88,51 +99,60 @@ export async function queuePendingMutation(input: {
   pending: PendingMutation<unknown>;
   error?: string | null;
 }): Promise<void> {
-  const existing = (await listSyncQueue(input.userId, input.tenantId)).find(
-    (item) => item.scope === input.scope && item.operationId === input.pending.operationId,
-  );
-  const now = new Date();
-  const attempts = (existing?.attempts ?? 0) + 1;
-  const mode = syncModeFor(input.action);
-  await saveItem({
-    scope: input.scope,
-    userId: input.userId,
-    tenantId: input.tenantId,
-    action: input.action,
-    targetId: input.targetId ?? null,
-    operationId: input.pending.operationId,
-    payload: input.pending.payload,
-    mode,
-    state: existing?.state === "DEAD_LETTER" ? "DEAD_LETTER" : "QUEUED",
-    attempts,
-    createdAt: existing?.createdAt ?? now.toISOString(),
-    updatedAt: now.toISOString(),
-    nextAttemptAt: existing?.state === "DEAD_LETTER" ? null : mode === "AUTO" ? nextRetryAt(now, attempts) : null,
-    lastError: input.error ?? null,
+  await withManifestLock(async () => {
+    const existing = await loadItemUnlocked(input.scope, input.pending.operationId);
+    const owned = existing?.userId === input.userId && existing.tenantId === input.tenantId ? existing : null;
+    const now = new Date();
+    const attempts = (owned?.attempts ?? 0) + 1;
+    const mode = syncModeFor(input.action);
+    await saveItemUnlocked({
+      scope: input.scope,
+      userId: input.userId,
+      tenantId: input.tenantId,
+      action: input.action,
+      targetId: input.targetId ?? null,
+      operationId: input.pending.operationId,
+      payload: input.pending.payload,
+      mode,
+      state: owned?.state === "DEAD_LETTER" ? "DEAD_LETTER" : "QUEUED",
+      attempts,
+      createdAt: owned?.createdAt ?? now.toISOString(),
+      updatedAt: now.toISOString(),
+      nextAttemptAt: owned?.state === "DEAD_LETTER" ? null : mode === "AUTO" ? nextRetryAt(now, attempts) : null,
+      lastError: input.error ?? null,
+    });
   });
 }
 
-/** Updates retry metadata while preserving the original operation ID and queue identity. */
+/** Updates retry metadata for the exact stored operation without reviving a dead letter. */
 export async function markSyncAttempt(item: SyncQueueItem, error: string | null): Promise<void> {
-  const attempts = item.attempts + 1;
-  const now = new Date();
-  await saveItem({
-    ...item,
-    attempts,
-    updatedAt: now.toISOString(),
-    nextAttemptAt: item.mode === "AUTO" ? nextRetryAt(now, attempts) : null,
-    lastError: error,
+  await withManifestLock(async () => {
+    const current = await loadItemUnlocked(item.scope, item.operationId);
+    if (!current || current.userId !== item.userId || current.tenantId !== item.tenantId || current.state === "DEAD_LETTER") return;
+    const attempts = current.attempts + 1;
+    const now = new Date();
+    await saveItemUnlocked({
+      ...current,
+      attempts,
+      updatedAt: now.toISOString(),
+      nextAttemptAt: current.mode === "AUTO" ? nextRetryAt(now, attempts) : null,
+      lastError: error,
+    });
   });
 }
 
 /** Moves one exact operation to dead-letter state for explicit user attention. */
 export async function deadLetterSyncItem(item: SyncQueueItem, error: string): Promise<void> {
-  await saveItem({
-    ...item,
-    state: "DEAD_LETTER",
-    updatedAt: new Date().toISOString(),
-    nextAttemptAt: null,
-    lastError: error,
+  await withManifestLock(async () => {
+    const current = await loadItemUnlocked(item.scope, item.operationId);
+    if (!current || current.userId !== item.userId || current.tenantId !== item.tenantId) return;
+    await saveItemUnlocked({
+      ...current,
+      state: "DEAD_LETTER",
+      updatedAt: new Date().toISOString(),
+      nextAttemptAt: null,
+      lastError: error,
+    });
   });
 }
 
