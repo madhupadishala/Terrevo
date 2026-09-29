@@ -23,4 +23,4 @@
 - CodeRabbit: external review required before merge.
 
 ## Rollback
-Apply `0023_security_audit.down.sql` and revert the Sprint 23 API boundary commits. No business records are modified by rollback.
+Apply `0023_security_audit.down.sql` and revert the Sprint 23 API boundary commits. Rollback removes active audit triggers/function but preserves collected evidence in `security_audit_events_archived_0023`; no business records are modified.
