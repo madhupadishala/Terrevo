@@ -41,8 +41,10 @@ export type AnalyticsRepository = {
   getManagerAnalytics(tenantId: string, accessToken: string, days: number): Promise<ManagerAnalytics>;
 };
 
+/** Builds the read-only manager analytics service over a tenant-scoped repository. */
 export function createAnalyticsService(repository: AnalyticsRepository) {
   return {
+    /** Returns a bounded rolling analytics window after validating the requested day count. */
     getManagerAnalytics(tenantId: string, accessToken: string, days = 7) {
       if (!Number.isInteger(days) || days < 1 || days > 90) {
         throw new AnalyticsInputError("Analytics days must be a whole number between 1 and 90.");
