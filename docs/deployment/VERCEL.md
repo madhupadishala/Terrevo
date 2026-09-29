@@ -15,9 +15,10 @@ The current web UI is intentionally a deployment-verification shell. Product wor
 
 ## API
 
-- Vercel entry: `api/[...path].ts`
+- Vercel entry: `api/index.js`
 - Public API prefix: `/api`
-- Existing internal handler paths are preserved after the adapter removes the `/api` prefix.
+- `vercel.json` rewrites every `/api/*` request to the gateway with the original path carried in an internal routing parameter.
+- Existing internal handler paths are restored before the request reaches the Terrevo handler.
 - Health: `GET /api/health`
 
 ## Environment variables
