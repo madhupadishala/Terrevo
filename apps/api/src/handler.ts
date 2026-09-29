@@ -18,6 +18,7 @@ import { createRcpaService, RcpaConflictError, RcpaInputError, RcpaNotFoundError
 import { createOrderService, OrderConflictError, OrderInputError, OrderNotFoundError } from "../../../modules/orders/src/index.ts";
 import { createAttendanceLeaveService, LeaveConflictError, LeaveInputError, LeaveNotFoundError } from "../../../modules/attendance-leave/src/index.ts";
 import { createExpenseService, ExpenseConflictError, ExpenseInputError, ExpenseNotFoundError } from "../../../modules/expenses/src/index.ts";
+import { createJointWorkService, JointWorkConflictError, JointWorkInputError, JointWorkNotFoundError } from "../../../modules/joint-work/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 
 export type ApiEnv = {
@@ -82,11 +83,11 @@ function mapError(error: unknown): Response {
     return json(status, { error: error.message });
   }
   if (error instanceof AuthorizationError) return json(403, { error: "Permission denied" });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError || error instanceof ExpenseInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError || error instanceof ExpenseInputError || error instanceof JointWorkInputError) {
     return json(400, { error: error.message });
   }
-  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError || error instanceof TradeCallNotFoundError || error instanceof RcpaNotFoundError || error instanceof OrderNotFoundError || error instanceof LeaveNotFoundError || error instanceof ExpenseNotFoundError) return json(404, { error: error.message });
-  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError || error instanceof LeaveConflictError || error instanceof ExpenseConflictError) return json(409, { error: error.message });
+  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError || error instanceof TradeCallNotFoundError || error instanceof RcpaNotFoundError || error instanceof OrderNotFoundError || error instanceof LeaveNotFoundError || error instanceof ExpenseNotFoundError || error instanceof JointWorkNotFoundError) return json(404, { error: error.message });
+  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError || error instanceof LeaveConflictError || error instanceof ExpenseConflictError || error instanceof JointWorkConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
     if (error.status === 400) return json(400, { error: "Provider rejected request" });
@@ -119,6 +120,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const orders = createOrderService(adapter.orders);
   const attendanceLeave = createAttendanceLeaveService(adapter.attendanceLeave, rbac);
   const expenses = createExpenseService(adapter.expenses, rbac);
+  const jointWork = createJointWorkService(adapter.jointWork, rbac);
 
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -198,6 +200,10 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         });
       }
 
+      if(request.method==="GET"&&path==="/v1/joint-work"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{assignments:await jointWork.list(context.tenantId,accessToken)});}
+      if(request.method==="POST"&&path==="/v1/joint-work"){const {accessToken,user,context}=await resolveTenantRequest(request);return json(201,{assignment:await jointWork.schedule(context.tenantId,user.id,accessToken,await readJsonObject(request))});}
+      const join=/^\/v1\/joint-work\/([^/]+)\/join$/.exec(path);if(request.method==="POST"&&join){const {accessToken,user,context}=await resolveTenantRequest(request);return json(200,{assignment:await jointWork.join(context.tenantId,user.id,accessToken,join[1],await readJsonObject(request))});}
+      const leave=/^\/v1\/joint-work\/([^/]+)\/leave$/.exec(path);if(request.method==="POST"&&leave){const {accessToken,user,context}=await resolveTenantRequest(request);return json(200,{assignment:await jointWork.leave(context.tenantId,user.id,accessToken,leave[1],await readJsonObject(request))});}
       if(request.method==="GET"&&path==="/v1/expenses"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{claims:await expenses.list(context.tenantId,accessToken)});}
       const expenseByExecution=/^\/v1\/executions\/([^/]+)\/expense$/.exec(path);if(request.method==="PUT"&&expenseByExecution){const {accessToken,user,context}=await resolveTenantRequest(request);return json(200,{claim:await expenses.save(context.tenantId,user.id,accessToken,expenseByExecution[1],await readJsonObject(request,65536))});}
       if(request.method==="GET"&&path==="/v1/expense-approvals"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{claims:await expenses.listPending(context.tenantId,accessToken)});}
