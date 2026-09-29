@@ -23,9 +23,10 @@ import {
   savePendingPresence,
 } from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
-import type { AuthSession, DailyTimesheet, InventoryBalance, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
+import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, ExpenseClaim, ExpenseLine, InventoryBalance, JointWork, LeaveRequest, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
 
-const APP_VERSION = "0.23.0";
+const APP_VERSION = "0.24.0";
+const EXPENSE_CATEGORIES: ExpenseCategory[] = ["TRAVEL", "MEAL", "LODGING", "LOCAL_CONVEYANCE", "OTHER"];
 
 export default function App() {
   const [booting, setBooting] = useState(true);
@@ -69,6 +70,20 @@ export default function App() {
   const [weeklyTimesheets, setWeeklyTimesheets] = useState<WeeklyTimesheet[]>([]);
   const [dailyRemarks, setDailyRemarks] = useState("");
   const [weeklyComment, setWeeklyComment] = useState("");
+  const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
+  const [leaveType, setLeaveType] = useState<"FULL_DAY" | "HALF_DAY">("FULL_DAY");
+  const [leaveStart, setLeaveStart] = useState("");
+  const [leaveEnd, setLeaveEnd] = useState("");
+  const [leaveReason, setLeaveReason] = useState("");
+  const [expenses, setExpenses] = useState<ExpenseClaim[]>([]);
+  const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>("TRAVEL");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseRemarks, setExpenseRemarks] = useState("");
+  const [expenseReceipt, setExpenseReceipt] = useState("");
+  const [expenseDraftLines, setExpenseDraftLines] = useState<ExpenseLine[]>([]);
+  const [expenseSubmitComment, setExpenseSubmitComment] = useState("");
+  const [jointWork, setJointWork] = useState<JointWork[]>([]);
   const [departure, setDeparture] = useState<DepartureIntegrity | null>(null);
   const [departureSamples, setDepartureSamples] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -157,12 +172,20 @@ export default function App() {
   }
 
   async function loadWorkRecords(client = api) {
-    const [daily, weekly] = await Promise.all([
+    const [daily, weekly, attendanceRows, leaveRows, expenseRows, jointRows] = await Promise.all([
       client.dailyTimesheets(),
       client.weeklyTimesheets(),
+      client.attendance(),
+      client.leaves(),
+      client.expenses(),
+      client.jointWork(),
     ]);
     setDailyTimesheets(daily);
     setWeeklyTimesheets(weekly);
+    setAttendance(attendanceRows);
+    setLeaves(leaveRows);
+    setExpenses(expenseRows);
+    setJointWork(jointRows);
   }
 
   async function loadDoctorContext(client: TerrevoApi, nextProgress: TourProgress | null, nextOpenVisit: Visit | null) {
@@ -336,6 +359,15 @@ export default function App() {
       setWeeklyTimesheets([]);
       setDailyRemarks("");
       setWeeklyComment("");
+      setAttendance([]);
+      setLeaves([]);
+      setLeaveStart("");
+      setLeaveEnd("");
+      setLeaveReason("");
+      setExpenses([]);
+      setExpenseDraftLines([]);
+      setExpenseSubmitComment("");
+      setJointWork([]);
       setDeparture(null);
     });
   }
@@ -513,6 +545,114 @@ export default function App() {
       setWeeklyComment("");
       await loadWorkRecords();
       setMessage("Weekly timesheet submitted from reviewed daily records.");
+    });
+  }
+
+  async function handleSubmitLeave() {
+    await run(async () => {
+      if (!leaveStart.trim()) throw new Error("Enter the leave start date as YYYY-MM-DD.");
+      const endDate = leaveType === "HALF_DAY" ? leaveStart.trim() : leaveEnd.trim();
+      if (!endDate) throw new Error("Enter the leave end date as YYYY-MM-DD.");
+      if (!leaveReason.trim()) throw new Error("Enter a leave reason.");
+      const scope = "leave-submit";
+      const pending = await getOrCreatePendingMutation(scope, async () => ({
+        leaveType,
+        startDate: leaveStart.trim(),
+        endDate,
+        reason: leaveReason.trim(),
+      }));
+      try {
+        await api.submitLeave({ operationId: pending.operationId, ...pending.payload });
+        await clearPendingMutation(scope);
+      } catch (cause) {
+        await clearPendingOnDefinitiveFailure(scope, cause);
+        throw cause;
+      }
+      setLeaveStart("");
+      setLeaveEnd("");
+      setLeaveReason("");
+      await loadWorkRecords();
+      setMessage("Leave request submitted for manager review.");
+    });
+  }
+
+  function handleAddExpenseLine() {
+    const amount = Number(expenseAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Expense amount must be greater than zero.");
+      return;
+    }
+    setExpenseDraftLines((current) => [...current, {
+      sequence: current.length + 1,
+      category: expenseCategory,
+      amount: Math.round(amount * 100) / 100,
+      remarks: expenseRemarks.trim() || null,
+      receiptReference: expenseReceipt.trim() || null,
+    }]);
+    setExpenseAmount("");
+    setExpenseRemarks("");
+    setExpenseReceipt("");
+    setError(null);
+  }
+
+  async function handleSaveExpense(executionId: string) {
+    await run(async () => {
+      if (expenseDraftLines.length === 0) throw new Error("Add at least one expense line.");
+      const scope = `expense-save.${executionId}`;
+      const pending = await getOrCreatePendingMutation(scope, async () => ({
+        currencyCode: "INR",
+        lines: expenseDraftLines,
+      }));
+      try {
+        await api.saveExpense(executionId, { operationId: pending.operationId, ...pending.payload });
+        await clearPendingMutation(scope);
+      } catch (cause) {
+        await clearPendingOnDefinitiveFailure(scope, cause);
+        throw cause;
+      }
+      setExpenseDraftLines([]);
+      await loadWorkRecords();
+      setMessage("Expense claim saved as a draft from the selected tour.");
+    });
+  }
+
+  async function handleSubmitExpense(claim: ExpenseClaim) {
+    await run(async () => {
+      const scope = `expense-submit.${claim.id}`;
+      const pending = await getOrCreatePendingMutation(scope, async () => ({
+        comment: expenseSubmitComment.trim() || null,
+      }));
+      try {
+        await api.submitExpense(claim.id, { operationId: pending.operationId, comment: pending.payload.comment });
+        await clearPendingMutation(scope);
+      } catch (cause) {
+        await clearPendingOnDefinitiveFailure(scope, cause);
+        throw cause;
+      }
+      setExpenseSubmitComment("");
+      await loadWorkRecords();
+      setMessage("Expense claim submitted for manager review.");
+    });
+  }
+
+  async function handleJointWorkAction(assignment: JointWork, action: "join" | "leave") {
+    await run(async () => {
+      const scope = `joint-work-${action}.${assignment.id}`;
+      const pending = await getOrCreatePendingMutation(scope, async () => {
+        const location = await captureFreshLocation();
+        rejectMocked(location);
+        return { location };
+      });
+      try {
+        if (action === "join") await api.joinJointWork(assignment.id, { operationId: pending.operationId, location: pending.payload.location });
+        else await api.leaveJointWork(assignment.id, { operationId: pending.operationId, location: pending.payload.location });
+        await clearPendingMutation(scope);
+      } catch (cause) {
+        await clearPendingOnDefinitiveFailure(scope, cause);
+        throw cause;
+      }
+      await loadWorkRecords();
+      setMessage(action === "join" ? "Joint field work joined with location evidence." : "Joint field work closed with location evidence.");
     });
   }
 
@@ -758,6 +898,11 @@ export default function App() {
   const sourceWeek = latestDaily ? weekStartFromDate(latestDaily.workDate) : null;
   const sourceWeekly = sourceWeek ? weeklyTimesheets.find((item) => item.weekStart === sourceWeek) ?? null : null;
   const latestWeekly = [...weeklyTimesheets].sort((a, b) => b.weekStart.localeCompare(a.weekStart))[0] ?? null;
+  const latestAttendance = attendance[0] ?? null;
+  const latestLeave = leaves[0] ?? null;
+  const latestExpense = expenses[0] ?? null;
+  const expenseExecutionId = progress?.executionId ?? latestDaily?.executionId ?? null;
+  const recentJointWork = jointWork.slice(0, 5);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -1056,6 +1201,92 @@ export default function App() {
           </View>
         ) : null}
 
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>ATTENDANCE</Text>
+          <Text style={styles.cardTitle}>{latestAttendance ? `${latestAttendance.workDate} · ${latestAttendance.status.replaceAll("_", " ")}` : "No attendance evidence yet"}</Text>
+          <Text style={styles.muted}>Attendance is derived from tour execution and approved leave. There is no second manual attendance clock.</Text>
+          {latestAttendance?.workedMinutes != null ? <Text style={styles.small}>Worked {latestAttendance.workedMinutes} of {latestAttendance.requiredMinutes ?? 0} required minutes.</Text> : null}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>LEAVE</Text>
+          <Text style={styles.cardTitle}>Request leave</Text>
+          <View style={styles.choiceButtons}>
+            {(["FULL_DAY", "HALF_DAY"] as const).map((type) => (
+              <Pressable key={type} style={[styles.compactChoice, leaveType === type && styles.choiceSelected]} onPress={() => {
+                setLeaveType(type);
+                if (type === "HALF_DAY") setLeaveEnd("");
+              }}>
+                <Text style={styles.choiceText}>{type === "FULL_DAY" ? "Full day" : "Half day"}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <TextInput style={styles.input} placeholder="Start date · YYYY-MM-DD" value={leaveStart} onChangeText={setLeaveStart} />
+          {leaveType === "FULL_DAY" ? <TextInput style={styles.input} placeholder="End date · YYYY-MM-DD" value={leaveEnd} onChangeText={setLeaveEnd} /> : null}
+          <TextInput style={[styles.input, styles.multiline]} multiline placeholder="Leave reason" value={leaveReason} onChangeText={setLeaveReason} />
+          <PrimaryButton label="Submit Leave Request" disabled={busy} onPress={() => void handleSubmitLeave()} />
+          {latestLeave ? <Text style={styles.small}>Latest: {latestLeave.startDate}{latestLeave.endDate !== latestLeave.startDate ? ` to ${latestLeave.endDate}` : ""} · {latestLeave.status}</Text> : null}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>EXPENSES</Text>
+          <Text style={styles.cardTitle}>Tour expense claim</Text>
+          <Text style={styles.muted}>Claims attach to real tour execution evidence. Total is calculated from your lines; currency is INR in this field build.</Text>
+          <View style={styles.choiceButtons}>
+            {EXPENSE_CATEGORIES.map((category) => (
+              <Pressable key={category} style={[styles.compactChoice, expenseCategory === category && styles.choiceSelected]} onPress={() => setExpenseCategory(category)}>
+                <Text style={styles.small}>{category.replaceAll("_", " ")}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <TextInput style={styles.input} keyboardType="decimal-pad" placeholder="Amount" value={expenseAmount} onChangeText={setExpenseAmount} />
+          <TextInput style={styles.input} placeholder="Remarks (optional)" value={expenseRemarks} onChangeText={setExpenseRemarks} />
+          <TextInput style={styles.input} placeholder="Receipt reference (optional)" value={expenseReceipt} onChangeText={setExpenseReceipt} />
+          <SecondaryButton label="Add Expense Line" onPress={handleAddExpenseLine} />
+          {expenseDraftLines.map((line, index) => (
+            <View key={`expense-draft-${index}`} style={styles.quantityRow}>
+              <View style={styles.flex}>
+                <Text style={styles.choiceText}>{line.category.replaceAll("_", " ")} · ₹{line.amount.toFixed(2)}</Text>
+                {line.remarks ? <Text style={styles.small}>{line.remarks}</Text> : null}
+              </View>
+              <Pressable onPress={() => setExpenseDraftLines((current) => current.filter((_, itemIndex) => itemIndex !== index).map((item, itemIndex) => ({ ...item, sequence: itemIndex + 1 })))}>
+                <Text style={styles.link}>Remove</Text>
+              </Pressable>
+            </View>
+          ))}
+          {expenseExecutionId ? <PrimaryButton label="Save Expense Draft" disabled={busy || expenseDraftLines.length === 0} onPress={() => void handleSaveExpense(expenseExecutionId)} /> : <Text style={styles.small}>A current or recent submitted tour is required before saving expenses.</Text>}
+          {latestExpense ? (
+            <>
+              <Text style={styles.small}>Latest claim: {latestExpense.workDate} · ₹{latestExpense.totalAmount.toFixed(2)} · {latestExpense.status}</Text>
+              {latestExpense.status === "DRAFT" || latestExpense.status === "RETURNED" ? (
+                <>
+                  <TextInput style={styles.input} placeholder="Submission comment (optional)" value={expenseSubmitComment} onChangeText={setExpenseSubmitComment} />
+                  <PrimaryButton label="Submit Expense Claim" disabled={busy} onPress={() => void handleSubmitExpense(latestExpense)} />
+                </>
+              ) : null}
+            </>
+          ) : null}
+        </View>
+
+        {recentJointWork.length > 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>JOINT FIELD WORK</Text>
+            <Text style={styles.cardTitle}>My assignments</Text>
+            {recentJointWork.map((assignment) => (
+              <View key={assignment.id} style={styles.observationCard}>
+                <Text style={styles.choiceText}>{assignment.workDate} · {assignment.status}</Text>
+                <Text style={styles.small}>{assignment.selfRole === "PARTICIPANT" ? "You are the field-work participant." : "Your tour is the target assignment."}</Text>
+                {assignment.selfRole === "PARTICIPANT" && assignment.status === "ACTIVE" && !assignment.joinedAt ? (
+                  <PrimaryButton label="Join Joint Work" disabled={busy} onPress={() => void handleJointWorkAction(assignment, "join")} />
+                ) : null}
+                {assignment.selfRole === "PARTICIPANT" && assignment.joinedAt && !assignment.leftAt ? (
+                  <PrimaryButton label="Leave Joint Work" disabled={busy} onPress={() => void handleJointWorkAction(assignment, "leave")} />
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {busy && departureSamples > 0 ? (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Departure continuity</Text>
@@ -1152,6 +1383,8 @@ const styles = StyleSheet.create({
   quantityInput: { width: 64, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#CDD5DF", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, textAlign: "center", fontSize: 15, color: "#132238" },
   observationCard: { borderWidth: 1, borderColor: "#E3E8EF", borderRadius: 10, padding: 10, gap: 8 },
   tripleInputs: { flexDirection: "row", gap: 8 },
+  choiceButtons: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  compactChoice: { borderWidth: 1, borderColor: "#CDD5DF", borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8 },
   metricInput: { flex: 1, minWidth: 0, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#CDD5DF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 9, textAlign: "center", fontSize: 14, color: "#132238" },
   verifiedLine: { color: "#265D3D", fontSize: 13, fontWeight: "700" },
   spinner: { marginTop: 4 },
