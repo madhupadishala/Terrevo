@@ -9,8 +9,8 @@ Sprint 22 turns the existing identity-scoped critical retry records into a visib
 - **TRV-SYNC-003** — Queue records shall expose created time, attempt count, last attempt, last error, and status `PENDING` or `DEAD_LETTER`.
 - **TRV-SYNC-004** — Foreground sync shall replay eligible pending actions in creation order through the same API contracts and same operation IDs. Replay shall never mint a replacement operation ID.
 - **TRV-SYNC-005** — Network failures, authentication interruption, HTTP 408/425/429 and 5xx responses remain pending. Sync stops on a retryable infrastructure/auth failure rather than burning through the queue.
-- **TRV-SYNC-006** — HTTP 400/403/404/409 is a definitive replay failure and shall move that item to dead-letter instead of silently deleting evidence.
-- **TRV-SYNC-007** — A user may explicitly retry dead-letter items; retry preserves the original operation ID and payload.
+- **TRV-SYNC-006** — Non-retryable 4xx responses (including 400/403/404/409/422, excluding 401/408/425/429) shall move that item to dead-letter instead of silently deleting evidence.
+- **TRV-SYNC-007** — A user may explicitly retry a dead-letter item with its original operation ID/payload or explicitly discard it. A corrected resubmission from the original workflow shall discard the dead-letter payload and create a new operation ID from the newly entered evidence.
 - **TRV-SYNC-008** — Sync status shall be visible in the field app with pending/dead-letter counts, recent items, last errors, and a manual Sync Now action.
 - **TRV-SYNC-009** — Tenant/session boundaries shall never replay another account or tenant's queue. Switching tenants clears only in-memory sync view; persisted records remain identity-scoped.
 - **TRV-SYNC-010** — Checkout presence evidence remains on its existing stronger user + tenant + visit binding and is not folded into generic mutation replay.
@@ -18,3 +18,5 @@ Sprint 22 turns the existing identity-scoped critical retry records into a visib
 - **TRV-SYNC-011A** — Start Tour, Check-in, Submit Tour, Joint Work join/leave and Checkout are time/location-sensitive and shall not be silently auto-replayed from stale evidence. They remain durable and visible for controlled retry through their original field workflow until a server contract can preserve offline event time/evidence safely.
 - **TRV-SYNC-012** — No database schema, backend endpoint, RBAC, inventory, DCR, order, attendance, expense or manager-approval contract changes are part of Sprint 22.
 - **TRV-SYNC-013** — Sync is foreground/user-driven only in this sprint. No 24/7 location or background execution is introduced.
+- **TRV-SYNC-014** — Queue index mutations shall be serialized per user + tenant so concurrent register/unregister operations cannot lose indexed work.
+- **TRV-SYNC-015** — Each foreground replay run shall use a fixed session + tenant client snapshot and shall stop if the active UI identity/tenant changes before the next replay.
