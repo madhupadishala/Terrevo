@@ -7,13 +7,14 @@ create table public.expense_decisions(id uuid primary key default extensions.gen
 create table public.expense_operations(id uuid primary key default extensions.gen_random_uuid(),tenant_id uuid not null,expense_claim_id uuid not null,actor_user_id uuid not null,operation_id uuid not null,request_hash bytea not null,created_at timestamptz not null default now(),unique(tenant_id,actor_user_id,operation_id),foreign key(tenant_id,expense_claim_id)references public.expense_claims(tenant_id,id)on delete cascade,foreign key(tenant_id,actor_user_id)references public.tenant_memberships(tenant_id,user_id)on delete restrict);
 create or replace function public.admin_save_expense_claim(p_tenant_id uuid,p_user_id uuid,p_execution_id uuid,p_operation_id uuid,p_currency text,p_lines jsonb)
 returns uuid language plpgsql security definer set search_path='' as $$
-declare v_exec public.tour_executions%rowtype;v_owner uuid;v_claim public.expense_claims%rowtype;v_hash bytea;v_old bytea;v_line jsonb;v_total numeric(14,2):=0;
+declare v_exec public.tour_executions%rowtype;v_owner uuid;v_claim public.expense_claims%rowtype;v_claim_id uuid;v_hash bytea;v_old bytea;v_line jsonb;v_total numeric(14,2):=0;
 begin
  if p_currency!~'^[A-Z]{3}$' or jsonb_typeof(p_lines)<>'array' or jsonb_array_length(p_lines)<1 or jsonb_array_length(p_lines)>50 then raise exception'invalid expense payload';end if;
  v_hash:=extensions.digest(jsonb_build_object('executionId',p_execution_id,'currency',p_currency,'lines',p_lines)::text,'sha256');
- select operation.expense_claim_id,operation.request_hash into v_claim.id,v_old from public.expense_operations operation where operation.tenant_id=p_tenant_id and operation.actor_user_id=p_user_id and operation.operation_id=p_operation_id;
- if found then if v_old is distinct from v_hash then raise exception'idempotency key reused with different payload';end if;return v_claim.id;end if;
- select execution.*,employee.user_id into v_exec,v_owner from public.tour_executions execution join public.employees employee on employee.tenant_id=execution.tenant_id and employee.id=execution.employee_id where execution.tenant_id=p_tenant_id and execution.id=p_execution_id;
+ select operation.expense_claim_id,operation.request_hash into v_claim_id,v_old from public.expense_operations operation where operation.tenant_id=p_tenant_id and operation.actor_user_id=p_user_id and operation.operation_id=p_operation_id;
+ if found then if v_old is distinct from v_hash then raise exception'idempotency key reused with different payload';end if;return v_claim_id;end if;
+ select execution.* into v_exec from public.tour_executions execution where execution.tenant_id=p_tenant_id and execution.id=p_execution_id;
+ select employee.user_id into v_owner from public.employees employee where employee.tenant_id=p_tenant_id and employee.id=v_exec.employee_id;
  if v_exec.id is null or v_owner is distinct from p_user_id then raise exception'owned execution not found';end if;
  select claim.* into v_claim from public.expense_claims claim where claim.tenant_id=p_tenant_id and claim.execution_id=p_execution_id for update;
  if v_claim.id is not null and v_claim.status not in('DRAFT','RETURNED')then raise exception'expense claim is not editable';end if;
