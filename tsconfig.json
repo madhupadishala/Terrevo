@@ -35,6 +35,7 @@
     "modules/attendance-leave/src/**/*.ts",
     "modules/expenses/src/**/*.ts",
     "modules/joint-work/src/**/*.ts",
-    "modules/manager-command/src/**/*.ts"
+    "modules/manager-command/src/**/*.ts",
+    "modules/analytics/src/**/*.ts"
   ]
 }
