@@ -1,4 +1,4 @@
-import type { AttendanceRow, AuthSession, DailyTimesheet, DistributionLine, DoctorCall, DoctorCallProductInput, ExpenseClaim, ExpenseLine, FieldMasterKind, InventoryBalance, JointWork, LeaveRequest, MasterItem, OrderLine, RcpaLine, RcpaReport, SalesOrder, StartTourOption, SubmitTourResult, Tenant, TourProgress, TradeCall, Visit, VisitDistribution, WeeklyTimesheet } from "./types";
+import type { AccessContext, AttendanceRow, AuthSession, DailyTimesheet, DistributionLine, DoctorCall, DoctorCallProductInput, ExpenseClaim, ExpenseLine, FieldMasterKind, InventoryBalance, JointWork, LeaveRequest, ManagerCommandCenter, MasterItem, OrderLine, RcpaLine, RcpaReport, SalesOrder, StartTourOption, SubmitTourResult, Tenant, TourProgress, TradeCall, Visit, VisitDistribution, WeeklyTimesheet } from "./types";
 import type { DepartureIntegrity, PresencePoint } from "./presence";
 
 const API_BASE_URL = (process.env.EXPO_PUBLIC_TERREVO_API_URL ?? "https://terrevo.vercel.app").replace(/\/+$/, "");
@@ -325,6 +325,18 @@ export class TerrevoApi {
     });
     const body = await response.json() as { order: SalesOrder };
     return body.order;
+  }
+
+  async accessContext(): Promise<AccessContext> {
+    const response = await this.request("/v1/access-context");
+    const body = await response.json() as { context: AccessContext };
+    return body.context;
+  }
+
+  async managerCommandCenter(): Promise<ManagerCommandCenter> {
+    const response = await this.request("/v1/manager/command-center");
+    const body = await response.json() as { commandCenter: ManagerCommandCenter };
+    return body.commandCenter;
   }
 
   async attendance(): Promise<AttendanceRow[]> {
