@@ -123,6 +123,7 @@ function mapOrgUnit(row: OrgUnitRow): OrgUnit {
   };
 }
 
+/** Creates the Supabase-backed repositories used by Terrevo domain services. */
 export function createSupabaseAdapter(
   config: SupabaseConfig,
   fetcher: Fetcher = fetch,
