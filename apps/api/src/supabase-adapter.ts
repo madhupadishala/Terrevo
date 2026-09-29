@@ -12,6 +12,7 @@ import type { InventoryBalance, InventoryRepository, VisitDistribution } from ".
 import type { SubmitTourRepository, SubmitTourResult } from "../../../modules/tour-submit/src/index.ts";
 import type { DailyTimesheet, DailyTimesheetRepository } from "../../../modules/timesheet-daily/src/index.ts";
 import type { WeeklyTimesheet, WeeklyTimesheetRepository } from "../../../modules/timesheet-weekly/src/index.ts";
+import type { TradeCall, TradeCallRepository } from "../../../modules/trade-call/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -134,6 +135,7 @@ export function createSupabaseAdapter(
   tourSubmit: SubmitTourRepository;
   dailyTimesheets: DailyTimesheetRepository;
   weeklyTimesheets: WeeklyTimesheetRepository;
+  tradeCalls: TradeCallRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -900,5 +902,25 @@ export function createSupabaseAdapter(
     },
   };
 
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets };
+  const mapTradeCall=(row:Record<string,any>):TradeCall=>({
+    id:row.id,visitId:row.visit_id,callType:row.call_type,outcome:row.outcome,
+    remarks:row.remarks,nextAction:row.next_action,updatedAt:row.updated_at,
+  });
+  const tradeCalls:TradeCallRepository={
+    async save(tenantId,userId,visitId,input){
+      const r=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_save_trade_call`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:tenantId,p_user_id:userId,p_visit_id:visitId,p_operation_id:input.operationId,
+          p_outcome:input.outcome,p_remarks:input.remarks,p_next_action:input.nextAction,
+        }),
+      }));return await r.json() as string;
+    },
+    async getByVisit(tenantId,visitId,accessToken){
+      const q=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,visit_id:`eq.${visitId}`,limit:"1"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/trade_calls?${q}`,{headers:authHeaders(config,accessToken)}));
+      const row=(await r.json() as Array<Record<string,any>>)[0];return row?mapTradeCall(row):null;
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls };
 }
