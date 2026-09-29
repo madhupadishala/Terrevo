@@ -20,7 +20,7 @@
 | 15 | RCPA | CLOSED |
 | 16 | POB / Orders | CLOSED |
 | 17 | Attendance + Leave | CLOSED |
-| 18 | Expenses | PLANNED |
+| 18 | Expenses | CLOSED |
 | 19 | Joint Field Work | PLANNED |
 | 20 | Manager Command Center | PLANNED |
 | 21 | Analytics + Reports | PLANNED |
@@ -29,4 +29,4 @@
 | 24 | Regression + UAT + Closure | PLANNED |
 | 25 | Pilot Release | PLANNED |
 
-Completed through Sprint 17. Next planned sprint: 18 — Expenses.
+Completed through Sprint 18. Next planned sprint: 19 — Joint Field Work.

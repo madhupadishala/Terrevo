@@ -18,6 +18,8 @@ export const PERMISSION_KEYS = [
   "TIMESHEET_APPROVE",
   "LEAVE_VIEW_TEAM",
   "LEAVE_APPROVE",
+  "EXPENSE_VIEW_TEAM",
+  "EXPENSE_APPROVE",
 ] as const;
 export type PermissionKey = typeof PERMISSION_KEYS[number];
 
