@@ -244,7 +244,7 @@ export class TerrevoApi {
   }
 
   async weeklyTimesheets(): Promise<WeeklyTimesheet[]> {
-    const response = await this.request("/v1/timesheets/weekly");
+    const response = await this.request("/v1/timesheets/weekly/own");
     const body = await response.json() as { timesheets: WeeklyTimesheet[] };
     return body.timesheets;
   }
