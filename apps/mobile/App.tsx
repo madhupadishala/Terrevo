@@ -90,7 +90,11 @@ export default function App() {
     try {
       await action();
     } catch (cause) {
-      setError(toMessage(cause));
+      if (checkoutRecorded) {
+        setMessage("Check-out is already recorded. Departure continuity could not complete, so no continuity conclusion was made.");
+      } else {
+        setError(toMessage(cause));
+      }
     } finally {
       setBusy(false);
     }
@@ -174,6 +178,7 @@ export default function App() {
     setMessage(null);
     setDeparture(null);
     setDepartureSamples(0);
+    let checkoutRecorded = false;
     try {
       if (stop.type === "doctor") {
         if (!doctorOutcome.trim()) throw new Error("Enter the doctor call outcome before check-out.");
@@ -187,6 +192,7 @@ export default function App() {
       const checkoutLocation = await captureFreshLocation();
       rejectMocked(checkoutLocation);
       await api.checkOut(visit.id, { operationId: Crypto.randomUUID(), location: checkoutLocation });
+      checkoutRecorded = true;
       await refreshField();
       setDoctorOutcome("");
       setDoctorRemarks("");
