@@ -1,5 +1,6 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 language: "en-US"
+early_access: false
 tone_instructions: "Be concise and evidence-based. Prioritize correctness, tenant isolation, data integrity, offline idempotency, security and regression risk over style."
 knowledge_base:
   code_guidelines:
@@ -10,15 +11,20 @@ knowledge_base:
       - "skills/warpath/SKILL.md"
 reviews:
   profile: "chill"
-  request_changes_workflow: true
+  request_changes_workflow: false
   high_level_summary: true
   changed_files_summary: true
   review_status: true
+  commit_status: true
+  fail_commit_status: true
   collapse_walkthrough: false
   poem: false
   auto_review:
     enabled: true
     drafts: false
+    auto_incremental_review: true
+    base_branches:
+      - "main"
   path_filters:
     - "!**/dist/**"
     - "!**/build/**"
@@ -49,3 +55,6 @@ reviews:
     - path: "database/**"
       instructions: |
         Require migration safety, backward compatibility, tenant isolation and rollback consideration.
+
+chat:
+  auto_reply: true
