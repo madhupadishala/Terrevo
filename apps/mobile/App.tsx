@@ -9,10 +9,10 @@ import {
   TextInput,
   View,
 } from "react-native";
-import * as Crypto from "expo-crypto";
-import { TerrevoApi } from "./src/api";
+import { ApiError, TerrevoApi } from "./src/api";
 import { captureFreshLocation, collectDepartureSamples } from "./src/location";
 import { evaluateDeparture, type DepartureIntegrity } from "./src/presence";
+import { clearPendingMutation, getOrCreatePendingMutation } from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
 import type { AuthSession, StartTourOption, Tenant, TourProgress, TourStop, Visit } from "./src/types";
 
@@ -133,17 +133,35 @@ export default function App() {
     }
   }
 
+  async function clearPendingOnDefinitiveFailure(scope: string, cause: unknown) {
+    if (cause instanceof ApiError && [400, 403, 404].includes(cause.status)) {
+      await clearPendingMutation(scope);
+    }
+  }
+
   async function handleStartTour(option: StartTourOption) {
     await run(async () => {
-      const location = await captureFreshLocation();
-      rejectMocked(location);
-      await api.startTour({
-        operationId: Crypto.randomUUID(),
-        planDayId: option.planDayId,
-        location,
-        deviceId: await getInstallationId(),
-        appVersion: APP_VERSION,
+      const scope = `start.${option.planDayId}`;
+      const pending = await getOrCreatePendingMutation(scope, async () => {
+        const location = await captureFreshLocation();
+        rejectMocked(location);
+        return {
+          location,
+          deviceId: await getInstallationId(),
+          appVersion: APP_VERSION,
+        };
       });
+      try {
+        await api.startTour({
+          operationId: pending.operationId,
+          planDayId: option.planDayId,
+          ...pending.payload,
+        });
+        await clearPendingMutation(scope);
+      } catch (cause) {
+        await clearPendingOnDefinitiveFailure(scope, cause);
+        throw cause;
+      }
       await refreshField();
       setMessage("Tour started. Location is captured only during active field actions.");
     });
@@ -151,14 +169,27 @@ export default function App() {
 
   async function handleCheckIn(stop: TourStop) {
     await run(async () => {
-      const location = await captureFreshLocation();
-      rejectMocked(location);
-      const visit = await api.checkIn({
-        operationId: Crypto.randomUUID(),
-        planStopId: stop.planStopId,
-        location,
-        exceptionReason: exceptionReason.trim() || null,
+      const scope = `check-in.${stop.planStopId}`;
+      const pending = await getOrCreatePendingMutation(scope, async () => {
+        const location = await captureFreshLocation();
+        rejectMocked(location);
+        return {
+          location,
+          exceptionReason: exceptionReason.trim() || null,
+        };
       });
+      let visit: Visit;
+      try {
+        visit = await api.checkIn({
+          operationId: pending.operationId,
+          planStopId: stop.planStopId,
+          ...pending.payload,
+        });
+        await clearPendingMutation(scope);
+      } catch (cause) {
+        await clearPendingOnDefinitiveFailure(scope, cause);
+        throw cause;
+      }
       setOpenVisit(visit);
       setExceptionReason("");
       await refreshField();
@@ -178,17 +209,41 @@ export default function App() {
     try {
       if (stop.type === "doctor") {
         if (!doctorOutcome.trim()) throw new Error("Enter the doctor call outcome before check-out.");
-        await api.saveDoctorCall(visit.id, {
-          operationId: Crypto.randomUUID(),
+        const callScope = `doctor-call.${visit.id}`;
+        const pendingCall = await getOrCreatePendingMutation(callScope, async () => ({
           callOutcome: doctorOutcome.trim(),
           remarks: doctorRemarks.trim() || null,
-        });
+        }));
+        try {
+          await api.saveDoctorCall(visit.id, {
+            operationId: pendingCall.operationId,
+            ...pendingCall.payload,
+          });
+          await clearPendingMutation(callScope);
+        } catch (cause) {
+          await clearPendingOnDefinitiveFailure(callScope, cause);
+          throw cause;
+        }
       }
 
-      const checkoutLocation = await captureFreshLocation();
-      rejectMocked(checkoutLocation);
-      await api.checkOut(visit.id, { operationId: Crypto.randomUUID(), location: checkoutLocation });
-      checkoutRecorded = true;
+      const checkoutScope = `check-out.${visit.id}`;
+      const pendingCheckout = await getOrCreatePendingMutation(checkoutScope, async () => {
+        const location = await captureFreshLocation();
+        rejectMocked(location);
+        return { location };
+      });
+      try {
+        await api.checkOut(visit.id, {
+          operationId: pendingCheckout.operationId,
+          ...pendingCheckout.payload,
+        });
+        checkoutRecorded = true;
+        await clearPendingMutation(checkoutScope);
+      } catch (cause) {
+        await clearPendingOnDefinitiveFailure(checkoutScope, cause);
+        throw cause;
+      }
+      const checkoutLocation = pendingCheckout.payload.location;
       await refreshField();
       setDoctorOutcome("");
       setDoctorRemarks("");
