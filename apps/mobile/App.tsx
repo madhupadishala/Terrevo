@@ -133,7 +133,9 @@ export default function App() {
             await loadFieldResources(api);
             await refreshField(api);
             await loadWorkRecords(api);
+            await refreshSyncQueue(storedSession, selected);
             await tryResumePendingPresence(api, storedSession, selected);
+            await tryResumeSyncQueue(storedSession, selected, api);
           }
         }
       } catch (cause) {
@@ -297,57 +299,57 @@ export default function App() {
     }
   }
 
-  async function replaySyncItem(item: SyncQueueItem): Promise<"SYNCED" | "RETRY" | "DEAD"> {
+  async function replaySyncItem(item: SyncQueueItem, client = api): Promise<"SYNCED" | "RETRY" | "DEAD"> {
     try {
       switch (item.action) {
         case "distribution": {
           const payload = item.payload as { items: Parameters<TerrevoApi["distribute"]>[1]["items"] };
-          await api.distribute(item.targetId!, { operationId: item.operationId, items: payload.items });
+          await client.distribute(item.targetId!, { operationId: item.operationId, items: payload.items });
           break;
         }
         case "doctor-call": {
           const payload = item.payload as Omit<Parameters<TerrevoApi["saveDoctorCall"]>[1], "operationId">;
-          await api.saveDoctorCall(item.targetId!, { operationId: item.operationId, ...payload });
+          await client.saveDoctorCall(item.targetId!, { operationId: item.operationId, ...payload });
           break;
         }
         case "trade-call": {
           const payload = item.payload as Omit<Parameters<TerrevoApi["saveTradeCall"]>[1], "operationId">;
-          await api.saveTradeCall(item.targetId!, { operationId: item.operationId, ...payload });
+          await client.saveTradeCall(item.targetId!, { operationId: item.operationId, ...payload });
           break;
         }
         case "rcpa": {
           const payload = item.payload as { lines: Parameters<TerrevoApi["saveRcpa"]>[1]["lines"] };
-          await api.saveRcpa(item.targetId!, { operationId: item.operationId, lines: payload.lines });
+          await client.saveRcpa(item.targetId!, { operationId: item.operationId, lines: payload.lines });
           break;
         }
         case "order": {
           const payload = item.payload as Omit<Parameters<TerrevoApi["saveOrder"]>[1], "operationId">;
-          await api.saveOrder(item.targetId!, { operationId: item.operationId, ...payload });
+          await client.saveOrder(item.targetId!, { operationId: item.operationId, ...payload });
           break;
         }
         case "daily-review": {
           const payload = item.payload as { remarks: string | null };
-          await api.reviewDailyTimesheet(item.targetId!, { operationId: item.operationId, remarks: payload.remarks });
+          await client.reviewDailyTimesheet(item.targetId!, { operationId: item.operationId, remarks: payload.remarks });
           break;
         }
         case "weekly-submit": {
           const payload = item.payload as { comment: string | null };
-          await api.submitWeeklyTimesheet(item.targetId!, { operationId: item.operationId, comment: payload.comment });
+          await client.submitWeeklyTimesheet(item.targetId!, { operationId: item.operationId, comment: payload.comment });
           break;
         }
         case "leave-submit": {
           const payload = item.payload as Omit<Parameters<TerrevoApi["submitLeave"]>[0], "operationId">;
-          await api.submitLeave({ operationId: item.operationId, ...payload });
+          await client.submitLeave({ operationId: item.operationId, ...payload });
           break;
         }
         case "expense-save": {
           const payload = item.payload as Omit<Parameters<TerrevoApi["saveExpense"]>[1], "operationId">;
-          await api.saveExpense(item.targetId!, { operationId: item.operationId, ...payload });
+          await client.saveExpense(item.targetId!, { operationId: item.operationId, ...payload });
           break;
         }
         case "expense-submit": {
           const payload = item.payload as { comment: string | null };
-          await api.submitExpense(item.targetId!, { operationId: item.operationId, comment: payload.comment });
+          await client.submitExpense(item.targetId!, { operationId: item.operationId, comment: payload.comment });
           break;
         }
         default:
@@ -367,24 +369,33 @@ export default function App() {
     }
   }
 
-  async function flushSyncQueue(force = false): Promise<{ synced: number; dead: number }> {
-    if (!session || !tenantId) return { synced: 0, dead: 0 };
-    const items = await listSyncQueue(session.user.id, tenantId);
+  async function flushSyncQueue(
+    force = false,
+    currentSession = session,
+    currentTenantId = tenantId,
+    client = api,
+  ): Promise<{ synced: number; dead: number }> {
+    if (!currentSession || !currentTenantId) return { synced: 0, dead: 0 };
+    const items = await listSyncQueue(currentSession.user.id, currentTenantId);
     let synced = 0;
     let dead = 0;
     for (const item of items) {
       if (item.state !== "QUEUED" || item.mode !== "AUTO" || (!force && !isSyncDue(item))) continue;
-      const result = await replaySyncItem(item);
+      const result = await replaySyncItem(item, client);
       if (result === "SYNCED") synced += 1;
       if (result === "DEAD") dead += 1;
     }
-    await refreshSyncQueue();
+    await refreshSyncQueue(currentSession, currentTenantId);
     return { synced, dead };
   }
 
-  async function tryResumeSyncQueue(): Promise<void> {
+  async function tryResumeSyncQueue(
+    currentSession = session,
+    currentTenantId = tenantId,
+    client = api,
+  ): Promise<void> {
     try {
-      await flushSyncQueue(false);
+      await flushSyncQueue(false, currentSession, currentTenantId, client);
     } catch {
       // Queue remains durable; explicit Sync Now can retry later.
     }
@@ -551,7 +562,9 @@ export default function App() {
     await loadFieldResources(api);
     await refreshField(api);
     await loadWorkRecords(api);
+    await refreshSyncQueue(currentSession, id);
     await tryResumePendingPresence(api, currentSession, id);
+    await tryResumeSyncQueue(currentSession, id, api);
   }
 
   async function syncPendingPresence(
@@ -793,7 +806,7 @@ export default function App() {
         reason: leaveReason.trim(),
       }));
       try {
-        await api.submitLeave({ operationId: pending.operationId, ...pending.payload });
+        await client.submitLeave({ operationId: pending.operationId, ...pending.payload });
         await completePendingMutation(scope);
       } catch (cause) {
         await recordPendingFailure(scope, cause);
@@ -884,6 +897,48 @@ export default function App() {
       }
       await loadWorkRecords();
       setMessage(action === "join" ? "Joint field work joined with location evidence." : "Joint field work closed with location evidence.");
+    });
+  }
+
+  async function handleSyncNow() {
+    if (syncing) return;
+    setSyncing(true);
+    setError(null);
+    try {
+      const result = await flushSyncQueue(true);
+      if (result.synced > 0) {
+        try {
+          await refreshField();
+          await loadWorkRecords();
+          setInventory(await api.inventory());
+        } catch {
+          // Sync result is authoritative even if the follow-up screen refresh fails.
+        }
+      }
+      const remaining = await refreshSyncQueue();
+      const summary = summarizeSyncQueue(remaining);
+      if (result.dead > 0 || summary.needsAttention > 0) {
+        setMessage(`Sync completed with ${summary.needsAttention} item(s) needing attention.`);
+      } else if (summary.manual > 0) {
+        setMessage(`Synced ${result.synced} item(s). ${summary.manual} field action(s) require retry from their original screen.`);
+      } else if (summary.waiting > 0) {
+        setMessage(`Synced ${result.synced} item(s). ${summary.waiting} item(s) remain queued for retry.`);
+      } else {
+        setMessage(`Sync complete. ${result.synced} queued item(s) uploaded.`);
+      }
+    } catch (cause) {
+      setError(toMessage(cause));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleDismissDeadLetter(item: SyncQueueItem) {
+    if (item.state !== "DEAD_LETTER") return;
+    await run(async () => {
+      await removeSyncItem(item.scope);
+      await refreshSyncQueue();
+      setMessage("Resolved sync item dismissed. Re-enter corrected data if the business action is still required.");
     });
   }
 
