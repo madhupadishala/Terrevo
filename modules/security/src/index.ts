@@ -1,6 +1,9 @@
 export class RequestBodyError extends Error {
-  constructor(readonly status: 400 | 413, message: string) {
+  readonly status: 400 | 413;
+
+  constructor(status: 400 | 413, message: string) {
     super(message);
+    this.status = status;
   }
 }
 
