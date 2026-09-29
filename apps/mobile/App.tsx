@@ -15,6 +15,7 @@ import { captureFreshLocation, collectDepartureSamples } from "./src/location";
 import { presenceStatusMessage, type DepartureIntegrity, type PresencePoint } from "./src/presence";
 import {
   clearPendingMutation,
+  clearPendingMutationIfOperation,
   clearPendingPresence,
   getOrCreatePendingMutation,
   getOrCreatePendingPresence,
@@ -304,10 +305,12 @@ export default function App() {
         pending,
         error: toMessage(cause),
       });
-      const item = (await listSyncQueue(session.user.id, tenantId)).find((candidate) => candidate.scope === scope);
+      const item = (await listSyncQueue(session.user.id, tenantId)).find(
+        (candidate) => candidate.scope === scope && candidate.operationId === pending.operationId,
+      );
       if (item && isDefinitiveSyncFailure(cause)) {
         await deadLetterSyncItem(item, toMessage(cause));
-        await clearPendingMutation(scope);
+        await clearPendingMutationIfOperation(scope, pending.operationId);
       }
       await refreshSyncQueue();
     } catch {
@@ -372,7 +375,7 @@ export default function App() {
           return "RETRY";
       }
       try {
-        await clearPendingMutation(item.scope);
+        await clearPendingMutationIfOperation(item.scope, item.operationId);
         await removeSyncItem(item.scope, item.operationId);
       } catch {
         // The server accepted the original operation ID; any stale local entry can replay idempotently.
@@ -381,7 +384,7 @@ export default function App() {
     } catch (cause) {
       if (isDefinitiveSyncFailure(cause)) {
         await deadLetterSyncItem(item, toMessage(cause));
-        await clearPendingMutation(item.scope);
+        await clearPendingMutationIfOperation(item.scope, item.operationId);
         return "DEAD";
       }
       await markSyncAttempt(item, toMessage(cause));
@@ -1289,7 +1292,7 @@ export default function App() {
               <Text style={styles.cardTitle}>{syncItems.length} unsynced item(s) on this device</Text>
               <Text style={styles.small}>Waiting {syncSummary.waiting} · Retry original action {syncSummary.manual} · Needs attention {syncSummary.needsAttention}</Text>
               {syncItems.slice(0, 6).map((item) => (
-                <View key={item.scope} style={styles.choiceRow}>
+                <View key={`${item.scope}::${item.operationId}`} style={styles.choiceRow}>
                   <Text style={styles.choiceText}>{item.action.replaceAll("-", " ")}</Text>
                   <Text style={styles.small}>
                     {item.state === "DEAD_LETTER"
