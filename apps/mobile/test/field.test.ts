@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDistributionLines, buildDoctorProducts, buildOrderLines, buildRcpaLines, distributionKey, projectedInventoryBalance, weekStartFromDate } from "../src/field.ts";
+import { accountMutationScope, buildDistributionLines, buildDoctorProducts, buildOrderLines, buildRcpaLines, distributionKey, projectedInventoryBalance, weekStartFromDate } from "../src/field.ts";
 
 test("doctor products preserve selection order and explicit sequence", () => {
   assert.deepEqual(buildDoctorProducts(["p2", "p1", "p2"]), [
@@ -50,4 +50,19 @@ test("RCPA combines company and competitor observations without inventing values
     { sequence: 1, productId: "p1", competitorBrand: null, prescriptionCount: 4, stockQuantity: 0, salesQuantity: 2 },
     { sequence: 2, productId: null, competitorBrand: "Brand X", prescriptionCount: 3, stockQuantity: 1, salesQuantity: 0 },
   ]);
+});
+
+
+test("critical retry scopes are isolated by tenant and user", () => {
+  const base = "leave-submit";
+  assert.equal(accountMutationScope("user-a", "tenant-a", base), "tenant-a.user-a.leave-submit");
+  assert.notEqual(
+    accountMutationScope("user-a", "tenant-a", base),
+    accountMutationScope("user-b", "tenant-a", base),
+  );
+  assert.notEqual(
+    accountMutationScope("user-a", "tenant-a", base),
+    accountMutationScope("user-a", "tenant-b", base),
+  );
+  assert.throws(() => accountMutationScope("", "tenant-a", base), /requires user, tenant/i);
 });

@@ -114,3 +114,12 @@ export function buildRcpaLines(
   }
   return result;
 }
+
+
+export function accountMutationScope(userId: string, tenantId: string, scope: string): string {
+  const user = userId.trim();
+  const tenant = tenantId.trim();
+  const base = scope.trim();
+  if (!user || !tenant || !base) throw new Error("Retry state requires user, tenant and operation scope.");
+  return `${tenant}.${user}.${base}`;
+}
