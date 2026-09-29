@@ -18,9 +18,17 @@ test("TRV-DEPLOY-001 health is reachable without provider secrets", async () => 
   });
 });
 
-test("TRV-DEPLOY-001 business routes fail closed when provider configuration is absent", async () => {
+test("TRV-DEPLOY-004 Vercel gateway rewrite restores the health path", async () => {
   const response = await createVercelApiHandler({}).fetch(
-    new Request("https://terrevo.example/api/v1/tenants"),
+    new Request("https://terrevo.example/api?__terrevo_path=health"),
+  );
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).apiAdapter, "ready");
+});
+
+test("TRV-DEPLOY-004 nested business route reaches Terrevo and fails closed without provider config", async () => {
+  const response = await createVercelApiHandler({}).fetch(
+    new Request("https://terrevo.example/api?__terrevo_path=v1/tenants"),
   );
   assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), {

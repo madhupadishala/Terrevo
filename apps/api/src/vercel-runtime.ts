@@ -24,9 +24,19 @@ function health(env: ApiEnv): VercelRuntimeHealth {
   };
 }
 
+function internalPath(url: URL): string {
+  const routedPath = url.searchParams.get("__terrevo_path");
+  if (routedPath !== null) {
+    const normalized = routedPath.replace(/^\/+/, "");
+    return normalized ? `/${normalized}` : "/";
+  }
+  return url.pathname.replace(/^\/api(?=\/|$)/, "") || "/";
+}
+
 function internalRequest(request: Request): Request {
   const url = new URL(request.url);
-  url.pathname = url.pathname.replace(/^\/api(?=\/|$)/, "") || "/";
+  url.pathname = internalPath(url);
+  url.searchParams.delete("__terrevo_path");
   return new Request(url, request);
 }
 
@@ -34,7 +44,7 @@ export function createVercelApiHandler(env: ApiEnv) {
   return {
     async fetch(request: Request): Promise<Response> {
       const url = new URL(request.url);
-      const path = url.pathname.replace(/^\/api(?=\/|$)/, "") || "/";
+      const path = internalPath(url);
 
       if (request.method === "GET" && path === "/health") {
         return Response.json(health(env), {
