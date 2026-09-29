@@ -160,10 +160,10 @@ begin
     select value,ordinality from jsonb_array_elements(p_samples) with ordinality
   loop
     if jsonb_typeof(v_sample)<>'object' then raise exception 'invalid presence sample'; end if;
-    if jsonb_typeof(v_sample->'latitude')<>'number'
-       or jsonb_typeof(v_sample->'longitude')<>'number'
-       or jsonb_typeof(v_sample->'accuracyMeters')<>'number'
-       or jsonb_typeof(v_sample->'capturedAt')<>'string' then
+    if jsonb_typeof(v_sample->'latitude') is distinct from 'number'
+       or jsonb_typeof(v_sample->'longitude') is distinct from 'number'
+       or jsonb_typeof(v_sample->'accuracyMeters') is distinct from 'number'
+       or jsonb_typeof(v_sample->'capturedAt') is distinct from 'string' then
       raise exception 'invalid presence sample fields';
     end if;
 

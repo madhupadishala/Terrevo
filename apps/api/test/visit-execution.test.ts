@@ -32,7 +32,7 @@ test("TRV-VIS-008 GPS exception review requires pending visible visit",async()=>
  const service=createVisitService({
   getSettings:async()=>({geofenceRadiusMeters:100,maxGpsAccuracyMeters:50}),updateSettings:async()=>{},
   checkIn:async()=>visitId,getOpen:async()=>null,getById:async()=>null,checkOut:async()=>{},
-  listPendingExceptions:async()=>[],decideException:async()=>{},
+  recordDeparture:async()=>visitId,getPresence:async()=>null,listPendingExceptions:async()=>[],decideException:async()=>{},
  },rbac());
  await assert.rejects(service.decideException(tenant,user,"token",visitId,{decision:"APPROVE"}),VisitNotFoundError);
 });

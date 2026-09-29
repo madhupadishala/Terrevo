@@ -34,3 +34,9 @@ export type DepartureIntegrity = {
   recordedAt: string;
   samples: DepartureIntegritySample[];
 };
+
+export function presenceStatusMessage(status: DepartureIntegrityStatus): string {
+  if (status === "CONSISTENT") return "Check-out complete. Server presence verification is consistent.";
+  if (status === "SPOOF_SUSPECTED") return "Check-out retained, but server presence verification detected suspicious location evidence.";
+  return "Check-out complete. Server presence verification requires review.";
+}

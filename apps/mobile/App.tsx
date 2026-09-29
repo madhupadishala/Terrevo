@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { ApiError, TerrevoApi } from "./src/api";
 import { captureFreshLocation, collectDepartureSamples } from "./src/location";
-import type { DepartureIntegrity } from "./src/presence";
+import { presenceStatusMessage, type DepartureIntegrity } from "./src/presence";
 import { clearPendingMutation, getOrCreatePendingMutation } from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
 import type { AuthSession, StartTourOption, Tenant, TourProgress, TourStop, Visit } from "./src/types";
@@ -264,11 +264,7 @@ export default function App() {
         throw cause;
       }
       setDeparture(result);
-      setMessage(result.status === "CONSISTENT"
-        ? "Check-out complete. Server presence verification is consistent."
-        : result.status === "SPOOF_SUSPECTED"
-          ? "Check-out retained, but server presence verification detected suspicious location evidence."
-          : "Check-out complete. Server presence verification requires review.");
+      setMessage(presenceStatusMessage(result.status));
     } catch (cause) {
       if (checkoutRecorded) {
         setMessage("Check-out is already recorded. Departure continuity could not complete, so no continuity conclusion was made.");
