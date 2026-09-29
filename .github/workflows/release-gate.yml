@@ -6,18 +6,88 @@ on:
         description: Target environment
         required: true
         type: choice
-        options: [dev, qa, uat, pilot]
+        options: [qa, uat, pilot]
+
 permissions:
   contents: read
+
 jobs:
-  gate:
+  regression:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm run verify:foundation
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run verify
+      - run: npm run verify:release-readiness
+      - run: git diff --check
+
+  mobile-release-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run bundle:android
+
+  migration-roundtrip:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: terrevo_release_gate
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d terrevo_release_gate"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: postgres
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGDATABASE: terrevo_release_gate
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+      - run: psql -v ON_ERROR_STOP=1 -f database/ci/supabase-bootstrap.sql
+      - name: Forward migrations
+        run: |
+          set -euo pipefail
+          find database/migrations -maxdepth 1 -type f -name '*.sql' ! -name '*.down.sql' -print0 | sort -z | while IFS= read -r -d '' file; do
+            echo "Applying $file"
+            psql -v ON_ERROR_STOP=1 -f "$file"
+          done
+      - name: Reverse migrations
+        run: |
+          set -euo pipefail
+          find database/migrations -maxdepth 1 -type f -name '*.down.sql' -print0 | sort -zr | while IFS= read -r -d '' file; do
+            echo "Rolling back $file"
+            psql -v ON_ERROR_STOP=1 -f "$file"
+          done
+
+  closure:
+    needs: [regression, mobile-release-smoke, migration-roundtrip]
+    runs-on: ubuntu-latest
+    steps:
       - run: |
-          echo "Deployment intentionally disabled in Sprint 0."
-          echo "Future deploy jobs require Karpathy scope/goal verification, Warpath GO and smoke-test result."
+          echo "Automated closure gate is green for ${{ inputs.environment }}."
+          echo "Pilot deployment still requires completed manual evidence in docs/qa/UAT-CLOSURE.md."
