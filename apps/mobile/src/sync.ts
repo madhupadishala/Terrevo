@@ -61,7 +61,8 @@ export function syncErrorStatus(error: unknown): number | null {
 
 export function isDefinitiveSyncFailure(error: unknown): boolean {
   const status = syncErrorStatus(error);
-  return status !== null && [400, 403, 404, 409].includes(status);
+  if (status === null || status < 400 || status >= 500) return false;
+  return ![401, 408, 425, 429].includes(status);
 }
 
 export function shouldStopSyncAfterFailure(error: unknown): boolean {
