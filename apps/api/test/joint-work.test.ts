@@ -2,3 +2,4 @@ import test from"node:test";import assert from"node:assert/strict";import{create
 const rb:any={authorize:async()=>{},accessContext:async()=>({roles:[],permissions:[],orgAssignments:[]}),assignRole:async()=>{}};
 test("target cannot equal participant",async()=>{const s=createJointWorkService({}as any,rb);await assert.rejects(s.schedule(t,a,"x",{operationId:o,targetEmployeeId:e,participantEmployeeId:e,workDate:"2026-10-01"}),JointWorkInputError)});
 test("join validates coordinates",async()=>{const s=createJointWorkService({}as any,rb);await assert.rejects(s.join(t,a,"x",e,{operationId:o,latitude:91,longitude:78,accuracyMeters:10}),JointWorkInputError)});
+test("self-scoped joint work list forwards authenticated user",async()=>{let received:any[]=[];const s=createJointWorkService({listVisible:async()=>[],listSelf:async(t,u,token)=>{received=[t,u,token];return[]}}as any,rb);assert.deepEqual(await s.listSelf(t,a,"token"),[]);assert.deepEqual(received,[t,a,"token"])});
