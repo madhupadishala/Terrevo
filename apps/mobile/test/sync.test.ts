@@ -18,6 +18,9 @@ test("sync scope parsing remains identity scoped", () => {
 test("sync failure policy distinguishes definitive business failures from retryable infrastructure", () => {
   assert.equal(isDefinitiveSyncFailure({ status: 400 }), true);
   assert.equal(isDefinitiveSyncFailure({ status: 409 }), true);
+  assert.equal(isDefinitiveSyncFailure({ status: 422 }), true);
+  assert.equal(isDefinitiveSyncFailure({ status: 401 }), false);
+  assert.equal(isDefinitiveSyncFailure({ status: 429 }), false);
   assert.equal(isDefinitiveSyncFailure({ status: 500 }), false);
   assert.equal(shouldStopSyncAfterFailure({ status: 400 }), false);
   assert.equal(shouldStopSyncAfterFailure({ status: 401 }), true);
