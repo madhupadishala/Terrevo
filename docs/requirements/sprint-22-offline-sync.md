@@ -17,3 +17,5 @@ Sprint 22 hardens retry-safe field writes without pretending server-authoritativ
 - **TRV-SYNC-011** — Dead-letter entries may be dismissed only by the owning user/tenant after the underlying issue is understood/corrected.
 - **TRV-SYNC-012** — Presence evidence keeps its existing stronger user + tenant + visit binding and is not folded into the generic queue.
 - **TRV-SYNC-013** — No background GPS, no fabricated timestamps, no optimistic inventory mutation, and no new backend/API/database contract are introduced.
+
+- **TRV-SYNC-014** — Pending retry cleanup and dead-letter transitions shall be conditional on the exact scope + operation ID so a replay can never delete or overwrite a newer same-scope operation.
