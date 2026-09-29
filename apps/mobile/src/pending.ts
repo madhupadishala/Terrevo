@@ -70,11 +70,12 @@ async function saveIndex(userId: string, tenantId: string, scopes: string[]): Pr
 async function withIndexLock(key: string, action: () => Promise<void>): Promise<void> {
   const prior = indexLocks.get(key) ?? Promise.resolve();
   const next = prior.then(action, action);
-  indexLocks.set(key, next.catch(() => {}));
+  const tracked = next.catch(() => {});
+  indexLocks.set(key, tracked);
   try {
     await next;
   } finally {
-    if (indexLocks.get(key) === next) indexLocks.delete(key);
+    if (indexLocks.get(key) === tracked) indexLocks.delete(key);
   }
 }
 
