@@ -32,6 +32,7 @@
     "modules/orders/src/**/*.ts",
     "modules/attendance-leave/src/**/*.ts",
     "modules/expenses/src/**/*.ts",
-    "modules/joint-work/src/**/*.ts"
+    "modules/joint-work/src/**/*.ts",
+    "modules/manager-command/src/**/*.ts"
   ]
 }

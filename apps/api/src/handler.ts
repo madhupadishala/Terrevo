@@ -19,6 +19,7 @@ import { createOrderService, OrderConflictError, OrderInputError, OrderNotFoundE
 import { createAttendanceLeaveService, LeaveConflictError, LeaveInputError, LeaveNotFoundError } from "../../../modules/attendance-leave/src/index.ts";
 import { createExpenseService, ExpenseConflictError, ExpenseInputError, ExpenseNotFoundError } from "../../../modules/expenses/src/index.ts";
 import { createJointWorkService, JointWorkConflictError, JointWorkInputError, JointWorkNotFoundError } from "../../../modules/joint-work/src/index.ts";
+import { createManagerCommandService } from "../../../modules/manager-command/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 
 export type ApiEnv = {
@@ -121,6 +122,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const attendanceLeave = createAttendanceLeaveService(adapter.attendanceLeave, rbac);
   const expenses = createExpenseService(adapter.expenses, rbac);
   const jointWork = createJointWorkService(adapter.jointWork, rbac);
+  const managerCommand = createManagerCommandService(adapter.managerCommand);
 
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -200,6 +202,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         });
       }
 
+      if(request.method==="GET"&&path==="/v1/manager/command-center"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{commandCenter:await managerCommand.get(context.tenantId,accessToken)});}
       if(request.method==="GET"&&path==="/v1/joint-work"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{assignments:await jointWork.list(context.tenantId,accessToken)});}
       if(request.method==="POST"&&path==="/v1/joint-work"){const {accessToken,user,context}=await resolveTenantRequest(request);return json(201,{assignment:await jointWork.schedule(context.tenantId,user.id,accessToken,await readJsonObject(request))});}
       const join=/^\/v1\/joint-work\/([^/]+)\/join$/.exec(path);if(request.method==="POST"&&join){const {accessToken,user,context}=await resolveTenantRequest(request);return json(200,{assignment:await jointWork.join(context.tenantId,user.id,accessToken,join[1],await readJsonObject(request))});}

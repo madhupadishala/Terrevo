@@ -22,6 +22,7 @@ export const PERMISSION_KEYS = [
   "EXPENSE_APPROVE",
   "JOINT_WORK_VIEW_TEAM",
   "JOINT_WORK_MANAGE",
+  "MANAGER_DASHBOARD_VIEW",
 ] as const;
 export type PermissionKey = typeof PERMISSION_KEYS[number];
 
