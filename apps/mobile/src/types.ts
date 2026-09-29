@@ -1,5 +1,3 @@
-import type { PresencePoint } from "./presence";
-
 export type AuthSession = {
   accessToken: string;
   refreshToken: string;
@@ -58,14 +56,4 @@ export type Visit = {
   geofenceRadiusMeters: number;
   checkinAt: string;
   checkoutAt: string | null;
-};
-
-export type CheckInInput = PresencePoint & {
-  operationId: string;
-  planStopId: string;
-  exceptionReason: string | null;
-};
-
-export type CheckOutInput = PresencePoint & {
-  operationId: string;
 };
