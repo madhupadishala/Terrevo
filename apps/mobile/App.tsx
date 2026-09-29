@@ -28,7 +28,7 @@ import {
   type PendingMutationSummary,
 } from "./src/pending";
 import { replayPendingMutation } from "./src/replay";
-import { isDefinitiveSyncFailure, parseSyncOperation, shouldStopSyncAfterFailure } from "./src/sync";
+import { isAutoReplaySafe, isDefinitiveSyncFailure, parseSyncOperation, shouldStopSyncAfterFailure } from "./src/sync";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
 import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, ExpenseClaim, ExpenseLine, InventoryBalance, JointWork, LeaveRequest, ManagerAnalytics, ManagerCommandCenter, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
 
@@ -266,15 +266,22 @@ export default function App() {
     client = api,
     currentSession = session,
     currentTenantId = tenantId,
-  ): Promise<{ synced: number; stopped: boolean }> {
-    if (!currentSession || !currentTenantId) return { synced: 0, stopped: false };
+  ): Promise<{ synced: number; stopped: boolean; manual: number }> {
+    if (!currentSession || !currentTenantId) return { synced: 0, stopped: false, manual: 0 };
     setSyncing(true);
     let synced = 0;
     let stopped = false;
+    let manual = 0;
     try {
       const items = await listPendingMutations(currentSession.user.id, currentTenantId);
       for (const item of items) {
         if (item.status === "DEAD_LETTER") continue;
+        const operation = parseSyncOperation(item.scope, currentSession.user.id, currentTenantId);
+        if (!operation) continue;
+        if (!isAutoReplaySafe(operation.kind)) {
+          manual += 1;
+          continue;
+        }
         const pending = await loadPendingMutation<unknown>(item.scope);
         if (!pending) continue;
         await markPendingMutationAttempt(item.scope);
@@ -298,7 +305,7 @@ export default function App() {
         // Presence evidence has its own stronger retry contract and stays persisted.
       }
       await refreshSyncStatus(currentSession, currentTenantId);
-      return { synced, stopped };
+      return { synced, stopped, manual };
     } finally {
       setSyncing(false);
     }
@@ -325,12 +332,13 @@ export default function App() {
           // Sync success is authoritative; a follow-up read can be retried separately.
         }
       }
-      const remaining = syncItems.filter((item) => item.status === "PENDING").length;
       setMessage(result.synced > 0
-        ? `${result.synced} queued action(s) synced. ${remaining} may still be pending.`
+        ? `${result.synced} queued action(s) synced safely.${result.manual ? ` ${result.manual} time/location-sensitive action(s) still need controlled retry.` : ""}`
         : result.stopped
           ? "Sync paused because the server or network is unavailable. Queued work is retained."
-          : "No pending queued actions needed replay.");
+          : result.manual
+            ? `${result.manual} queued time/location-sensitive action(s) require controlled retry in the original field workflow.`
+            : "No pending queued actions needed replay.");
     });
   }
 
