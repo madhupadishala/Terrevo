@@ -339,6 +339,7 @@ export class TerrevoApi {
     return body.commandCenter;
   }
 
+  /** Fetches the manager's read-only analytics projection for the requested rolling window. */
   async managerAnalytics(days: number): Promise<ManagerAnalytics> {
     const response = await this.request(`/v1/manager/analytics?days=${encodeURIComponent(String(days))}`);
     const body = await response.json() as { analytics: ManagerAnalytics };
