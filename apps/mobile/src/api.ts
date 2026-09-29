@@ -1,4 +1,4 @@
-import type { AuthSession, StartTourOption, Tenant, TourProgress, Visit } from "./types";
+import type { AuthSession, DistributionLine, DoctorCall, DoctorCallProductInput, FieldMasterKind, InventoryBalance, MasterItem, StartTourOption, SubmitTourResult, Tenant, TourProgress, Visit, VisitDistribution } from "./types";
 import type { DepartureIntegrity, PresencePoint } from "./presence";
 
 const API_BASE_URL = (process.env.EXPO_PUBLIC_TERREVO_API_URL ?? "https://terrevo.vercel.app").replace(/\/+$/, "");
@@ -163,21 +163,69 @@ export class TerrevoApi {
     return body.visit;
   }
 
+  async master(kind: FieldMasterKind): Promise<MasterItem[]> {
+    const response = await this.request(`/v1/masters/${kind}`);
+    const body = await response.json() as { items: MasterItem[] };
+    return body.items;
+  }
+
+  async inventory(): Promise<InventoryBalance[]> {
+    const response = await this.request("/v1/inventory");
+    const body = await response.json() as { balances: InventoryBalance[] };
+    return body.balances;
+  }
+
+  async doctorCall(visitId: string): Promise<DoctorCall | null> {
+    try {
+      const response = await this.request(`/v1/visits/${encodeURIComponent(visitId)}/doctor-call`);
+      const body = await response.json() as { doctorCall: DoctorCall };
+      return body.doctorCall;
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 404) return null;
+      throw cause;
+    }
+  }
+
   async saveDoctorCall(visitId: string, input: {
     operationId: string;
     callOutcome: string;
     remarks: string | null;
-  }): Promise<void> {
-    await this.request(`/v1/visits/${encodeURIComponent(visitId)}/doctor-call`, {
+    nextAction: string | null;
+    products: DoctorCallProductInput[];
+  }): Promise<DoctorCall> {
+    const response = await this.request(`/v1/visits/${encodeURIComponent(visitId)}/doctor-call`, {
       method: "PUT",
-      body: JSON.stringify({
-        operationId: input.operationId,
-        callOutcome: input.callOutcome,
-        remarks: input.remarks,
-        nextAction: null,
-        products: [],
-      }),
+      body: JSON.stringify(input),
     });
+    const body = await response.json() as { doctorCall: DoctorCall };
+    return body.doctorCall;
+  }
+
+  async visitDistributions(visitId: string): Promise<VisitDistribution[]> {
+    const response = await this.request(`/v1/visits/${encodeURIComponent(visitId)}/distributions`);
+    const body = await response.json() as { distributions: VisitDistribution[] };
+    return body.distributions;
+  }
+
+  async distribute(visitId: string, input: {
+    operationId: string;
+    items: DistributionLine[];
+  }): Promise<VisitDistribution[]> {
+    const response = await this.request(`/v1/visits/${encodeURIComponent(visitId)}/distributions`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    const body = await response.json() as { distributions: VisitDistribution[] };
+    return body.distributions;
+  }
+
+  async submitTour(input: { operationId: string; shortDayReason: string | null }): Promise<SubmitTourResult> {
+    const response = await this.request("/v1/tour-executions/submit", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    const body = await response.json() as { execution: SubmitTourResult };
+    return body.execution;
   }
 
   async recordPresence(visitId: string, input: { operationId: string; samples: PresencePoint[] }): Promise<DepartureIntegrity> {
