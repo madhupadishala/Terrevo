@@ -148,3 +148,49 @@ export type WeeklyTimesheet = {
   reviewComment: string | null;
   reviewedAt: string | null;
 };
+
+export type TradeCall = {
+  id: string;
+  visitId: string;
+  callType: "chemist" | "stockist";
+  outcome: string;
+  remarks: string | null;
+  nextAction: string | null;
+  updatedAt: string;
+};
+
+export type RcpaLine = {
+  sequence: number;
+  productId: string | null;
+  competitorBrand: string | null;
+  prescriptionCount: number;
+  stockQuantity: number;
+  salesQuantity: number;
+};
+
+export type RcpaReport = {
+  id: string;
+  visitId: string;
+  chemistId: string;
+  lines: RcpaLine[];
+  updatedAt: string;
+};
+
+export type OrderLine = {
+  sequence: number;
+  productId: string;
+  quantity: number;
+  remarks: string | null;
+};
+
+export type SalesOrder = {
+  id: string;
+  visitId: string;
+  customerType: "chemist" | "stockist";
+  customerId: string;
+  customerCode: string;
+  customerName: string;
+  status: "BOOKED";
+  lines: Array<OrderLine & { productCode: string; productName: string }>;
+  updatedAt: string;
+};

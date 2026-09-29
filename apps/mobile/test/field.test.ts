@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDistributionLines, buildDoctorProducts, distributionKey, projectedInventoryBalance, weekStartFromDate } from "../src/field.ts";
+import { buildDistributionLines, buildDoctorProducts, buildOrderLines, buildRcpaLines, distributionKey, projectedInventoryBalance, weekStartFromDate } from "../src/field.ts";
 
 test("doctor products preserve selection order and explicit sequence", () => {
   assert.deepEqual(buildDoctorProducts(["p2", "p1", "p2"]), [
@@ -31,4 +31,23 @@ test("projected inventory shows remaining balance without mutating actual stock"
 test("week start is derived deterministically from a work date", () => {
   assert.equal(weekStartFromDate("2026-09-29"), "2026-09-28");
   assert.equal(weekStartFromDate("2026-09-28"), "2026-09-28");
+});
+
+test("order lines preserve selection order and require positive quantities", () => {
+  assert.deepEqual(buildOrderLines(["p2", "p1", "p2"], { p2: "3", p1: "1" }), [
+    { sequence: 1, productId: "p2", quantity: 3, remarks: null },
+    { sequence: 2, productId: "p1", quantity: 1, remarks: null },
+  ]);
+  assert.throws(() => buildOrderLines(["p1"], { p1: "0" }), /positive whole number/i);
+});
+
+test("RCPA combines company and competitor observations without inventing values", () => {
+  assert.deepEqual(buildRcpaLines(
+    ["p1"],
+    { p1: { prescriptionCount: "4", stockQuantity: "", salesQuantity: "2" } },
+    [{ brand: "Brand X", prescriptionCount: "3", stockQuantity: "1", salesQuantity: "" }],
+  ), [
+    { sequence: 1, productId: "p1", competitorBrand: null, prescriptionCount: 4, stockQuantity: 0, salesQuantity: 2 },
+    { sequence: 2, productId: null, competitorBrand: "Brand X", prescriptionCount: 3, stockQuantity: 1, salesQuantity: 0 },
+  ]);
 });

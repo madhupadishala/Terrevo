@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import { ApiError, TerrevoApi } from "./src/api";
-import { buildDistributionLines, buildDoctorProducts, distributionKey, projectedInventoryBalance, weekStartFromDate } from "./src/field";
+import { buildDistributionLines, buildDoctorProducts, buildOrderLines, buildRcpaLines, distributionKey, projectedInventoryBalance, type RcpaCompetitorDraft, weekStartFromDate } from "./src/field";
 import { captureFreshLocation, collectDepartureSamples } from "./src/location";
 import { presenceStatusMessage, type DepartureIntegrity, type PresencePoint } from "./src/presence";
 import {
@@ -25,7 +25,7 @@ import {
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
 import type { AuthSession, DailyTimesheet, InventoryBalance, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
 
-const APP_VERSION = "0.22.0";
+const APP_VERSION = "0.23.0";
 
 export default function App() {
   const [booting, setBooting] = useState(true);
@@ -41,6 +41,21 @@ export default function App() {
   const [doctorOutcome, setDoctorOutcome] = useState("");
   const [doctorRemarks, setDoctorRemarks] = useState("");
   const [doctorNextAction, setDoctorNextAction] = useState("");
+  const [tradeOutcome, setTradeOutcome] = useState("");
+  const [tradeRemarks, setTradeRemarks] = useState("");
+  const [tradeNextAction, setTradeNextAction] = useState("");
+  const [rcpaProductSearch, setRcpaProductSearch] = useState("");
+  const [selectedRcpaProductIds, setSelectedRcpaProductIds] = useState<string[]>([]);
+  const [rcpaObservations, setRcpaObservations] = useState<Record<string, { prescriptionCount?: string; stockQuantity?: string; salesQuantity?: string }>>({});
+  const [rcpaCompetitors, setRcpaCompetitors] = useState<RcpaCompetitorDraft[]>([]);
+  const [competitorBrand, setCompetitorBrand] = useState("");
+  const [competitorPrescription, setCompetitorPrescription] = useState("");
+  const [competitorStock, setCompetitorStock] = useState("");
+  const [competitorSales, setCompetitorSales] = useState("");
+  const [orderProductSearch, setOrderProductSearch] = useState("");
+  const [selectedOrderProductIds, setSelectedOrderProductIds] = useState<string[]>([]);
+  const [orderQuantities, setOrderQuantities] = useState<Record<string, string>>({});
+  const [orderRemarks, setOrderRemarks] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [products, setProducts] = useState<MasterItem[]>([]);
@@ -110,6 +125,24 @@ export default function App() {
     setVisitDistributions([]);
   }
 
+  function resetTradeDraft() {
+    setTradeOutcome("");
+    setTradeRemarks("");
+    setTradeNextAction("");
+    setRcpaProductSearch("");
+    setSelectedRcpaProductIds([]);
+    setRcpaObservations({});
+    setRcpaCompetitors([]);
+    setCompetitorBrand("");
+    setCompetitorPrescription("");
+    setCompetitorStock("");
+    setCompetitorSales("");
+    setOrderProductSearch("");
+    setSelectedOrderProductIds([]);
+    setOrderQuantities({});
+    setOrderRemarks("");
+  }
+
   async function loadFieldResources(client = api) {
     const [nextProducts, nextSamples, nextGifts, nextInventory] = await Promise.all([
       client.master("products"),
@@ -151,6 +184,45 @@ export default function App() {
     setVisitDistributions(distributions);
   }
 
+  async function loadTradeContext(client: TerrevoApi, nextProgress: TourProgress | null, nextOpenVisit: Visit | null) {
+    const stop = nextProgress?.stops.find((item) => item.planStopId === nextOpenVisit?.planStopId);
+    if (!nextOpenVisit || (stop?.type !== "chemist" && stop?.type !== "stockist")) {
+      resetTradeDraft();
+      return;
+    }
+    const [call, report, order] = await Promise.all([
+      client.tradeCall(nextOpenVisit.id),
+      stop.type === "chemist" ? client.rcpa(nextOpenVisit.id) : Promise.resolve(null),
+      client.order(nextOpenVisit.id),
+    ]);
+    setTradeOutcome(call?.outcome ?? "");
+    setTradeRemarks(call?.remarks ?? "");
+    setTradeNextAction(call?.nextAction ?? "");
+    setRcpaProductSearch("");
+    setSelectedRcpaProductIds(report?.lines.filter((line) => line.productId).map((line) => line.productId!) ?? []);
+    setRcpaObservations(Object.fromEntries(
+      report?.lines.filter((line) => line.productId).map((line) => [line.productId!, {
+        prescriptionCount: String(line.prescriptionCount),
+        stockQuantity: String(line.stockQuantity),
+        salesQuantity: String(line.salesQuantity),
+      }]) ?? [],
+    ));
+    setRcpaCompetitors(report?.lines.filter((line) => line.competitorBrand).map((line) => ({
+      brand: line.competitorBrand!,
+      prescriptionCount: String(line.prescriptionCount),
+      stockQuantity: String(line.stockQuantity),
+      salesQuantity: String(line.salesQuantity),
+    })) ?? []);
+    setCompetitorBrand("");
+    setCompetitorPrescription("");
+    setCompetitorStock("");
+    setCompetitorSales("");
+    setOrderProductSearch("");
+    setSelectedOrderProductIds(order?.lines.map((line) => line.productId) ?? []);
+    setOrderQuantities(Object.fromEntries(order?.lines.map((line) => [line.productId, String(line.quantity)]) ?? []));
+    setOrderRemarks("");
+  }
+
   async function refreshField(client = api) {
     const [nextProgress, nextOpenVisit, nextStartOptions] = await Promise.all([
       client.progress(),
@@ -160,7 +232,10 @@ export default function App() {
     setProgress(nextProgress);
     setOpenVisit(nextOpenVisit);
     setStartOptions(nextStartOptions);
-    await loadDoctorContext(client, nextProgress, nextOpenVisit);
+    await Promise.all([
+      loadDoctorContext(client, nextProgress, nextOpenVisit),
+      loadTradeContext(client, nextProgress, nextOpenVisit),
+    ]);
   }
 
   async function run(action: () => Promise<void>) {
@@ -255,6 +330,7 @@ export default function App() {
       setGifts([]);
       setInventory([]);
       resetDoctorDraft();
+      resetTradeDraft();
       setShortDayReason("");
       setDailyTimesheets([]);
       setWeeklyTimesheets([]);
@@ -440,6 +516,40 @@ export default function App() {
     });
   }
 
+  function handleAddRcpaCompetitor() {
+    const brand = competitorBrand.trim();
+    if (!brand) {
+      setError("Enter a competitor brand before adding the RCPA line.");
+      return;
+    }
+    if (rcpaCompetitors.some((item) => item.brand.toLowerCase() === brand.toLowerCase())) {
+      setError("That competitor brand is already in this RCPA.");
+      return;
+    }
+    try {
+      buildRcpaLines([], {}, [{
+        brand,
+        prescriptionCount: competitorPrescription,
+        stockQuantity: competitorStock,
+        salesQuantity: competitorSales,
+      }]);
+    } catch (cause) {
+      setError(toMessage(cause));
+      return;
+    }
+    setRcpaCompetitors((current) => [...current, {
+      brand,
+      prescriptionCount: competitorPrescription,
+      stockQuantity: competitorStock,
+      salesQuantity: competitorSales,
+    }]);
+    setCompetitorBrand("");
+    setCompetitorPrescription("");
+    setCompetitorStock("");
+    setCompetitorSales("");
+    setError(null);
+  }
+
   async function handleCheckOut(stop: TourStop, visit: Visit) {
     setBusy(true);
     setError(null);
@@ -473,6 +583,56 @@ export default function App() {
         }
       }
 
+      if (stop.type === "chemist" || stop.type === "stockist") {
+        if (!tradeOutcome.trim()) throw new Error(`Enter the ${stop.type} call outcome before check-out.`);
+        const tradeScope = `trade-call.${visit.id}`;
+        const pendingTrade = await getOrCreatePendingMutation(tradeScope, async () => ({
+          outcome: tradeOutcome.trim(),
+          remarks: tradeRemarks.trim() || null,
+          nextAction: tradeNextAction.trim() || null,
+        }));
+        try {
+          await api.saveTradeCall(visit.id, { operationId: pendingTrade.operationId, ...pendingTrade.payload });
+          await clearPendingMutation(tradeScope);
+        } catch (cause) {
+          await clearPendingOnDefinitiveFailure(tradeScope, cause);
+          throw cause;
+        }
+
+        if (stop.type === "chemist" && (selectedRcpaProductIds.length > 0 || rcpaCompetitors.length > 0)) {
+          const rcpaScope = `rcpa.${visit.id}`;
+          const lines = buildRcpaLines(selectedRcpaProductIds, rcpaObservations, rcpaCompetitors);
+          const pendingRcpa = await getOrCreatePendingMutation(rcpaScope, async () => ({ lines }));
+          try {
+            await api.saveRcpa(visit.id, { operationId: pendingRcpa.operationId, lines: pendingRcpa.payload.lines });
+            await clearPendingMutation(rcpaScope);
+          } catch (cause) {
+            await clearPendingOnDefinitiveFailure(rcpaScope, cause);
+            throw cause;
+          }
+        }
+
+        if (selectedOrderProductIds.length > 0) {
+          const orderScope = `order.${visit.id}`;
+          const lines = buildOrderLines(selectedOrderProductIds, orderQuantities);
+          const pendingOrder = await getOrCreatePendingMutation(orderScope, async () => ({
+            remarks: orderRemarks.trim() || null,
+            lines,
+          }));
+          try {
+            await api.saveOrder(visit.id, {
+              operationId: pendingOrder.operationId,
+              remarks: pendingOrder.payload.remarks,
+              lines: pendingOrder.payload.lines,
+            });
+            await clearPendingMutation(orderScope);
+          } catch (cause) {
+            await clearPendingOnDefinitiveFailure(orderScope, cause);
+            throw cause;
+          }
+        }
+      }
+
       const checkoutScope = `check-out.${visit.id}`;
       const pendingCheckout = await getOrCreatePendingMutation(checkoutScope, async () => {
         const location = await captureFreshLocation();
@@ -500,7 +660,8 @@ export default function App() {
       const checkoutLocation = pendingCheckout.payload.location;
       await refreshField();
       resetDoctorDraft();
-      setMessage("Check-out recorded. Keep Terrevo open while departure continuity is observed for about 2 minutes.");
+      resetTradeDraft();
+      setMessage("Check-out recorded. Field evidence is saved; keep Terrevo open while departure continuity is observed for about 2 minutes.");
       await collectDepartureSamples(async (point, count) => {
         pendingPresence.payload.samples = [...pendingPresence.payload.samples, point];
         await savePendingPresence(pendingPresence);
@@ -582,6 +743,14 @@ export default function App() {
   const productQuery = productSearch.trim().toLowerCase();
   const visibleProducts = products
     .filter((item) => !productQuery || item.code.toLowerCase().includes(productQuery) || item.name.toLowerCase().includes(productQuery))
+    .slice(0, 8);
+  const rcpaQuery = rcpaProductSearch.trim().toLowerCase();
+  const visibleRcpaProducts = products
+    .filter((item) => !rcpaQuery || item.code.toLowerCase().includes(rcpaQuery) || item.name.toLowerCase().includes(rcpaQuery))
+    .slice(0, 8);
+  const orderQuery = orderProductSearch.trim().toLowerCase();
+  const visibleOrderProducts = products
+    .filter((item) => !orderQuery || item.code.toLowerCase().includes(orderQuery) || item.name.toLowerCase().includes(orderQuery))
     .slice(0, 8);
   const inventoryRows = inventory.filter((balance) => balance.quantity > 0);
   const hasDistributionDraft = Object.values(distributionQuantities).some((value) => value.trim() !== "");
@@ -709,6 +878,101 @@ export default function App() {
                           disabled={busy || !hasDistributionDraft}
                           onPress={() => void handleRecordDistribution(openVisit)}
                         />
+                      </>
+                    ) : null}
+                    {stop.type === "chemist" || stop.type === "stockist" ? (
+                      <>
+                        <Text style={styles.sectionTitle}>{labelStopType(stop.type)} call</Text>
+                        <TextInput style={styles.input} placeholder="Call outcome" value={tradeOutcome} onChangeText={setTradeOutcome} />
+                        <TextInput style={[styles.input, styles.multiline]} multiline placeholder="Call remarks (optional)" value={tradeRemarks} onChangeText={setTradeRemarks} />
+                        <TextInput style={styles.input} placeholder="Next action (optional)" value={tradeNextAction} onChangeText={setTradeNextAction} />
+
+                        {stop.type === "chemist" ? (
+                          <>
+                            <Text style={styles.sectionTitle}>RCPA observations (optional)</Text>
+                            <Text style={styles.small}>Enter only observed prescription, stock or sales quantities. RCPA is saved with check-out when any line is entered.</Text>
+                            <TextInput style={styles.input} placeholder="Search company product" value={rcpaProductSearch} onChangeText={setRcpaProductSearch} />
+                            {visibleRcpaProducts.map((item) => {
+                              const selected = selectedRcpaProductIds.includes(item.id);
+                              return (
+                                <Pressable
+                                  key={`rcpa-${item.id}`}
+                                  style={[styles.choiceRow, selected && styles.choiceSelected]}
+                                  onPress={() => setSelectedRcpaProductIds((current) => current.includes(item.id)
+                                    ? current.filter((id) => id !== item.id)
+                                    : [...current, item.id])}
+                                >
+                                  <Text style={styles.choiceText}>{item.code} · {item.name}</Text>
+                                  <Text style={styles.small}>{selected ? "Selected for RCPA" : "Tap to add"}</Text>
+                                </Pressable>
+                              );
+                            })}
+                            {selectedRcpaProductIds.map((productId) => {
+                              const item = products.find((entry) => entry.id === productId);
+                              const observation = rcpaObservations[productId] ?? {};
+                              return (
+                                <View key={`rcpa-values-${productId}`} style={styles.observationCard}>
+                                  <Text style={styles.choiceText}>{item ? `${item.code} · ${item.name}` : "Company product"}</Text>
+                                  <View style={styles.tripleInputs}>
+                                    <TextInput style={styles.metricInput} keyboardType="number-pad" placeholder="Rx" value={observation.prescriptionCount ?? ""} onChangeText={(value) => setRcpaObservations((current) => ({ ...current, [productId]: { ...current[productId], prescriptionCount: value } }))} />
+                                    <TextInput style={styles.metricInput} keyboardType="number-pad" placeholder="Stock" value={observation.stockQuantity ?? ""} onChangeText={(value) => setRcpaObservations((current) => ({ ...current, [productId]: { ...current[productId], stockQuantity: value } }))} />
+                                    <TextInput style={styles.metricInput} keyboardType="number-pad" placeholder="Sales" value={observation.salesQuantity ?? ""} onChangeText={(value) => setRcpaObservations((current) => ({ ...current, [productId]: { ...current[productId], salesQuantity: value } }))} />
+                                  </View>
+                                </View>
+                              );
+                            })}
+                            <Text style={styles.small}>Competitor observation</Text>
+                            <TextInput style={styles.input} placeholder="Competitor brand" value={competitorBrand} onChangeText={setCompetitorBrand} />
+                            <View style={styles.tripleInputs}>
+                              <TextInput style={styles.metricInput} keyboardType="number-pad" placeholder="Rx" value={competitorPrescription} onChangeText={setCompetitorPrescription} />
+                              <TextInput style={styles.metricInput} keyboardType="number-pad" placeholder="Stock" value={competitorStock} onChangeText={setCompetitorStock} />
+                              <TextInput style={styles.metricInput} keyboardType="number-pad" placeholder="Sales" value={competitorSales} onChangeText={setCompetitorSales} />
+                            </View>
+                            <SecondaryButton label="Add Competitor RCPA Line" onPress={handleAddRcpaCompetitor} />
+                            {rcpaCompetitors.map((item, index) => (
+                              <View key={`competitor-${item.brand.toLowerCase()}-${index}`} style={styles.quantityRow}>
+                                <View style={styles.flex}>
+                                  <Text style={styles.choiceText}>{item.brand}</Text>
+                                  <Text style={styles.small}>Rx {item.prescriptionCount || "0"} · Stock {item.stockQuantity || "0"} · Sales {item.salesQuantity || "0"}</Text>
+                                </View>
+                                <Pressable onPress={() => setRcpaCompetitors((current) => current.filter((_, itemIndex) => itemIndex !== index))}>
+                                  <Text style={styles.link}>Remove</Text>
+                                </Pressable>
+                              </View>
+                            ))}
+                          </>
+                        ) : null}
+
+                        <Text style={styles.sectionTitle}>Order / POB (optional)</Text>
+                        <Text style={styles.small}>No price, tax or discount is invented. Select only products and quantities actually booked.</Text>
+                        <TextInput style={styles.input} placeholder="Search order product" value={orderProductSearch} onChangeText={setOrderProductSearch} />
+                        {visibleOrderProducts.map((item) => {
+                          const selected = selectedOrderProductIds.includes(item.id);
+                          return (
+                            <Pressable
+                              key={`order-${item.id}`}
+                              style={[styles.choiceRow, selected && styles.choiceSelected]}
+                              onPress={() => setSelectedOrderProductIds((current) => current.includes(item.id)
+                                ? current.filter((id) => id !== item.id)
+                                : [...current, item.id])}
+                            >
+                              <Text style={styles.choiceText}>{item.code} · {item.name}</Text>
+                              <Text style={styles.small}>{selected ? "Selected for order" : "Tap to add"}</Text>
+                            </Pressable>
+                          );
+                        })}
+                        {selectedOrderProductIds.map((productId) => {
+                          const item = products.find((entry) => entry.id === productId);
+                          return (
+                            <View key={`order-qty-${productId}`} style={styles.quantityRow}>
+                              <View style={styles.flex}><Text style={styles.choiceText}>{item ? `${item.code} · ${item.name}` : "Product"}</Text></View>
+                              <TextInput style={styles.quantityInput} keyboardType="number-pad" placeholder="Qty" value={orderQuantities[productId] ?? ""} onChangeText={(value) => setOrderQuantities((current) => ({ ...current, [productId]: value }))} />
+                            </View>
+                          );
+                        })}
+                        {selectedOrderProductIds.length > 0 ? (
+                          <TextInput style={[styles.input, styles.multiline]} multiline placeholder="Order remarks (optional)" value={orderRemarks} onChangeText={setOrderRemarks} />
+                        ) : null}
                       </>
                     ) : null}
                     <PrimaryButton label="Check Out" disabled={busy} onPress={() => void handleCheckOut(stop, openVisit)} />
@@ -886,6 +1150,9 @@ const styles = StyleSheet.create({
   choiceText: { fontSize: 14, fontWeight: "700", color: "#263A52" },
   quantityRow: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderColor: "#E3E8EF", borderRadius: 10, padding: 10 },
   quantityInput: { width: 64, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#CDD5DF", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, textAlign: "center", fontSize: 15, color: "#132238" },
+  observationCard: { borderWidth: 1, borderColor: "#E3E8EF", borderRadius: 10, padding: 10, gap: 8 },
+  tripleInputs: { flexDirection: "row", gap: 8 },
+  metricInput: { flex: 1, minWidth: 0, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#CDD5DF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 9, textAlign: "center", fontSize: 14, color: "#132238" },
   verifiedLine: { color: "#265D3D", fontSize: 13, fontWeight: "700" },
   spinner: { marginTop: 4 },
   privacy: { paddingHorizontal: 4, paddingTop: 4 },

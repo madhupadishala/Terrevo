@@ -1,4 +1,4 @@
-import type { AuthSession, DailyTimesheet, DistributionLine, DoctorCall, DoctorCallProductInput, FieldMasterKind, InventoryBalance, MasterItem, StartTourOption, SubmitTourResult, Tenant, TourProgress, Visit, VisitDistribution, WeeklyTimesheet } from "./types";
+import type { AuthSession, DailyTimesheet, DistributionLine, DoctorCall, DoctorCallProductInput, FieldMasterKind, InventoryBalance, MasterItem, OrderLine, RcpaLine, RcpaReport, SalesOrder, StartTourOption, SubmitTourResult, Tenant, TourProgress, TradeCall, Visit, VisitDistribution, WeeklyTimesheet } from "./types";
 import type { DepartureIntegrity, PresencePoint } from "./presence";
 
 const API_BASE_URL = (process.env.EXPO_PUBLIC_TERREVO_API_URL ?? "https://terrevo.vercel.app").replace(/\/+$/, "");
@@ -265,6 +265,66 @@ export class TerrevoApi {
     });
     const body = await response.json() as { timesheet: WeeklyTimesheet };
     return body.timesheet;
+  }
+
+  async tradeCall(visitId: string): Promise<TradeCall | null> {
+    try {
+      const response = await this.request(`/v1/visits/${encodeURIComponent(visitId)}/trade-call`);
+      const body = await response.json() as { tradeCall: TradeCall };
+      return body.tradeCall;
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 404) return null;
+      throw cause;
+    }
+  }
+
+  async saveTradeCall(visitId: string, input: { operationId: string; outcome: string; remarks: string | null; nextAction: string | null }): Promise<TradeCall> {
+    const response = await this.request(`/v1/visits/${encodeURIComponent(visitId)}/trade-call`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+    const body = await response.json() as { tradeCall: TradeCall };
+    return body.tradeCall;
+  }
+
+  async rcpa(visitId: string): Promise<RcpaReport | null> {
+    try {
+      const response = await this.request(`/v1/visits/${encodeURIComponent(visitId)}/rcpa`);
+      const body = await response.json() as { rcpa: RcpaReport };
+      return body.rcpa;
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 404) return null;
+      throw cause;
+    }
+  }
+
+  async saveRcpa(visitId: string, input: { operationId: string; lines: RcpaLine[] }): Promise<RcpaReport> {
+    const response = await this.request(`/v1/visits/${encodeURIComponent(visitId)}/rcpa`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+    const body = await response.json() as { rcpa: RcpaReport };
+    return body.rcpa;
+  }
+
+  async order(visitId: string): Promise<SalesOrder | null> {
+    try {
+      const response = await this.request(`/v1/visits/${encodeURIComponent(visitId)}/order`);
+      const body = await response.json() as { order: SalesOrder };
+      return body.order;
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 404) return null;
+      throw cause;
+    }
+  }
+
+  async saveOrder(visitId: string, input: { operationId: string; remarks: string | null; lines: OrderLine[] }): Promise<SalesOrder> {
+    const response = await this.request(`/v1/visits/${encodeURIComponent(visitId)}/order`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+    const body = await response.json() as { order: SalesOrder };
+    return body.order;
   }
 
   async recordPresence(visitId: string, input: { operationId: string; samples: PresencePoint[] }): Promise<DepartureIntegrity> {
