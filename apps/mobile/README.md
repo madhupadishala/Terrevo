@@ -23,7 +23,7 @@ The API URL defaults to `https://terrevo.vercel.app` when the environment variab
 - Departure evaluation allows stationary and irregular nearby movement. It flags a reported mocked point as `SPOOF_SUSPECTED`; poor accuracy, too few samples, non-sequential time, or an implausible location jump becomes `REVIEW_REQUIRED`.
 - Departure samples are submitted to the Terrevo server, which independently derives the integrity result and stores the raw evidence immutably. Android's mocked-location flag remains only one signal; hardware-backed app/device attestation is still required before treating the evidence as tamper-proof.
 - Start, check-in, doctor-call and checkout keep the operation ID and mutation payload in device SecureStore until the server acknowledges success. A network-uncertain retry therefore replays the same operation and, for checkout, the same GPS payload.
-- Presence evidence also keeps a user/tenant/visit-bound resume pointer. Terrevo retries it after login or tenant selection and will not allow a later field visit to overwrite unsynced evidence.
+- Presence evidence is stored as one user/tenant/visit-bound SecureStore envelope containing the operation ID and captured samples. Terrevo retries it after login or tenant selection and will not allow a later field visit to overwrite unsynced evidence.
 - Each post-checkout coordinate is persisted immediately as it is captured. If the app closes mid-sampling, partial evidence is still sent later and the server marks fewer than three samples as REVIEW_REQUIRED rather than losing the audit trail.
 
 ## Important prerequisites
