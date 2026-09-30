@@ -50,8 +50,12 @@ jobs:
         run: |
           set -euo pipefail
           manifest_sha="$(node -e 'const fs=require("fs"); console.log(JSON.parse(fs.readFileSync(process.env.MANIFEST,"utf8")).exactCommit || "")')"
-          test "$manifest_sha" = "$HEAD_SHA" || {
-            echo "Evidence manifest qualifies $manifest_sha but current head is $HEAD_SHA"
+          git cat-file -e "$manifest_sha^{commit}" 2>/dev/null || {
+            echo "Evidence manifest references unknown commit: $manifest_sha"
+            exit 1
+          }
+          git merge-base --is-ancestor "$manifest_sha" "$HEAD_SHA" || {
+            echo "Qualified commit $manifest_sha is not an ancestor of current head $HEAD_SHA"
             exit 1
           }
 
