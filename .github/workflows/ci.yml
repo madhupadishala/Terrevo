@@ -74,6 +74,9 @@ jobs:
             echo "Applying $file"
             psql -v ON_ERROR_STOP=1 -f "$file"
           done
+      - name: Run Wave 1 tenant/RBAC/RLS boundary qualification
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/wave-1-boundary-tests.sql
+
       - name: Apply all rollback migrations in reverse
         run: |
           set -euo pipefail
