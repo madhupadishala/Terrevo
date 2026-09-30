@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "verify:foundation": "node scripts/verify-foundation.mjs",
+    "verify:product-gates": "node scripts/verify-product-gates.mjs",
     "build:api": "node -e \"require('fs').rmSync('.vercel-api',{recursive:true,force:true})\" && tsc -p tsconfig.vercel-api.json",
     "build:web": "vite build --config apps/web/vite.config.ts",
     "verify:vercel-runtime": "node scripts/verify-vercel-runtime.mjs",
