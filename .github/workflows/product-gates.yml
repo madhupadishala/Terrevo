@@ -1,0 +1,71 @@
+name: Product Gates
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      manifest:
+        description: Evidence manifest path
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Resolve evidence manifest
+        id: manifest
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          DISPATCH_MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            manifest="$DISPATCH_MANIFEST"
+          else
+            manifest="$(printf '%s\n' "$PR_BODY" | sed -n 's/^- Evidence manifest: `\([^\`]*\)`.*/\1/p' | head -n1)"
+          fi
+          test -n "$manifest" || { echo "Evidence manifest path missing from PR body"; exit 1; }
+          test -f "$manifest" || { echo "Evidence manifest does not exist: $manifest"; exit 1; }
+          echo "path=$manifest" >> "$GITHUB_OUTPUT"
+
+      - name: Verify exact commit in manifest
+        shell: bash
+        env:
+          MANIFEST: ${{ steps.manifest.outputs.path }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          manifest_sha="$(node -e 'const fs=require("fs"); console.log(JSON.parse(fs.readFileSync(process.env.MANIFEST,"utf8")).exactCommit || "")')"
+          test "$manifest_sha" = "$HEAD_SHA" || {
+            echo "Evidence manifest qualifies $manifest_sha but current head is $HEAD_SHA"
+            exit 1
+          }
+
+      - name: Verify product gates
+        run: node scripts/verify-product-gates.mjs "${{ steps.manifest.outputs.path }}"
+
+      - name: Prevent focused tests
+        run: |
+          if grep -RInE '\.(only)\s*\(' apps modules test tests 2>/dev/null; then
+            echo "Focused tests are forbidden"
+            exit 1
+          fi
+
+      - name: Repository verification
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npm run verify
