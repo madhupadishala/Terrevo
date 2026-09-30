@@ -15,6 +15,7 @@ import { captureFreshLocation, collectDepartureSamples } from "./src/location";
 import { presenceStatusMessage, type DepartureIntegrity, type PresencePoint } from "./src/presence";
 import {
   clearPendingMutation,
+  clearPendingMutationIfOperation,
   clearPendingPresence,
   getOrCreatePendingMutation,
   getOrCreatePendingPresence,
@@ -23,9 +24,11 @@ import {
   savePendingPresence,
 } from "./src/pending";
 import { getInstallationId, loadSession, loadTenantId, saveSession, saveTenantId } from "./src/storage";
+import { deadLetterSyncItem, listSyncQueue, markSyncAttempt, queuePendingMutation, removeSyncItem } from "./src/sync-queue";
+import { isSyncDue, summarizeSyncQueue, type SyncAction, type SyncQueueItem } from "./src/sync";
 import type { AttendanceRow, AuthSession, DailyTimesheet, ExpenseCategory, ExpenseClaim, ExpenseLine, InventoryBalance, JointWork, LeaveRequest, ManagerAnalytics, ManagerCommandCenter, MasterItem, StartTourOption, Tenant, TourProgress, TourStop, Visit, VisitDistribution, WeeklyTimesheet } from "./src/types";
 
-const APP_VERSION = "0.27.0";
+const APP_VERSION = "0.28.0";
 const EXPENSE_CATEGORIES: ExpenseCategory[] = ["TRAVEL", "MEAL", "LODGING", "LOCAL_CONVEYANCE", "OTHER"];
 
 /** Renders the Terrevo field application and coordinates tenant-scoped field state. */
@@ -91,6 +94,10 @@ export default function App() {
   const analyticsDaysRef = useRef<7 | 30>(7);
   const analyticsRequestRef = useRef(0);
   const tenantIdRef = useRef<string | null>(null);
+  const sessionUserIdRef = useRef<string | null>(null);
+  const [syncItems, setSyncItems] = useState<SyncQueueItem[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const syncInFlightRef = useRef(false);
   const [departure, setDeparture] = useState<DepartureIntegrity | null>(null);
   const [departureSamples, setDepartureSamples] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -104,6 +111,7 @@ export default function App() {
 
   useEffect(() => {
     tenantIdRef.current = tenantId;
+    sessionUserIdRef.current = session?.user.id ?? null;
     api.configure(session, tenantId);
   }, [api, session, tenantId]);
 
@@ -112,6 +120,7 @@ export default function App() {
       try {
         const [storedSession, storedTenant] = await Promise.all([loadSession(), loadTenantId()]);
         setSession(storedSession);
+        sessionUserIdRef.current = storedSession?.user.id ?? null;
         setTenantId(storedTenant);
         tenantIdRef.current = storedTenant;
         api.configure(storedSession, storedTenant);
@@ -129,7 +138,9 @@ export default function App() {
             await loadFieldResources(api);
             await refreshField(api);
             await loadWorkRecords(api);
+            await refreshSyncQueue(storedSession, selected);
             await tryResumePendingPresence(api, storedSession, selected);
+            await tryResumeSyncQueue(storedSession, selected, api);
           }
         }
       } catch (cause) {
@@ -208,6 +219,8 @@ export default function App() {
     setManagerAnalytics(null);
     analyticsDaysRef.current = 7;
     setAnalyticsDays(7);
+    setSyncItems([]);
+    setSyncing(false);
     setDeparture(null);
     setDepartureSamples(0);
   }
@@ -215,6 +228,267 @@ export default function App() {
   function mutationScope(scope: string): string {
     if (!session || !tenantId) throw new Error("Session context is unavailable for retry state.");
     return accountMutationScope(session.user.id, tenantId, scope);
+  }
+
+  async function refreshSyncQueue(
+    currentSession = session,
+    currentTenantId = tenantId,
+  ): Promise<SyncQueueItem[]> {
+    if (!currentSession || !currentTenantId) {
+      setSyncItems([]);
+      return [];
+    }
+    const items = await listSyncQueue(currentSession.user.id, currentTenantId);
+    setSyncItems(items);
+    return items;
+  }
+
+  function isDefinitiveSyncFailure(cause: unknown): boolean {
+    return cause instanceof ApiError && [400, 403, 404, 409].includes(cause.status);
+  }
+
+  /** Cleans local retry state after the server has already committed an idempotent mutation. */
+  async function completePendingMutation(scope: string): Promise<void> {
+    const pending = await loadPendingMutation<unknown>(scope);
+    try {
+      await clearPendingMutation(scope);
+    } catch {
+      // Keep going so local storage failure cannot turn a committed server write into a false failure.
+    }
+    if (!pending) return;
+    try {
+      await removeSyncItem(scope, pending.operationId);
+      await refreshSyncQueue();
+    } catch {
+      // A stale queue entry may replay idempotently and can be cleaned on the next sync pass.
+    }
+  }
+
+  function syncDescriptor(scope: string): { action: SyncAction; targetId: string | null } | null {
+    const businessScope = scope.split(".").slice(2).join(".");
+    const mappings: Array<[string, SyncAction]> = [
+      ["start.", "start-tour"],
+      ["check-in.", "check-in"],
+      ["distribution.", "distribution"],
+      ["doctor-call.", "doctor-call"],
+      ["trade-call.", "trade-call"],
+      ["rcpa.", "rcpa"],
+      ["order.", "order"],
+      ["check-out.", "check-out"],
+      ["submit-tour.", "submit-tour"],
+      ["daily-timesheet-review.", "daily-review"],
+      ["weekly-timesheet-submit.", "weekly-submit"],
+      ["expense-save.", "expense-save"],
+      ["expense-submit.", "expense-submit"],
+      ["joint-work-join.", "joint-work-join"],
+      ["joint-work-leave.", "joint-work-leave"],
+    ];
+    if (businessScope === "leave-submit") return { action: "leave-submit", targetId: null };
+    for (const [prefix, action] of mappings) {
+      if (businessScope.startsWith(prefix)) return { action, targetId: businessScope.slice(prefix.length) || null };
+    }
+    return null;
+  }
+
+  async function recordPendingFailure(scope: string, cause: unknown): Promise<void> {
+    if (!session || !tenantId) return;
+    const descriptor = syncDescriptor(scope);
+    const pending = await loadPendingMutation<unknown>(scope);
+    if (!descriptor || !pending) return;
+    try {
+      await queuePendingMutation({
+        scope,
+        userId: session.user.id,
+        tenantId,
+        action: descriptor.action,
+        targetId: descriptor.targetId,
+        pending,
+        error: toMessage(cause),
+      });
+      const item = (await listSyncQueue(session.user.id, tenantId)).find(
+        (candidate) => candidate.scope === scope && candidate.operationId === pending.operationId,
+      );
+      if (item && isDefinitiveSyncFailure(cause)) {
+        await deadLetterSyncItem(item, toMessage(cause));
+        await clearPendingMutationIfOperation(scope, pending.operationId);
+      }
+      await refreshSyncQueue();
+    } catch {
+      setMessage("The retry payload is preserved on this device, but sync-status metadata could not be updated.");
+    }
+  }
+
+  async function replaySyncItem(item: SyncQueueItem, client = api): Promise<"SYNCED" | "RETRY" | "DEAD"> {
+    const payloadRecord =
+      item.payload !== null && typeof item.payload === "object" && !Array.isArray(item.payload)
+        ? item.payload as Record<string, unknown>
+        : null;
+    const targetRequired = item.action !== "leave-submit";
+    const invalidTarget = targetRequired && (typeof item.targetId !== "string" || item.targetId.length === 0);
+    const validPayload = (() => {
+      if (!payloadRecord) return false;
+      switch (item.action) {
+        case "distribution":
+          return Array.isArray(payloadRecord.items);
+        case "doctor-call":
+          return typeof payloadRecord.callOutcome === "string" && Array.isArray(payloadRecord.products);
+        case "trade-call":
+          return typeof payloadRecord.outcome === "string";
+        case "rcpa":
+          return Array.isArray(payloadRecord.lines);
+        case "order":
+          return Array.isArray(payloadRecord.lines);
+        case "daily-review":
+          return payloadRecord.remarks === null || typeof payloadRecord.remarks === "string";
+        case "weekly-submit":
+        case "expense-submit":
+          return payloadRecord.comment === null || typeof payloadRecord.comment === "string";
+        case "leave-submit":
+          return (
+            (payloadRecord.leaveType === "FULL_DAY" || payloadRecord.leaveType === "HALF_DAY") &&
+            typeof payloadRecord.startDate === "string" &&
+            typeof payloadRecord.endDate === "string" &&
+            typeof payloadRecord.reason === "string"
+          );
+        case "expense-save":
+          return typeof payloadRecord.currencyCode === "string" && Array.isArray(payloadRecord.lines);
+        default:
+          return false;
+      }
+    })();
+
+    if (invalidTarget || !validPayload) {
+      await deadLetterSyncItem(item, "Stored sync item is malformed and requires user attention.");
+      await clearPendingMutationIfOperation(item.scope, item.operationId);
+      return "DEAD";
+    }
+
+    try {
+      switch (item.action) {
+        case "distribution": {
+          const payload = item.payload as { items: Parameters<TerrevoApi["distribute"]>[1]["items"] };
+          await client.distribute(item.targetId!, { operationId: item.operationId, items: payload.items });
+          break;
+        }
+        case "doctor-call": {
+          const payload = item.payload as Omit<Parameters<TerrevoApi["saveDoctorCall"]>[1], "operationId">;
+          await client.saveDoctorCall(item.targetId!, { operationId: item.operationId, ...payload });
+          break;
+        }
+        case "trade-call": {
+          const payload = item.payload as Omit<Parameters<TerrevoApi["saveTradeCall"]>[1], "operationId">;
+          await client.saveTradeCall(item.targetId!, { operationId: item.operationId, ...payload });
+          break;
+        }
+        case "rcpa": {
+          const payload = item.payload as { lines: Parameters<TerrevoApi["saveRcpa"]>[1]["lines"] };
+          await client.saveRcpa(item.targetId!, { operationId: item.operationId, lines: payload.lines });
+          break;
+        }
+        case "order": {
+          const payload = item.payload as Omit<Parameters<TerrevoApi["saveOrder"]>[1], "operationId">;
+          await client.saveOrder(item.targetId!, { operationId: item.operationId, ...payload });
+          break;
+        }
+        case "daily-review": {
+          const payload = item.payload as { remarks: string | null };
+          await client.reviewDailyTimesheet(item.targetId!, { operationId: item.operationId, remarks: payload.remarks });
+          break;
+        }
+        case "weekly-submit": {
+          const payload = item.payload as { comment: string | null };
+          await client.submitWeeklyTimesheet(item.targetId!, { operationId: item.operationId, comment: payload.comment });
+          break;
+        }
+        case "leave-submit": {
+          const payload = item.payload as Omit<Parameters<TerrevoApi["submitLeave"]>[0], "operationId">;
+          await client.submitLeave({ operationId: item.operationId, ...payload });
+          break;
+        }
+        case "expense-save": {
+          const payload = item.payload as Omit<Parameters<TerrevoApi["saveExpense"]>[1], "operationId">;
+          await client.saveExpense(item.targetId!, { operationId: item.operationId, ...payload });
+          break;
+        }
+        case "expense-submit": {
+          const payload = item.payload as { comment: string | null };
+          await client.submitExpense(item.targetId!, { operationId: item.operationId, comment: payload.comment });
+          break;
+        }
+        default:
+          return "RETRY";
+      }
+      try {
+        await clearPendingMutationIfOperation(item.scope, item.operationId);
+        await removeSyncItem(item.scope, item.operationId);
+      } catch {
+        // The server accepted the original operation ID; any stale local entry can replay idempotently.
+      }
+      return "SYNCED";
+    } catch (cause) {
+      if (isDefinitiveSyncFailure(cause)) {
+        await deadLetterSyncItem(item, toMessage(cause));
+        await clearPendingMutationIfOperation(item.scope, item.operationId);
+        return "DEAD";
+      }
+      await markSyncAttempt(item, toMessage(cause));
+      return "RETRY";
+    }
+  }
+
+  /** Replays eligible queue items once under the immutable user/tenant context that started the pass. */
+  async function flushSyncQueue(
+    force = false,
+    currentSession = session,
+    currentTenantId = tenantId,
+  ): Promise<{ synced: number; dead: number }> {
+    if (!currentSession || !currentTenantId || syncInFlightRef.current) return { synced: 0, dead: 0 };
+    syncInFlightRef.current = true;
+    const replayClient = new TerrevoApi(async (nextSession) => {
+      if (nextSession?.user.id === currentSession.user.id) {
+        setSession(nextSession);
+        sessionUserIdRef.current = nextSession.user.id;
+        await saveSession(nextSession);
+      }
+    });
+    replayClient.configure(currentSession, currentTenantId);
+    try {
+      const items = await listSyncQueue(currentSession.user.id, currentTenantId);
+      let synced = 0;
+      let dead = 0;
+      for (const item of items) {
+        if (sessionUserIdRef.current !== currentSession.user.id || tenantIdRef.current !== currentTenantId) break;
+        if (item.state !== "QUEUED" || item.mode !== "AUTO" || (!force && !isSyncDue(item))) continue;
+        const result = await replaySyncItem(item, replayClient);
+        if (result === "SYNCED") synced += 1;
+        if (result === "DEAD") dead += 1;
+      }
+      await refreshSyncQueue(currentSession, currentTenantId);
+      return { synced, dead };
+    } finally {
+      syncInFlightRef.current = false;
+    }
+  }
+
+  async function tryResumeSyncQueue(
+    currentSession = session,
+    currentTenantId = tenantId,
+    client = api,
+  ): Promise<void> {
+    try {
+      const result = await flushSyncQueue(false, currentSession, currentTenantId);
+      if (result.synced > 0) {
+        try {
+          await refreshField(client);
+          await loadWorkRecords(client);
+          setInventory(await client.inventory());
+        } catch {
+          // Replay remains authoritative; the normal refresh path can recover later.
+        }
+      }
+    } catch {
+      // Queue remains durable; explicit Sync Now can retry later.
+    }
   }
 
   async function loadFieldResources(client = api) {
@@ -360,6 +634,7 @@ export default function App() {
   async function handleLogin() {
     await run(async () => {
       const nextSession = await api.login(email, password);
+      sessionUserIdRef.current = nextSession.user.id;
       api.configure(nextSession, null);
       const accessible = await api.tenants();
       setTenants(accessible);
@@ -378,7 +653,9 @@ export default function App() {
     await loadFieldResources(api);
     await refreshField(api);
     await loadWorkRecords(api);
+    await refreshSyncQueue(currentSession, id);
     await tryResumePendingPresence(api, currentSession, id);
+    await tryResumeSyncQueue(currentSession, id, api);
   }
 
   async function syncPendingPresence(
@@ -428,6 +705,7 @@ export default function App() {
   async function handleLogout() {
     await run(async () => {
       await api.logout();
+      sessionUserIdRef.current = null;
       await saveTenantId(null);
       tenantIdRef.current = null;
       setTenantId(null);
@@ -439,12 +717,6 @@ export default function App() {
   function rejectMocked(location: { mocked: boolean | null }) {
     if (location.mocked === true) {
       throw new Error("Location verification failed. Use the registered device with normal location services enabled.");
-    }
-  }
-
-  async function clearPendingOnDefinitiveFailure(scope: string, cause: unknown) {
-    if (cause instanceof ApiError && [400, 403, 404].includes(cause.status)) {
-      await clearPendingMutation(scope);
     }
   }
 
@@ -466,9 +738,9 @@ export default function App() {
           planDayId: option.planDayId,
           ...pending.payload,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       await refreshField();
@@ -495,9 +767,9 @@ export default function App() {
           planStopId: stop.planStopId,
           ...pending.payload,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setOpenVisit(visit);
@@ -520,13 +792,13 @@ export default function App() {
           operationId: pending.operationId,
           items: pending.payload.items,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
         setVisitDistributions(distributions);
         setDistributionQuantities({});
         setInventory(await api.inventory());
         setMessage("Samples/gifts recorded against this doctor visit.");
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
     });
@@ -547,13 +819,13 @@ export default function App() {
           operationId: pending.operationId,
           shortDayReason: pending.payload.shortDayReason,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
         setShortDayReason("");
         await refreshField();
         await loadWorkRecords();
         setMessage(`Workday closed. Worked time: ${submitted.workedMinutes} minutes. Daily timesheet generated automatically.`);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
     });
@@ -570,9 +842,9 @@ export default function App() {
           operationId: pending.operationId,
           remarks: pending.payload.remarks,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setDailyRemarks("");
@@ -601,9 +873,9 @@ export default function App() {
           operationId: pending.operationId,
           comment: pending.payload.comment,
         });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setWeeklyComment("");
@@ -627,9 +899,9 @@ export default function App() {
       }));
       try {
         await api.submitLeave({ operationId: pending.operationId, ...pending.payload });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setLeaveStart("");
@@ -669,9 +941,9 @@ export default function App() {
       }));
       try {
         await api.saveExpense(executionId, { operationId: pending.operationId, ...pending.payload });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setExpenseDraftLines([]);
@@ -688,9 +960,9 @@ export default function App() {
       }));
       try {
         await api.submitExpense(claim.id, { operationId: pending.operationId, comment: pending.payload.comment });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       setExpenseSubmitComment("");
@@ -710,13 +982,59 @@ export default function App() {
       try {
         if (action === "join") await api.joinJointWork(assignment.id, { operationId: pending.operationId, location: pending.payload.location });
         else await api.leaveJointWork(assignment.id, { operationId: pending.operationId, location: pending.payload.location });
-        await clearPendingMutation(scope);
+        await completePendingMutation(scope);
       } catch (cause) {
-        await clearPendingOnDefinitiveFailure(scope, cause);
+        await recordPendingFailure(scope, cause);
         throw cause;
       }
       await loadWorkRecords();
       setMessage(action === "join" ? "Joint field work joined with location evidence." : "Joint field work closed with location evidence.");
+    });
+  }
+
+  /** Explicitly retries currently queued automatic writes without overlapping another replay pass. */
+  async function handleSyncNow() {
+    if (syncing || syncInFlightRef.current) {
+      setMessage("Sync is already in progress.");
+      return;
+    }
+    setSyncing(true);
+    setError(null);
+    try {
+      const result = await flushSyncQueue(true);
+      if (result.synced > 0) {
+        try {
+          await refreshField();
+          await loadWorkRecords();
+          setInventory(await api.inventory());
+        } catch {
+          // Sync result is authoritative even if the follow-up screen refresh fails.
+        }
+      }
+      const remaining = await refreshSyncQueue();
+      const summary = summarizeSyncQueue(remaining);
+      if (result.dead > 0 || summary.needsAttention > 0) {
+        setMessage(`Sync completed with ${summary.needsAttention} item(s) needing attention.`);
+      } else if (summary.manual > 0) {
+        setMessage(`Synced ${result.synced} item(s). ${summary.manual} field action(s) require retry from their original screen.`);
+      } else if (summary.waiting > 0) {
+        setMessage(`Synced ${result.synced} item(s). ${summary.waiting} item(s) remain queued for retry.`);
+      } else {
+        setMessage(`Sync complete. ${result.synced} queued item(s) uploaded.`);
+      }
+    } catch (cause) {
+      setError(toMessage(cause));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleDismissDeadLetter(item: SyncQueueItem) {
+    if (item.state !== "DEAD_LETTER") return;
+    await run(async () => {
+      await removeSyncItem(item.scope, item.operationId);
+      await refreshSyncQueue();
+      setMessage("Resolved sync item dismissed. Re-enter corrected data if the business action is still required.");
     });
   }
 
@@ -803,9 +1121,9 @@ export default function App() {
             operationId: pendingCall.operationId,
             ...pendingCall.payload,
           });
-          await clearPendingMutation(callScope);
+          await completePendingMutation(callScope);
         } catch (cause) {
-          await clearPendingOnDefinitiveFailure(callScope, cause);
+          await recordPendingFailure(callScope, cause);
           throw cause;
         }
       }
@@ -820,9 +1138,9 @@ export default function App() {
         }));
         try {
           await api.saveTradeCall(visit.id, { operationId: pendingTrade.operationId, ...pendingTrade.payload });
-          await clearPendingMutation(tradeScope);
+          await completePendingMutation(tradeScope);
         } catch (cause) {
-          await clearPendingOnDefinitiveFailure(tradeScope, cause);
+          await recordPendingFailure(tradeScope, cause);
           throw cause;
         }
 
@@ -832,9 +1150,9 @@ export default function App() {
           const pendingRcpa = await getOrCreatePendingMutation(rcpaScope, async () => ({ lines }));
           try {
             await api.saveRcpa(visit.id, { operationId: pendingRcpa.operationId, lines: pendingRcpa.payload.lines });
-            await clearPendingMutation(rcpaScope);
+            await completePendingMutation(rcpaScope);
           } catch (cause) {
-            await clearPendingOnDefinitiveFailure(rcpaScope, cause);
+            await recordPendingFailure(rcpaScope, cause);
             throw cause;
           }
         }
@@ -852,9 +1170,9 @@ export default function App() {
               remarks: pendingOrder.payload.remarks,
               lines: pendingOrder.payload.lines,
             });
-            await clearPendingMutation(orderScope);
+            await completePendingMutation(orderScope);
           } catch (cause) {
-            await clearPendingOnDefinitiveFailure(orderScope, cause);
+            await recordPendingFailure(orderScope, cause);
             throw cause;
           }
         }
@@ -877,10 +1195,10 @@ export default function App() {
           ...pendingCheckout.payload,
         });
         checkoutRecorded = true;
-        await clearPendingMutation(checkoutScope);
+        await completePendingMutation(checkoutScope);
       } catch (cause) {
-        const definitive = cause instanceof ApiError && [400, 403, 404].includes(cause.status);
-        await clearPendingOnDefinitiveFailure(checkoutScope, cause);
+        const definitive = isDefinitiveSyncFailure(cause);
+        await recordPendingFailure(checkoutScope, cause);
         if (definitive) await clearPendingPresence();
         throw cause;
       }
@@ -990,6 +1308,7 @@ export default function App() {
   const latestExpense = expenses[0] ?? null;
   const expenseExecutionId = progress?.executionId ?? latestDaily?.executionId ?? null;
   const recentJointWork = jointWork.slice(0, 5);
+  const syncSummary = summarizeSyncQueue(syncItems);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -999,11 +1318,43 @@ export default function App() {
             <Text style={styles.brand}>Terrevo</Text>
             <Text style={styles.muted}>{selectedTenant?.name ?? "Field operations"}</Text>
           </View>
-          <Pressable onPress={() => void handleLogout()}><Text style={styles.link}>Sign out</Text></Pressable>
+          <Pressable disabled={busy || syncing} onPress={() => void handleLogout()}><Text style={[styles.link, (busy || syncing) && styles.disabled]}>Sign out</Text></Pressable>
         </View>
 
         {error ? <Notice text={error} error /> : null}
         {message ? <Notice text={message} /> : null}
+
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>SYNC STATUS</Text>
+          {syncItems.length === 0 ? (
+            <>
+              <Text style={styles.cardTitle}>All retry-safe writes are synced</Text>
+              <Text style={styles.muted}>Server-authoritative GPS/time actions still require a live server response before the field workflow advances.</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.cardTitle}>{syncItems.length} unsynced item(s) on this device</Text>
+              <Text style={styles.small}>Waiting {syncSummary.waiting} · Retry original action {syncSummary.manual} · Needs attention {syncSummary.needsAttention}</Text>
+              {syncItems.slice(0, 6).map((item) => (
+                <View key={`${item.scope}::${item.operationId}`} style={styles.choiceRow}>
+                  <Text style={styles.choiceText}>{item.action.replaceAll("-", " ")}</Text>
+                  <Text style={styles.small}>
+                    {item.state === "DEAD_LETTER"
+                      ? "Needs attention"
+                      : item.mode === "MANUAL" ? "Retry from the original field action" : "Queued for safe replay"}
+                  </Text>
+                  {item.lastError ? <Text style={styles.small}>{item.lastError}</Text> : null}
+                  {item.state === "DEAD_LETTER" ? (
+                    <Pressable onPress={() => void handleDismissDeadLetter(item)}>
+                      <Text style={styles.link}>Dismiss after correction</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ))}
+              <PrimaryButton label={syncing ? "Syncing…" : "Sync Now"} disabled={busy || syncing} onPress={() => void handleSyncNow()} />
+            </>
+          )}
+        </View>
 
         {managerCommand ? (
           <View style={styles.card}>
