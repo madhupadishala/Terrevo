@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "changeId": "TRV-CHANGE-XXX",
+  "sprint": "Sprint XX",
+  "requirementIds": [
+    "TRV-XXX-001"
+  ],
+  "exactCommit": "REPLACE_WITH_FULL_COMMIT_SHA",
+  "owner": "REPLACE",
+  "reviewers": [],
+  "impact": {
+    "ui": false,
+    "database": false,
+    "apiContract": false,
+    "securityTenant": false,
+    "offlineSync": false,
+    "regulatoryDomain": false
+  },
+  "artifacts": {
+    "urs": [],
+    "frs": [],
+    "architecture": [],
+    "figma": [],
+    "userGuide": [],
+    "traceability": [],
+    "benchmark": []
+  },
+  "automatedChecks": {
+    "typecheck": "BLOCKED",
+    "lint": "BLOCKED",
+    "unit_tests": "BLOCKED",
+    "integration_tests": "BLOCKED",
+    "relevant_e2e": "BLOCKED",
+    "architecture": "BLOCKED",
+    "security": "BLOCKED",
+    "secret_scan": "BLOCKED",
+    "dependency_audit": "BLOCKED",
+    "module_regression": "BLOCKED",
+    "build": "BLOCKED",
+    "design_verification": "BLOCKED",
+    "browser_verification": "BLOCKED",
+    "evidence_verification": "BLOCKED"
+  },
+  "gates": {
+    "karpathy": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": [],
+      "rationale": ""
+    },
+    "ponytail": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": [],
+      "rationale": ""
+    },
+    "product_design": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": [],
+      "rationale": ""
+    },
+    "architecture": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": [],
+      "rationale": ""
+    },
+    "warpath": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": [],
+      "rationale": ""
+    },
+    "coderabbit": {
+      "status": "BLOCKED",
+      "reviewer": "CodeRabbit",
+      "evidence": [],
+      "rationale": ""
+    },
+    "hacker": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": [],
+      "rationale": ""
+    },
+    "evidence": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": [],
+      "rationale": ""
+    },
+    "regulatory_knowledge": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": [],
+      "rationale": ""
+    },
+    "modular_benchmark": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": [],
+      "rationale": ""
+    }
+  },
+  "rollback": {
+    "documented": false,
+    "tested": false,
+    "evidence": []
+  },
+  "finalQualification": {
+    "status": "IMPLEMENTED / NOT QUALIFIED",
+    "qualifiedBy": "",
+    "qualifiedAt": ""
+  }
+}
