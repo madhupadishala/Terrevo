@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "changeId": "TRV-SPRINT-02",
+  "sprint": "Sprint 2",
+  "requirementIds": [
+    "TRV-ORG-001",
+    "TRV-ORG-002",
+    "TRV-ORG-003",
+    "TRV-ORG-004",
+    "TRV-RBAC-001",
+    "TRV-RBAC-002",
+    "TRV-RBAC-003",
+    "TRV-RBAC-004",
+    "TRV-RBAC-005"
+  ],
+  "exactCommit": "ddb8b01ff88b8ac28e97358d4429008866c35221",
+  "owner": "madhupadishala",
+  "reviewers": [
+    "OpenAI GPT-5.6 Sol",
+    "CodeRabbit pending"
+  ],
+  "impact": {
+    "ui": false,
+    "database": true,
+    "apiContract": true,
+    "securityTenant": true,
+    "offlineSync": false,
+    "regulatoryDomain": false
+  },
+  "artifacts": {
+    "urs": [],
+    "frs": [],
+    "architecture": [
+      "docs/qa/WAVE-1-REQUALIFICATION.md"
+    ],
+    "figma": [],
+    "userGuide": [],
+    "traceability": [
+      "docs/requirements/sprint-00-organization-rbac.md"
+    ],
+    "benchmark": [
+      "docs/qa/WAVE-1-REQUALIFICATION.md"
+    ]
+  },
+  "automatedChecks": {
+    "typecheck": "BLOCKED",
+    "lint": "BLOCKED",
+    "unit_tests": "BLOCKED",
+    "integration_tests": "BLOCKED",
+    "relevant_e2e": "NOT_APPLICABLE",
+    "architecture": "BLOCKED",
+    "security": "BLOCKED",
+    "secret_scan": "BLOCKED",
+    "dependency_audit": "BLOCKED",
+    "module_regression": "BLOCKED",
+    "build": "BLOCKED",
+    "design_verification": "NOT_APPLICABLE",
+    "browser_verification": "NOT_APPLICABLE",
+    "evidence_verification": "BLOCKED"
+  },
+  "gates": {
+    "karpathy": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": [
+        "Wave 1 audit uses existing implementation and adds only requirement-driven qualification tests."
+      ],
+      "rationale": ""
+    },
+    "ponytail": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": [
+        "No new runtime abstraction or dependency introduced."
+      ],
+      "rationale": ""
+    },
+    "product_design": {
+      "status": "NOT_APPLICABLE",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": [],
+      "rationale": "No product UI is changed by this requalification scope."
+    },
+    "architecture": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": [
+        "docs/qa/WAVE-1-REQUALIFICATION.md"
+      ],
+      "rationale": ""
+    },
+    "warpath": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": [
+        "Failure-path and boundary tests added for Wave 1; CI execution pending."
+      ],
+      "rationale": ""
+    },
+    "coderabbit": {
+      "status": "BLOCKED",
+      "reviewer": "CodeRabbit",
+      "evidence": [],
+      "rationale": "Independent PR review pending."
+    },
+    "hacker": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": [
+        "database/ci/wave-1-boundary-tests.sql"
+      ],
+      "rationale": ""
+    },
+    "evidence": {
+      "status": "BLOCKED",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": [
+        "docs/qa/WAVE-1-REQUALIFICATION.md"
+      ],
+      "rationale": "CI and CodeRabbit evidence not yet complete."
+    },
+    "regulatory_knowledge": {
+      "status": "NOT_APPLICABLE",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": [],
+      "rationale": "This sprint does not encode a pharmacovigilance regulatory decision."
+    },
+    "modular_benchmark": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": [
+        "docs/qa/WAVE-1-REQUALIFICATION.md"
+      ],
+      "rationale": ""
+    }
+  },
+  "rollback": {
+    "documented": true,
+    "tested": false,
+    "evidence": [
+      "Revert Wave 1 requalification commits; no production migration is introduced by the audit."
+    ]
+  },
+  "finalQualification": {
+    "status": "IMPLEMENTED / NOT QUALIFIED",
+    "qualifiedBy": "",
+    "qualifiedAt": ""
+  }
+}
