@@ -5,7 +5,7 @@
   "requirementIds": [
     "TRV-GOV-001"
   ],
-  "exactCommit": "919f11148e1fff507685bc4d224332d5436c3494",
+  "exactCommit": "04d1563810b20a01c75ed1e8e19f6cf5ea3abed0",
   "owner": "madhupadishala",
   "reviewers": [
     "OpenAI GPT-5.6 Sol",
@@ -95,7 +95,7 @@
       "status": "BLOCKED",
       "reviewer": "CodeRabbit",
       "evidence": [],
-      "rationale": "Independent PR review pending."
+      "rationale": "Independent PR review pending on latest governance head."
     },
     "hacker": {
       "status": "NOT_APPLICABLE",
