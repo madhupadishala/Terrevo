@@ -58,3 +58,35 @@ test("TRV-APR-004 return preserves a required manager comment", async()=>{
   await service.decide(tenantId,actorId,planId,"token",{decision:"RETURN",comment:"Move doctor to Tuesday"});
   assert.equal(comment,"Move doctor to Tuesday");
 });
+
+test("TRV-APR-002 rejects review of a non-submitted plan before authorization or write", async()=>{
+  let authorizations=0; let writes=0;
+  const service=createTourApprovalService({
+    listPending:async()=>[],
+    getForReview:async()=>({...submitted(),status:"APPROVED" as const}),
+    decide:async()=>{writes++},
+  }, {authorize:async()=>{authorizations++},accessContext:async()=>({roles:[],permissions:[],orgAssignments:[]}),assignRole:async()=>{}} as any);
+
+  await assert.rejects(
+    service.decide(tenantId,actorId,planId,"token",{decision:"APPROVE"}),
+    /Only submitted tour plans can be reviewed/,
+  );
+  assert.equal(authorizations,0);
+  assert.equal(writes,0);
+});
+
+test("TRV-APR-001 rejects submitted plans with no reviewable territory before write", async()=>{
+  let writes=0;
+  const service=createTourApprovalService({
+    listPending:async()=>[],
+    getForReview:async()=>({...submitted(),days:[]}),
+    decide:async()=>{writes++},
+  }, {authorize:async()=>{},accessContext:async()=>({roles:[],permissions:[],orgAssignments:[]}),assignRole:async()=>{}} as any);
+
+  await assert.rejects(
+    service.decide(tenantId,actorId,planId,"token",{decision:"APPROVE"}),
+    /no reviewable days/,
+  );
+  assert.equal(writes,0);
+});
+
