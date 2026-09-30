@@ -25,6 +25,9 @@ reviews:
     auto_incremental_review: true
     base_branches:
       - "main"
+      - "feature/sprint-22-offline-sync"
+      - "feature/sprint-23-security-audit"
+      - "feature/sprint-24-regression-uat-closure"
   path_filters:
     - "!**/dist/**"
     - "!**/build/**"

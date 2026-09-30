@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
@@ -9,7 +12,9 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "api/**/*.ts",
@@ -36,6 +41,7 @@
     "modules/expenses/src/**/*.ts",
     "modules/joint-work/src/**/*.ts",
     "modules/manager-command/src/**/*.ts",
-    "modules/analytics/src/**/*.ts"
+    "modules/analytics/src/**/*.ts",
+    "modules/security/src/**/*.ts"
   ]
 }
