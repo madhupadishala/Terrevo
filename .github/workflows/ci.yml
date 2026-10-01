@@ -14,12 +14,43 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run verify:foundation
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
       - run: git diff --check
+
+
+  quality-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install quality tooling
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: ESLint core qualification scope
+        run: npm run lint:core
+      - name: Architecture and circular dependency checks
+        run: npm run check:architecture:core
+      - name: Dead code and dependency hygiene
+        run: npm run check:dead-code
+      - name: Duplication threshold
+        run: npm run check:duplication:core
+      - name: Dependency vulnerability audit
+        run: npm run check:dependency-audit
+      - name: Product-gate verifier negative tests
+        run: npm run test:product-gates
+      - name: Governance evidence structure
+        run: npm run verify:evidence-structure -- docs/evidence/TRV-GOV-001.product-gates.json
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   mobile:
     runs-on: ubuntu-latest
