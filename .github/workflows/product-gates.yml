@@ -46,12 +46,24 @@ jobs:
             manifest="$(printf '%s\n' "$PR_BODY" | sed -n 's/^- Evidence manifest: `\([^`]*\)`.*/\1/p' | head -n1)"
           fi
           test -n "$manifest" || { echo "Evidence manifest path missing from PR body"; exit 1; }
-          case "$manifest" in
-            docs/evidence/*.product-gates.json) ;;
-            *) echo "Evidence manifest must be under docs/evidence and end in .product-gates.json"; exit 1 ;;
-          esac
           test -f "$manifest" || { echo "Evidence manifest does not exist: $manifest"; exit 1; }
-          echo "path=$manifest" >> "$GITHUB_OUTPUT"
+
+          evidence_root="$(realpath docs/evidence)"
+          manifest_real="$(realpath "$manifest")"
+          case "$manifest_real" in
+            "$evidence_root"/*.product-gates.json) ;;
+            *)
+              echo "Evidence manifest must resolve inside docs/evidence and end in .product-gates.json"
+              exit 1
+              ;;
+          esac
+
+          workspace_real="$(realpath "$GITHUB_WORKSPACE")"
+          case "$manifest_real" in
+            "$workspace_real"/*) manifest_rel="${manifest_real#"$workspace_real"/}" ;;
+            *) echo "Evidence manifest resolved outside the checked-out workspace"; exit 1 ;;
+          esac
+          echo "path=$manifest_rel" >> "$GITHUB_OUTPUT"
 
       - name: Verify exact qualified implementation
         shell: bash
@@ -78,6 +90,26 @@ jobs:
               exit 1
             fi
           fi
+
+      - name: Verify authoritative CodeRabbit status
+        shell: bash
+        env:
+          MANIFEST: ${{ steps.manifest.outputs.path }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          manifest_sha="$(node -e 'const fs=require("fs"); console.log(JSON.parse(fs.readFileSync(process.env.MANIFEST,"utf8")).exactCommit || "")')"
+          response="$(curl --fail --silent --show-error             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/$REPOSITORY/commits/$manifest_sha/status")"
+          STATUS_JSON="$response" node - <<'NODE'
+          const payload = JSON.parse(process.env.STATUS_JSON);
+          const matches = (payload.statuses || []).filter(s => s.context === "CodeRabbit");
+          if (!matches.some(s => s.state === "success")) {
+            console.error("CodeRabbit authoritative status is not success for the qualified commit");
+            process.exit(1);
+          }
+          console.log("Authoritative CodeRabbit status: PASS");
+          NODE
 
       - name: Verify evidence structure
         env:
