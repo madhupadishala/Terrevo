@@ -187,5 +187,12 @@
       "forward_migration": [],
       "reverse_migration": []
     }
+  },
+  "automatedCheckScopes": {
+    "lint": "",
+    "architecture": "",
+    "dead_code": "",
+    "duplication": "",
+    "module_regression": ""
   }
 }
