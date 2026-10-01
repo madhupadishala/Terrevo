@@ -1,0 +1,25 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "apps/api/src/index.ts",
+    "apps/api/src/vercel-runtime.ts",
+    "apps/web/src/main.tsx"
+  ],
+  "project": [
+    "apps/api/src/**/*.ts",
+    "modules/identity/**/*.ts",
+    "modules/tenant/**/*.ts",
+    "modules/organization/**/*.ts",
+    "modules/rbac/**/*.ts",
+    "modules/masters/**/*.ts",
+    "modules/tour-planning/**/*.ts",
+    "modules/tour-approval/**/*.ts",
+    "apps/web/**/*.ts",
+    "apps/web/**/*.tsx"
+  ],
+  "include": [
+    "files",
+    "dependencies",
+    "unlisted"
+  ]
+}
