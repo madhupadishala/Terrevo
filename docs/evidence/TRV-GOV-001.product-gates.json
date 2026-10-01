@@ -5,7 +5,7 @@
   "requirementIds": [
     "TRV-GOV-001"
   ],
-  "exactCommit": "04d1563810b20a01c75ed1e8e19f6cf5ea3abed0",
+  "exactCommit": "2f62f286fd02825bda1ffc3b58a78e4d28555663",
   "owner": "madhupadishala",
   "reviewers": [
     "OpenAI GPT-5.6 Sol",
@@ -15,7 +15,7 @@
     "ui": false,
     "database": false,
     "apiContract": false,
-    "securityTenant": false,
+    "securityTenant": true,
     "offlineSync": false,
     "regulatoryDomain": false
   },
@@ -40,10 +40,10 @@
     "typecheck": "BLOCKED",
     "lint": "BLOCKED",
     "unit_tests": "BLOCKED",
-    "integration_tests": "BLOCKED",
+    "integration_tests": "NOT_APPLICABLE",
     "relevant_e2e": "NOT_APPLICABLE",
     "architecture": "BLOCKED",
-    "security": "NOT_APPLICABLE",
+    "security": "BLOCKED",
     "secret_scan": "BLOCKED",
     "dependency_audit": "BLOCKED",
     "module_regression": "BLOCKED",
@@ -54,79 +54,111 @@
   },
   "gates": {
     "karpathy": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "evidence": [
-        "Scoped governance-only branch; no runtime feature edits."
-      ],
-      "rationale": ""
+      "evidence": {
+        "scope_review": [],
+        "assumptions": [],
+        "smallest_correct_change": [],
+        "verification": []
+      },
+      "rationale": "Awaiting fresh CI/review evidence on the hardened governance implementation."
     },
     "ponytail": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "evidence": [
-        "Uses existing Node/GitHub Actions; no new runtime dependency."
-      ],
-      "rationale": ""
+      "evidence": {
+        "reuse_review": [],
+        "duplication_review": [],
+        "maintainability_review": []
+      },
+      "rationale": "Awaiting fresh duplication/maintainability CI evidence."
     },
     "product_design": {
       "status": "NOT_APPLICABLE",
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "evidence": [],
+      "evidence": {
+        "figma_or_no_ui_rationale": [],
+        "carbon_density_review": [],
+        "accessibility": [],
+        "responsive_states": [],
+        "browser_verification": []
+      },
       "rationale": "Governance-only change has no product UI surface."
     },
     "architecture": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "evidence": [
-        "Canonical dependency direction and module boundary rules codified in governance docs."
-      ],
-      "rationale": ""
+      "evidence": {
+        "boundary_review": [],
+        "dependency_direction": [],
+        "shared_services_review": [],
+        "vendor_leakage_review": []
+      },
+      "rationale": "Awaiting fresh CI/review evidence on the hardened governance implementation."
     },
     "warpath": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "evidence": [
-        "Verifier fails closed for missing manifests, missing gates, blocked checks and incomplete qualification."
-      ],
-      "rationale": ""
+      "evidence": {
+        "failure_paths": [],
+        "retry_edge_cases": [],
+        "state_abuse": [],
+        "rollback": []
+      },
+      "rationale": "Awaiting fresh CI/review evidence on the hardened governance implementation."
     },
     "coderabbit": {
       "status": "BLOCKED",
       "reviewer": "CodeRabbit",
-      "evidence": [],
-      "rationale": "Independent PR review pending on latest governance head."
+      "evidence": {
+        "review_url_or_id": [],
+        "unresolved_material_findings_zero": []
+      },
+      "rationale": "Awaiting fresh independent review on the hardened governance head."
     },
     "hacker": {
-      "status": "NOT_APPLICABLE",
+      "status": "BLOCKED",
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "evidence": [],
-      "rationale": "No runtime/API/authentication surface changed; security requirements are governance-only."
+      "evidence": {
+        "authorization_abuse": [],
+        "tenant_escape": [],
+        "replay_injection": [],
+        "tamper_workflow_bypass": []
+      },
+      "rationale": "Governance tamper/workflow-bypass qualification is applicable and awaiting fresh security evidence."
     },
     "evidence": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "evidence": [
-        "docs/evidence/TRV-GOV-001.product-gates.json",
-        "scripts/verify-product-gates.mjs"
-      ],
-      "rationale": ""
+      "evidence": {
+        "requirements_traceability": [],
+        "tests": [],
+        "exact_commit": [],
+        "immutable_or_versioned_evidence": []
+      },
+      "rationale": "Awaiting fresh CI/review evidence on the hardened governance implementation."
     },
     "regulatory_knowledge": {
       "status": "NOT_APPLICABLE",
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "evidence": [],
+      "evidence": {
+        "applicability_assessment": [],
+        "authoritative_sources_or_na_rationale": [],
+        "version_provenance": []
+      },
       "rationale": "Governance mechanics do not make or encode a regulated domain decision."
     },
     "modular_benchmark": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "evidence": [
-        "README.md",
-        "AGENTS.md",
-        "docs/governance/PRODUCT-OPERATING-SYSTEM.md"
-      ],
-      "rationale": ""
+      "evidence": {
+        "module_completeness": [],
+        "market_benchmark": [],
+        "no_fake_controls": [],
+        "integration_completeness": []
+      },
+      "rationale": "Awaiting fresh CI/review evidence on the hardened governance implementation."
     }
   },
   "rollback": {
@@ -144,23 +176,25 @@
   "automatedCheckApplicability": {
     "integration_tests": {
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "rationale": "Governance changes do not alter a runtime integration contract; repository regression tests remain mandatory."
+      "rationale": "Governance enforcement changes do not alter a product/runtime integration contract; repository and workflow regression remain mandatory."
     },
     "relevant_e2e": {
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "rationale": "Governance changes expose no end-user workflow requiring E2E interaction."
-    },
-    "security": {
-      "reviewer": "OpenAI GPT-5.6 Sol",
-      "rationale": "No runtime authentication or authorization path is changed; secret scanning and dependency audit remain mandatory."
+      "rationale": "No end-user workflow is introduced by governance enforcement."
     },
     "design_verification": {
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "rationale": "Governance changes contain no product UI."
+      "rationale": "No product UI is changed."
     },
     "browser_verification": {
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "rationale": "Governance changes contain no browser-visible product behavior."
+      "rationale": "No browser-visible product behavior is changed."
+    }
+  },
+  "impactEvidence": {
+    "database": {
+      "forward_migration": [],
+      "reverse_migration": []
     }
   }
 }
