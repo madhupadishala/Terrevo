@@ -28,6 +28,7 @@ reviews:
     auto_incremental_review: true
     base_branches:
       - "main"
+      - "governance/product-operating-system"
       - "feature/sprint-22-offline-sync"
       - "feature/sprint-23-security-audit"
       - "feature/sprint-24-regression-uat-closure"
@@ -63,10 +64,6 @@ reviews:
     - path: "database/**"
       instructions: |
         Require migration safety, backward compatibility, tenant isolation and rollback consideration.
-
-chat:
-  auto_reply: true
-
     - path: "docs/evidence/**"
       instructions: |
         Treat evidence as controlled qualification data. Flag unsupported PASS claims, missing reviewer/rationale,
@@ -75,3 +72,5 @@ chat:
       instructions: |
         Review governance changes fail-closed. Flag bypasses, optionalization of mandatory gates, self-attestation loopholes,
         or mechanisms that allow implementation to be called COMPLETE without exact-commit evidence.
+chat:
+  auto_reply: true
