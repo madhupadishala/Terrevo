@@ -63,7 +63,7 @@ const runStructure = manifest =>
 
 assert.equal(runFinal(structuredClone(base)).status, 0, "valid manifest should pass final verifier");
 assert.notEqual(
-  runFinalWithoutAuthoritativeCodeRabbit(structuredClone(base)).status,
+  runFinal(structuredClone(base), false).status,
   0,
   "CodeRabbit PASS must fail without authoritative status verification"
 );
