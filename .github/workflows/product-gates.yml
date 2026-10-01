@@ -110,6 +110,7 @@ jobs:
           }
           console.log("Authoritative CodeRabbit status: PASS");
           NODE
+          echo "CODERABBIT_STATUS_VERIFIED=true" >> "$GITHUB_ENV"
 
       - name: Verify evidence structure
         env:
