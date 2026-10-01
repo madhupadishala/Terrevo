@@ -17,14 +17,16 @@
     "verify": "npm run verify:foundation && npm run typecheck && npm test && npm run build",
     "lint": "eslint \"apps/**/*.{ts,tsx}\" \"modules/**/*.ts\"",
     "check:architecture": "depcruise --validate .dependency-cruiser.cjs apps/api/src modules && madge --circular --extensions ts,tsx apps/api/src modules",
-    "check:dead-code": "knip --config knip.json",
+    "check:dead-code": "npm run check:dead-code:core && npm run check:dead-code:web",
     "check:duplication": "jscpd --config .jscpd.json apps modules",
     "check:dependency-audit": "npm audit --audit-level=high",
     "verify:evidence-structure": "node scripts/verify-evidence-structure.mjs",
     "lint:core": "eslint \"apps/api/src/**/*.ts\" \"apps/api/test/identity-tenant.test.ts\" \"apps/api/test/organization-rbac.test.ts\" \"apps/api/test/masters.test.ts\" \"apps/api/test/tour-planning.test.ts\" \"apps/api/test/tour-approval.test.ts\" \"modules/{identity,tenant,organization,rbac,masters,tour-planning,tour-approval}/**/*.ts\"",
     "check:architecture:core": "depcruise --validate .dependency-cruiser.cjs apps/api/src modules/identity modules/tenant modules/organization modules/rbac modules/masters modules/tour-planning modules/tour-approval && madge --circular --extensions ts,tsx apps/api/src modules/identity modules/tenant modules/organization modules/rbac modules/masters modules/tour-planning modules/tour-approval",
     "check:duplication:core": "jscpd --config .jscpd.json apps/api/src modules/identity modules/tenant modules/organization modules/rbac modules/masters modules/tour-planning modules/tour-approval",
-    "test:product-gates": "node scripts/test-product-gates.mjs"
+    "test:product-gates": "node scripts/test-product-gates.mjs",
+    "check:dead-code:core": "knip --config knip.json",
+    "check:dead-code:web": "knip --config knip.web.json"
   },
   "engines": {
     "node": ">=22"
