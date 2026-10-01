@@ -62,6 +62,11 @@ const runStructure = manifest =>
   spawnSync(process.execPath, ["scripts/verify-evidence-structure.mjs", writeManifest(manifest)], {encoding:"utf8"});
 
 assert.equal(runFinal(structuredClone(base)).status, 0, "valid manifest should pass final verifier");
+assert.notEqual(
+  runFinalWithoutAuthoritativeCodeRabbit(structuredClone(base)).status,
+  0,
+  "CodeRabbit PASS must fail without authoritative status verification"
+);
 assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest should pass structure verifier");
 
 {
