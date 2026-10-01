@@ -13,8 +13,17 @@ const failures = [];
 const nonempty = value => typeof value === "string" && value.trim().length > 0;
 const validEvidenceList = value => Array.isArray(value) && value.length > 0 && value.every(nonempty);
 const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
+const impactKeys = ["ui","database","apiContract","securityTenant","offlineSync","regulatoryDomain"];
+const nonExemptibleGates = new Set(policy.nonExemptibleGates || []);
 
 if (!/^[0-9a-f]{40}$/.test(manifest.exactCommit || "")) failures.push("exactCommit must be a full 40-character commit SHA");
+if (!isRecord(manifest.impact)) {
+  failures.push("impact must be an object");
+} else {
+  for (const key of impactKeys) {
+    if (typeof manifest.impact[key] !== "boolean") failures.push(`impact.${key} must be boolean`);
+  }
+}
 
 const impactKeys = ["ui","database","apiContract","securityTenant","offlineSync","regulatoryDomain"];
 if (!isRecord(manifest.impact)) {
@@ -46,6 +55,10 @@ for (const gate of policy.gates) {
     }
   }
   if (result.status === "NOT_APPLICABLE" && !nonempty(result.rationale)) failures.push(`${gate.id} NOT_APPLICABLE requires rationale`);
+}
+
+if (manifest.gates?.coderabbit?.status === "PASS" && process.env.CODERABBIT_STATUS_VERIFIED !== "true") {
+  failures.push("coderabbit PASS requires authoritative CodeRabbit status verification for exactCommit");
 }
 
 const exemptible = new Set(policy.exemptibleAutomatedChecks || []);
