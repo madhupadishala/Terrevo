@@ -8,6 +8,22 @@ const policy = JSON.parse(fs.readFileSync("governance/product-gates.json", "utf8
 const gateEvidence = gate => Object.fromEntries(gate.evidence.map(item => [item, [`test:${item}`]]));
 const boundJobs = [...new Set(Object.values(policy.automatedCheckBindings || {}).flat())];
 
+assert.deepEqual(
+  policy.automatedCheckBindings?.design_verification,
+  ["design-verification"],
+  "design_verification must bind to the trusted design-verification GitHub Actions job"
+);
+assert.deepEqual(
+  policy.automatedCheckBindings?.browser_verification,
+  ["browser-verification"],
+  "browser_verification must bind to the trusted browser-verification GitHub Actions job"
+);
+assert.equal(
+  policy.trustedProducers?.githubActions?.slug,
+  "github-actions",
+  "automated check bindings must rely on the trusted GitHub Actions producer"
+);
+
 const base = {
   schemaVersion: 1,
   changeId: "TRV-TEST-001",
