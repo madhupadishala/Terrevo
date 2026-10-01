@@ -140,5 +140,27 @@
     "status": "IMPLEMENTED / NOT QUALIFIED",
     "qualifiedBy": "",
     "qualifiedAt": ""
+  },
+  "automatedCheckApplicability": {
+    "integration_tests": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "Governance changes do not alter a runtime integration contract; repository regression tests remain mandatory."
+    },
+    "relevant_e2e": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "Governance changes expose no end-user workflow requiring E2E interaction."
+    },
+    "security": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "No runtime authentication or authorization path is changed; secret scanning and dependency audit remain mandatory."
+    },
+    "design_verification": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "Governance changes contain no product UI."
+    },
+    "browser_verification": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "Governance changes contain no browser-visible product behavior."
+    }
   }
 }
