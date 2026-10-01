@@ -48,8 +48,15 @@ const writeManifest = manifest => {
   return file;
 };
 
-const runFinal = manifest =>
-  spawnSync(process.execPath, ["scripts/verify-product-gates.mjs", writeManifest(manifest)], {encoding:"utf8"});
+const runFinal = (manifest, coderabbitVerified = true) =>
+  spawnSync(
+    process.execPath,
+    ["scripts/verify-product-gates.mjs", writeManifest(manifest)],
+    {
+      encoding:"utf8",
+      env:{...process.env, CODERABBIT_STATUS_VERIFIED: coderabbitVerified ? "true" : "false"}
+    }
+  );
 
 const runStructure = manifest =>
   spawnSync(process.execPath, ["scripts/verify-evidence-structure.mjs", writeManifest(manifest)], {encoding:"utf8"});
@@ -160,6 +167,10 @@ assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest shou
   m.gates.coderabbit.status="NOT_APPLICABLE";
   m.gates.coderabbit.rationale="incorrect exemption";
   assert.notEqual(runFinal(m).status,0,"CodeRabbit gate is non-exemptible");
+}
+{
+  const m=structuredClone(base);
+  assert.notEqual(runFinal(m, false).status,0,"authoritative CodeRabbit status must be required");
 }
 
 console.log("PRODUCT GATE VERIFIER TESTS: PASS");
