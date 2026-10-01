@@ -145,4 +145,21 @@ assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest shou
   assert.notEqual(runStructure(m).status,0,"artifact path traversal must fail");
 }
 
+{
+  const m=structuredClone(base);
+  delete m.impact.offlineSync;
+  assert.notEqual(runFinal(m).status,0,"missing impact field must fail");
+}
+{
+  const m=structuredClone(base);
+  m.impact.ui="false";
+  assert.notEqual(runFinal(m).status,0,"non-boolean impact field must fail");
+}
+{
+  const m=structuredClone(base);
+  m.gates.coderabbit.status="NOT_APPLICABLE";
+  m.gates.coderabbit.rationale="incorrect exemption";
+  assert.notEqual(runFinal(m).status,0,"CodeRabbit gate is non-exemptible");
+}
+
 console.log("PRODUCT GATE VERIFIER TESTS: PASS");
