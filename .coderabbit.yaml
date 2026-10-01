@@ -18,6 +18,7 @@ reviews:
   high_level_summary: true
   changed_files_summary: true
   review_status: true
+  review_progress: false
   commit_status: true
   fail_commit_status: true
   collapse_walkthrough: false
