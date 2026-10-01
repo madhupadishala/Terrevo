@@ -45,61 +45,108 @@
     "karpathy": {
       "status": "BLOCKED",
       "reviewer": "",
-      "evidence": [],
+      "evidence": {
+        "scope_review": [],
+        "assumptions": [],
+        "smallest_correct_change": [],
+        "verification": []
+      },
       "rationale": ""
     },
     "ponytail": {
       "status": "BLOCKED",
       "reviewer": "",
-      "evidence": [],
+      "evidence": {
+        "reuse_review": [],
+        "duplication_review": [],
+        "maintainability_review": []
+      },
       "rationale": ""
     },
     "product_design": {
       "status": "BLOCKED",
       "reviewer": "",
-      "evidence": [],
+      "evidence": {
+        "figma_or_no_ui_rationale": [],
+        "carbon_density_review": [],
+        "accessibility": [],
+        "responsive_states": [],
+        "browser_verification": []
+      },
       "rationale": ""
     },
     "architecture": {
       "status": "BLOCKED",
       "reviewer": "",
-      "evidence": [],
+      "evidence": {
+        "boundary_review": [],
+        "dependency_direction": [],
+        "shared_services_review": [],
+        "vendor_leakage_review": []
+      },
       "rationale": ""
     },
     "warpath": {
       "status": "BLOCKED",
       "reviewer": "",
-      "evidence": [],
+      "evidence": {
+        "failure_paths": [],
+        "retry_edge_cases": [],
+        "state_abuse": [],
+        "rollback": []
+      },
       "rationale": ""
     },
     "coderabbit": {
       "status": "BLOCKED",
       "reviewer": "CodeRabbit",
-      "evidence": [],
+      "evidence": {
+        "review_url_or_id": [],
+        "unresolved_material_findings_zero": []
+      },
       "rationale": ""
     },
     "hacker": {
       "status": "BLOCKED",
       "reviewer": "",
-      "evidence": [],
+      "evidence": {
+        "authorization_abuse": [],
+        "tenant_escape": [],
+        "replay_injection": [],
+        "tamper_workflow_bypass": []
+      },
       "rationale": ""
     },
     "evidence": {
       "status": "BLOCKED",
       "reviewer": "",
-      "evidence": [],
+      "evidence": {
+        "requirements_traceability": [],
+        "tests": [],
+        "exact_commit": [],
+        "immutable_or_versioned_evidence": []
+      },
       "rationale": ""
     },
     "regulatory_knowledge": {
       "status": "BLOCKED",
       "reviewer": "",
-      "evidence": [],
+      "evidence": {
+        "applicability_assessment": [],
+        "authoritative_sources_or_na_rationale": [],
+        "version_provenance": []
+      },
       "rationale": ""
     },
     "modular_benchmark": {
       "status": "BLOCKED",
       "reviewer": "",
-      "evidence": [],
+      "evidence": {
+        "module_completeness": [],
+        "market_benchmark": [],
+        "no_fake_controls": [],
+        "integration_completeness": []
+      },
       "rationale": ""
     }
   },
@@ -133,6 +180,12 @@
     "browser_verification": {
       "reviewer": "",
       "rationale": ""
+    }
+  },
+  "impactEvidence": {
+    "database": {
+      "forward_migration": [],
+      "reverse_migration": []
     }
   }
 }
