@@ -198,5 +198,12 @@
       "forward_migration": [],
       "reverse_migration": []
     }
+  },
+  "automatedCheckScopes": {
+    "lint": "Core qualification scope only: apps/api/src, Wave 1 API tests, and identity/tenant/organization/rbac/masters/tour-planning/tour-approval modules. Excludes apps/web and non-core modules.",
+    "architecture": "Core qualification scope only: apps/api/src plus identity/tenant/organization/rbac/masters/tour-planning/tour-approval modules. Excludes apps/web and non-core modules.",
+    "dead_code": "Knip runs separate core and apps/web analyses.",
+    "duplication": "Core qualification scope only: apps/api/src plus identity/tenant/organization/rbac/masters/tour-planning/tour-approval modules. Excludes apps/web and non-core modules.",
+    "module_regression": "Foundation, mobile, and database-migrations jobs together provide regression coverage for the currently qualified scope."
   }
 }
