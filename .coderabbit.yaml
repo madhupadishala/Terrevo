@@ -29,6 +29,7 @@ reviews:
     base_branches:
       - "main"
       - "governance/product-operating-system"
+      - "requalify/wave-1-sprints-01-05"
       - "feature/sprint-22-offline-sync"
       - "feature/sprint-23-security-audit"
       - "feature/sprint-24-regression-uat-closure"
