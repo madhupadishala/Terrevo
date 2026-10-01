@@ -23,6 +23,7 @@ if (!fs.existsSync(manifestPath)) {
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 const policy = JSON.parse(fs.readFileSync(policyPath, "utf8"));
 const exemptible = new Set(policy.exemptibleAutomatedChecks || []);
+const nonExemptibleGates = new Set(policy.nonExemptibleGates || []);
 
 if (manifest.schemaVersion !== 1) failures.push("schemaVersion must be 1");
 if (!nonempty(manifest.changeId)) failures.push("changeId is required");
@@ -47,6 +48,7 @@ for (const gate of policy.gates) {
     failures.push(`invalid status for gate ${gate.id}: ${result.status}`);
     continue;
   }
+  if (nonExemptibleGates.has(gate.id) && result.status === "NOT_APPLICABLE") failures.push(`gate ${gate.id} is non-exemptible and cannot be NOT_APPLICABLE`);
   if (!nonempty(result.reviewer)) failures.push(`gate ${gate.id} missing reviewer`);
   if (result.status === "PASS") {
     if (!isRecord(result.evidence)) {
