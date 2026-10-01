@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "policyName": "Terrevo Product Development Operating System",
   "completionRule": "A sprint or change is not COMPLETE until every mandatory gate is PASS or approved NOT_APPLICABLE and all required automated checks pass for the exact qualified commit.",
   "statuses": [
@@ -220,8 +220,12 @@
     "build": [
       "foundation"
     ],
-    "design_verification": [],
-    "browser_verification": [],
+    "design_verification": [
+      "design-verification"
+    ],
+    "browser_verification": [
+      "browser-verification"
+    ],
     "evidence_verification": [
       "quality-security"
     ]
