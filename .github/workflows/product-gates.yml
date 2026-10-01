@@ -78,6 +78,11 @@ jobs:
             fi
           fi
 
+      - name: Verify evidence structure
+        env:
+          MANIFEST: ${{ steps.manifest.outputs.path }}
+        run: node scripts/verify-evidence-structure.mjs "$MANIFEST"
+
       - name: Verify product gates
         env:
           MANIFEST: ${{ steps.manifest.outputs.path }}
@@ -87,9 +92,23 @@ jobs:
         run: npm run test:product-gates
 
       - name: Prevent focused tests
+        shell: bash
         run: |
-          if grep -RInE '\.(only)\s*\(' apps modules test tests 2>/dev/null; then
+          set -euo pipefail
+          search_dirs=(apps modules)
+          for directory in "${search_dirs[@]}"; do
+            test -d "$directory" || {
+              echo "Focused-test search directory is missing: $directory"
+              exit 1
+            }
+          done
+          status=0
+          grep -RInE '\.(only)\s*\(' "${search_dirs[@]}" || status=$?
+          if [ "$status" -eq 0 ]; then
             echo "Focused tests are forbidden"
+            exit 1
+          elif [ "$status" -ne 1 ]; then
+            echo "Focused-test search failed with grep status $status"
             exit 1
           fi
 
