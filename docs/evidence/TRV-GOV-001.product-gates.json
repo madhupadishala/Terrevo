@@ -69,10 +69,12 @@
       "reviewer": "OpenAI GPT-5.6 Sol",
       "evidence": {
         "reuse_review": [],
-        "duplication_review": [],
+        "duplication_review": [
+          "GitHub Actions quality-security job 110417573380 passed jscpd duplication threshold on implementation commit 2f62f286fd02825bda1ffc3b58a78e4d28555663"
+        ],
         "maintainability_review": []
       },
-      "rationale": "Awaiting fresh duplication/maintainability CI evidence."
+      "rationale": "Duplication review is recorded; gate remains BLOCKED until the final independent governance review and evidence closure."
     },
     "product_design": {
       "status": "NOT_APPLICABLE",
