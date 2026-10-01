@@ -56,6 +56,45 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+
+  design-verification:
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.body, 'UI CHANGE: YES')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22"
+      - name: Verify UI design evidence
+        run: |
+          if [ ! -f scripts/verify-ui-design.mjs ]; then
+            echo "UI changes require a real design verification script."
+            exit 1
+          fi
+          node scripts/verify-ui-design.mjs
+
+  browser-verification:
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.body, 'UI CHANGE: YES')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22"
+      - name: Verify UI in a real browser
+        run: |
+          if [ ! -f scripts/verify-ui-browser.mjs ]; then
+            echo "UI changes require a real browser verification script."
+            exit 1
+          fi
+          node scripts/verify-ui-browser.mjs
+
   mobile:
     runs-on: ubuntu-latest
     defaults:
