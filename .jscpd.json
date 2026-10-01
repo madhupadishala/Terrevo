@@ -1,0 +1,16 @@
+{
+  "threshold": 8,
+  "reporters": ["console"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/*.test.ts",
+    "database/**",
+    "docs/**"
+  ],
+  "format": ["typescript", "tsx", "javascript"],
+  "minLines": 8,
+  "minTokens": 60
+}
