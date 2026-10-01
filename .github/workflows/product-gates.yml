@@ -211,16 +211,62 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          manifest_sha="$(node -e 'const fs=require("fs"); console.log(JSON.parse(fs.readFileSync(process.env.MANIFEST,"utf8")).exactCommit || "")')"
           check_file="$RUNNER_TEMP/automated-check-runs.json"
-          curl --fail --silent --show-error             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/$REPOSITORY/commits/$manifest_sha/check-runs?per_page=100"             > "$check_file"
           CHECK_FILE="$check_file" node --input-type=module - <<'NODE'
           import fs from "node:fs";
-          const payload = JSON.parse(fs.readFileSync(process.env.CHECK_FILE,"utf8"));
-          if (!Array.isArray(payload.check_runs) || payload.total_count > payload.check_runs.length) {
-            console.error("Exact-commit check-run result is incomplete");
-            process.exit(1);
+
+          const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST,"utf8"));
+          const policy = JSON.parse(fs.readFileSync("governance/product-gates.json","utf8"));
+          const jobs = [...new Set(
+            Object.entries(manifest.automatedChecks || {})
+              .filter(([,status]) => status === "PASS")
+              .flatMap(([id]) => policy.automatedCheckBindings?.[id] || [])
+          )];
+
+          const allRuns = [];
+          for (const jobName of jobs) {
+            let page = 1;
+            while (true) {
+              const url = new URL(
+                `https://api.github.com/repos/${process.env.REPOSITORY}/commits/${manifest.exactCommit}/check-runs`
+              );
+              url.searchParams.set("check_name", jobName);
+              url.searchParams.set("filter", "all");
+              url.searchParams.set("per_page", "100");
+              url.searchParams.set("page", String(page));
+
+              const response = await fetch(url, {
+                headers: {
+                  Authorization: `Bearer ${process.env.GH_TOKEN}`,
+                  Accept: "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28"
+                }
+              });
+              if (!response.ok) {
+                console.error(`Failed to load check runs for ${jobName}: ${response.status}`);
+                process.exit(1);
+              }
+
+              const payload = await response.json();
+              if (!Array.isArray(payload.check_runs)) {
+                console.error(`Invalid check-run payload for ${jobName}`);
+                process.exit(1);
+              }
+              allRuns.push(...payload.check_runs);
+
+              if (payload.check_runs.length < 100) break;
+              page += 1;
+              if (page > 50) {
+                console.error(`Check-run pagination exceeded safety limit for ${jobName}`);
+                process.exit(1);
+              }
+            }
           }
+
+          fs.writeFileSync(
+            process.env.CHECK_FILE,
+            JSON.stringify({total_count: allRuns.length, check_runs: allRuns})
+          );
           NODE
           echo "AUTOMATED_CHECK_RUNS_FILE=$check_file" >> "$GITHUB_ENV"
 
