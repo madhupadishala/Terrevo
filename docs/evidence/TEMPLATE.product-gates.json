@@ -112,5 +112,27 @@
     "status": "IMPLEMENTED / NOT QUALIFIED",
     "qualifiedBy": "",
     "qualifiedAt": ""
+  },
+  "automatedCheckApplicability": {
+    "integration_tests": {
+      "reviewer": "",
+      "rationale": ""
+    },
+    "relevant_e2e": {
+      "reviewer": "",
+      "rationale": ""
+    },
+    "security": {
+      "reviewer": "",
+      "rationale": ""
+    },
+    "design_verification": {
+      "reviewer": "",
+      "rationale": ""
+    },
+    "browser_verification": {
+      "reviewer": "",
+      "rationale": ""
+    }
   }
 }
