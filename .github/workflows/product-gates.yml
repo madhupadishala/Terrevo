@@ -83,11 +83,17 @@ jobs:
               echo "Qualified commit $manifest_sha is not an ancestor of current head $HEAD_SHA"
               exit 1
             }
-            changed="$(git diff --name-only "$manifest_sha" "$HEAD_SHA")"
-            invalid="$(printf '%s\n' "$changed" | grep -Ev '^(docs/evidence/|docs/qa/)' || true)"
-            if [ -n "$invalid" ]; then
-              echo "Implementation changed after qualified commit $manifest_sha:"
-              printf '%s\n' "$invalid"
+            invalid=0
+            while IFS= read -r -d '' changed_path; do
+              case "$changed_path" in
+                docs/evidence/*|docs/qa/*) ;;
+                *)
+                  echo "Implementation changed after qualified commit $manifest_sha: $changed_path"
+                  invalid=1
+                  ;;
+              esac
+            done < <(git diff --no-renames --name-only -z "$manifest_sha" "$HEAD_SHA")
+            if [ "$invalid" -ne 0 ]; then
               exit 1
             fi
           fi
