@@ -2,6 +2,7 @@ name: Product Gates
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
     inputs:
       manifest:
@@ -12,6 +13,10 @@ on:
 permissions:
   contents: read
   pull-requests: read
+
+concurrency:
+  group: product-gates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   policy:
@@ -36,13 +41,17 @@ jobs:
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             manifest="$DISPATCH_MANIFEST"
           else
-            manifest="$(printf '%s\n' "$PR_BODY" | sed -n 's/^- Evidence manifest: `\([^\`]*\)`.*/\1/p' | head -n1)"
+            manifest="$(printf '%s\n' "$PR_BODY" | sed -n 's/^- Evidence manifest: `\([^`]*\)`.*/\1/p' | head -n1)"
           fi
           test -n "$manifest" || { echo "Evidence manifest path missing from PR body"; exit 1; }
+          case "$manifest" in
+            docs/evidence/*.product-gates.json) ;;
+            *) echo "Evidence manifest must be under docs/evidence and end in .product-gates.json"; exit 1 ;;
+          esac
           test -f "$manifest" || { echo "Evidence manifest does not exist: $manifest"; exit 1; }
           echo "path=$manifest" >> "$GITHUB_OUTPUT"
 
-      - name: Verify exact commit in manifest
+      - name: Verify exact qualified implementation
         shell: bash
         env:
           MANIFEST: ${{ steps.manifest.outputs.path }}
@@ -54,13 +63,27 @@ jobs:
             echo "Evidence manifest references unknown commit: $manifest_sha"
             exit 1
           }
-          git merge-base --is-ancestor "$manifest_sha" "$HEAD_SHA" || {
-            echo "Qualified commit $manifest_sha is not an ancestor of current head $HEAD_SHA"
-            exit 1
-          }
+          if [ "$manifest_sha" != "$HEAD_SHA" ]; then
+            git merge-base --is-ancestor "$manifest_sha" "$HEAD_SHA" || {
+              echo "Qualified commit $manifest_sha is not an ancestor of current head $HEAD_SHA"
+              exit 1
+            }
+            changed="$(git diff --name-only "$manifest_sha" "$HEAD_SHA")"
+            invalid="$(printf '%s\n' "$changed" | grep -Ev '^(docs/evidence/|docs/qa/)' || true)"
+            if [ -n "$invalid" ]; then
+              echo "Implementation changed after qualified commit $manifest_sha:"
+              printf '%s\n' "$invalid"
+              exit 1
+            fi
+          fi
 
       - name: Verify product gates
-        run: node scripts/verify-product-gates.mjs "${{ steps.manifest.outputs.path }}"
+        env:
+          MANIFEST: ${{ steps.manifest.outputs.path }}
+        run: node scripts/verify-product-gates.mjs "$MANIFEST"
+
+      - name: Verify policy fail-closed behavior
+        run: npm run test:product-gates
 
       - name: Prevent focused tests
         run: |
@@ -71,5 +94,5 @@ jobs:
 
       - name: Repository verification
         run: |
-          npm install --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
           npm run verify
