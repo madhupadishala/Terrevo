@@ -40,7 +40,7 @@ jobs:
         run: npm run lint:core
       - name: Architecture and circular dependency checks
         run: npm run check:architecture:core
-      - name: Dead code and dependency hygiene
+      - name: Dead code and dependency hygiene (core + web)
         run: npm run check:dead-code
       - name: Duplication threshold
         run: npm run check:duplication:core
