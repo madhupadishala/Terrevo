@@ -16,6 +16,17 @@ const isRecord = value => value !== null && typeof value === "object" && !Array.
 
 if (!/^[0-9a-f]{40}$/.test(manifest.exactCommit || "")) failures.push("exactCommit must be a full 40-character commit SHA");
 
+const impactKeys = ["ui","database","apiContract","securityTenant","offlineSync","regulatoryDomain"];
+if (!isRecord(manifest.impact)) {
+  failures.push("impact must be an object");
+} else {
+  for (const key of impactKeys) {
+    if (typeof manifest.impact[key] !== "boolean") failures.push(`impact.${key} must be boolean`);
+  }
+}
+
+const nonExemptibleGates = new Set(policy.nonExemptibleGates || []);
+
 for (const gate of policy.gates) {
   const result = manifest.gates?.[gate.id];
   if (!result) {
@@ -23,6 +34,7 @@ for (const gate of policy.gates) {
     continue;
   }
   if (!["PASS", "NOT_APPLICABLE"].includes(result.status)) failures.push(`${gate.id} is ${result.status || "missing"}, not qualified`);
+  if (nonExemptibleGates.has(gate.id) && result.status !== "PASS") failures.push(`${gate.id} is non-exemptible and must be PASS`);
   if (!nonempty(result.reviewer)) failures.push(`${gate.id} missing reviewer`);
   if (result.status === "PASS") {
     if (!isRecord(result.evidence)) {
