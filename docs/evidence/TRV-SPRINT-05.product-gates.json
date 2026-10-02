@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 1,
+  "changeId": "TRV-SPRINT-05",
+  "sprint": "Sprint 5",
+  "requirementIds": [
+    "TRV-APR-001",
+    "TRV-APR-002",
+    "TRV-APR-003",
+    "TRV-APR-004",
+    "TRV-APR-005",
+    "TRV-APR-006",
+    "TRV-APR-007",
+    "TRV-APR-008"
+  ],
+  "exactCommit": "ba7fe7c15d082eb2102c887f480440a07d628889",
+  "owner": "madhupadishala",
+  "reviewers": [
+    "OpenAI GPT-5.6 Sol",
+    "CodeRabbit"
+  ],
+  "impact": {
+    "ui": false,
+    "database": true,
+    "apiContract": true,
+    "securityTenant": true,
+    "offlineSync": false,
+    "regulatoryDomain": false
+  },
+  "artifacts": {
+    "urs": [],
+    "frs": [],
+    "architecture": [
+      "docs/qa/WAVE-1-REQUALIFICATION.md"
+    ],
+    "figma": [],
+    "userGuide": [],
+    "traceability": [
+      "docs/requirements/sprint-05-tour-approval.md"
+    ],
+    "benchmark": [
+      "docs/qa/WAVE-1-REQUALIFICATION.md"
+    ]
+  },
+  "automatedChecks": {
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "unit_tests": "PASS",
+    "integration_tests": "PASS",
+    "relevant_e2e": "NOT_APPLICABLE",
+    "architecture": "PASS",
+    "security": "PASS",
+    "secret_scan": "PASS",
+    "dependency_audit": "PASS",
+    "module_regression": "PASS",
+    "build": "PASS",
+    "design_verification": "NOT_APPLICABLE",
+    "browser_verification": "NOT_APPLICABLE",
+    "evidence_verification": "PASS"
+  },
+  "automatedCheckApplicability": {
+    "relevant_e2e": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "Wave 1 requalification changes backend/API/database qualification only; no user-facing workflow or UI behavior changed. Relevant regression coverage is unit/API plus transactional database boundary testing."
+    },
+    "design_verification": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "No product UI or design-system surface changed in Wave 1 requalification."
+    },
+    "browser_verification": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "No browser-visible behavior changed in Wave 1 requalification; browser verification is therefore not applicable to this evidence-only qualification."
+    }
+  },
+  "impactEvidence": {
+    "database": {
+      "forward_migration": [
+        "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — database-migrations / Apply all forward migrations: success."
+      ],
+      "reverse_migration": [
+        "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — database-migrations / Apply all rollback migrations in reverse: success."
+      ]
+    }
+  },
+  "gates": {
+    "karpathy": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "scope_review": [
+          "docs/qa/WAVE-1-REQUALIFICATION.md"
+        ],
+        "assumptions": [
+          "Wave 1 preserves proven runtime behavior and limits the change to qualification tests, CI wiring and evidence."
+        ],
+        "smallest_correct_change": [
+          "PR #46 contains only requirement-driven qualification additions for Sprints 1–5."
+        ],
+        "verification": [
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992"
+        ]
+      },
+      "rationale": ""
+    },
+    "ponytail": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "reuse_review": [
+          "Existing runtime modules, repositories, services and test harnesses were retained."
+        ],
+        "duplication_review": [
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — quality-security duplication/dead-code checks passed."
+        ],
+        "maintainability_review": [
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — quality-security and foundation jobs passed."
+        ]
+      },
+      "rationale": ""
+    },
+    "product_design": {
+      "status": "NOT_APPLICABLE",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {},
+      "rationale": "Wave 1 requalification introduces no product UI or design-system change."
+    },
+    "architecture": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "boundary_review": [
+          "docs/qa/WAVE-1-REQUALIFICATION.md"
+        ],
+        "dependency_direction": [
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — Architecture and circular dependency checks passed."
+        ],
+        "shared_services_review": [
+          "docs/qa/WAVE-1-REQUALIFICATION.md"
+        ],
+        "vendor_leakage_review": [
+          "docs/qa/WAVE-1-REQUALIFICATION.md"
+        ]
+      },
+      "rationale": ""
+    },
+    "warpath": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "failure_paths": [
+          "apps/api/test/identity-tenant.test.ts",
+          "apps/api/test/tour-approval.test.ts",
+          "database/ci/wave-1-boundary-tests.sql"
+        ],
+        "retry_edge_cases": [
+          "docs/qa/WAVE-1-REQUALIFICATION.md — retry/offline semantics are not introduced by Sprints 1–5; the qualification explicitly covers relevant failure, state and rollback paths."
+        ],
+        "state_abuse": [
+          "apps/api/test/tour-approval.test.ts",
+          "database/ci/wave-1-boundary-tests.sql"
+        ],
+        "rollback": [
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — all rollback migrations applied successfully in reverse."
+        ]
+      },
+      "rationale": ""
+    },
+    "coderabbit": {
+      "status": "PASS",
+      "reviewer": "CodeRabbit",
+      "evidence": {
+        "review_url_or_id": [
+          "https://github.com/madhupadishala/Terrevo/pull/46#pullrequestreview-5384310313"
+        ],
+        "unresolved_material_findings_zero": [
+          "CodeRabbit APPROVED exact implementation commit ba7fe7c15d082eb2102c887f480440a07d628889; authoritative CodeRabbit commit status is success."
+        ]
+      },
+      "rationale": ""
+    },
+    "hacker": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "authorization_abuse": [
+          "apps/api/test/identity-tenant.test.ts",
+          "apps/api/test/tour-approval.test.ts",
+          "database/ci/wave-1-boundary-tests.sql"
+        ],
+        "tenant_escape": [
+          "database/ci/wave-1-boundary-tests.sql"
+        ],
+        "replay_injection": [
+          "docs/qa/WAVE-1-REQUALIFICATION.md — no client-controlled replay/injection bypass was introduced; server authorization, input validation and database privilege boundaries were exercised by the qualifying tests."
+        ],
+        "tamper_workflow_bypass": [
+          "apps/api/test/tour-approval.test.ts",
+          "database/ci/wave-1-boundary-tests.sql"
+        ]
+      },
+      "rationale": ""
+    },
+    "evidence": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "requirements_traceability": [
+          "docs/requirements/sprint-05-tour-approval.md"
+        ],
+        "tests": [
+          "apps/api/test/identity-tenant.test.ts",
+          "apps/api/test/tour-approval.test.ts",
+          "database/ci/wave-1-boundary-tests.sql",
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992"
+        ],
+        "exact_commit": [
+          "ba7fe7c15d082eb2102c887f480440a07d628889"
+        ],
+        "immutable_or_versioned_evidence": [
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992",
+          "https://github.com/madhupadishala/Terrevo/pull/46#pullrequestreview-5384310313"
+        ]
+      },
+      "rationale": ""
+    },
+    "regulatory_knowledge": {
+      "status": "NOT_APPLICABLE",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {},
+      "rationale": "Wave 1 is field-force platform foundation/workflow qualification and does not encode a pharmacovigilance regulatory decision."
+    },
+    "modular_benchmark": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "module_completeness": [
+          "docs/qa/WAVE-1-REQUALIFICATION.md"
+        ],
+        "market_benchmark": [
+          "docs/qa/WAVE-1-REQUALIFICATION.md — Wave 1 is assessed against enterprise SFA tenant, hierarchy, master-data, tour-planning and approval expectations."
+        ],
+        "no_fake_controls": [
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992",
+          "https://github.com/madhupadishala/Terrevo/pull/46#pullrequestreview-5384310313"
+        ],
+        "integration_completeness": [
+          "docs/qa/WAVE-1-REQUALIFICATION.md",
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992"
+        ]
+      },
+      "rationale": ""
+    }
+  },
+  "rollback": {
+    "documented": true,
+    "tested": true,
+    "evidence": [
+      "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — reverse migration sequence completed successfully."
+    ]
+  },
+  "finalQualification": {
+    "status": "COMPLETE",
+    "qualifiedBy": "OpenAI GPT-5.6 Sol + CodeRabbit + GitHub Actions",
+    "qualifiedAt": "2026-10-01T19:25:36Z"
+  }
+}
