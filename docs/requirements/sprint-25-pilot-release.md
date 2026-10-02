@@ -9,7 +9,7 @@
 - TRV-PILOT-006: Pilot rollout shall have documented entry criteria, rollback decision rules, rollback steps, and post-release observation checks.
 - TRV-PILOT-007: Pilot release tooling shall not contain provider secrets or bypass UAT/security gates.
 - TRV-PILOT-008: A failed smoke/UAT/release gate shall stop promotion rather than downgrade or skip validation.
-- TRV-PILOT-009: Automatic Vercel previews shall skip non-runtime commits and deploy only when web/API/runtime/database/build-contract files change; inability to determine change scope shall fail safe by allowing deployment.
+- TRV-PILOT-009: Automatic Vercel Git deployments shall be disabled on the active Sprint 25 feature branch so review/fix commits cannot exhaust the daily deployment quota. `main` remains deployment-enabled as the controlled checkpoint; `ignoreCommand` additionally skips non-runtime builds where automatic deployment is enabled.
 
 ## Scope Lock
 - Responsible area: release packaging, smoke, pilot promotion controls, rollback runbook.
