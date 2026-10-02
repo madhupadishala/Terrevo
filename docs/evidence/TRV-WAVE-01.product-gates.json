@@ -9,7 +9,7 @@
     "TRV-SPRINT-04",
     "TRV-SPRINT-05"
   ],
-  "exactCommit": "1f5e09826b928890924e748def7700d4aada0549",
+  "exactCommit": "a6375e7523240a6c34926ab47496af1093d3146c",
   "owner": "madhupadishala",
   "reviewers": [
     "OpenAI GPT-5.6 Sol",
@@ -75,10 +75,10 @@
   "impactEvidence": {
     "database": {
       "forward_migration": [
-        "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — forward migrations passed."
+        "https://github.com/madhupadishala/Terrevo/actions/runs/37013819215 — forward migrations passed."
       ],
       "reverse_migration": [
-        "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — reverse migrations passed."
+        "https://github.com/madhupadishala/Terrevo/actions/runs/37013819215 — reverse migrations passed."
       ]
     }
   },
@@ -97,7 +97,7 @@
           "PR #46 remains limited to Wave 1 qualification scope."
         ],
         "verification": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862"
+          "https://github.com/madhupadishala/Terrevo/actions/runs/37013819215"
         ]
       },
       "rationale": ""
@@ -110,10 +110,10 @@
           "Existing runtime modules and test harnesses retained."
         ],
         "duplication_review": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — quality-security checks passed."
+          "https://github.com/madhupadishala/Terrevo/actions/runs/37013819215 — quality-security checks passed."
         ],
         "maintainability_review": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — quality-security and foundation checks passed."
+          "https://github.com/madhupadishala/Terrevo/actions/runs/37013819215 — quality-security and foundation checks passed."
         ]
       },
       "rationale": ""
@@ -132,7 +132,7 @@
           "docs/qa/WAVE-1-REQUALIFICATION.md"
         ],
         "dependency_direction": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — architecture and circular-dependency checks passed."
+          "https://github.com/madhupadishala/Terrevo/actions/runs/37013819215 — architecture and circular-dependency checks passed."
         ],
         "shared_services_review": [
           "docs/qa/WAVE-1-REQUALIFICATION.md"
@@ -160,7 +160,7 @@
           "database/ci/wave-1-boundary-tests.sql"
         ],
         "rollback": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — reverse migrations passed."
+          "https://github.com/madhupadishala/Terrevo/actions/runs/37013819215 — reverse migrations passed."
         ]
       },
       "rationale": "Exact-commit CI evidence is recorded, but this gate remains staged BLOCKED until the corrected evidence package receives a clean CodeRabbit review and the final qualification promotion is performed."
@@ -211,13 +211,13 @@
           "apps/api/test/identity-tenant.test.ts",
           "apps/api/test/tour-approval.test.ts",
           "database/ci/wave-1-boundary-tests.sql",
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862"
+          "https://github.com/madhupadishala/Terrevo/actions/runs/37013819215"
         ],
         "exact_commit": [
-          "1f5e09826b928890924e748def7700d4aada0549"
+          "a6375e7523240a6c34926ab47496af1093d3146c"
         ],
         "immutable_or_versioned_evidence": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862",
+          "https://github.com/madhupadishala/Terrevo/actions/runs/37013819215",
           "https://github.com/madhupadishala/Terrevo/pull/46#pullrequestreview-5388705700"
         ]
       },
@@ -240,11 +240,11 @@
           "docs/qa/WAVE-1-REQUALIFICATION.md — enterprise SFA tenant, hierarchy, masters, tour-planning and approval expectations are assessed."
         ],
         "no_fake_controls": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862"
+          "https://github.com/madhupadishala/Terrevo/actions/runs/37013819215"
         ],
         "integration_completeness": [
           "docs/qa/WAVE-1-REQUALIFICATION.md",
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862"
+          "https://github.com/madhupadishala/Terrevo/actions/runs/37013819215"
         ]
       },
       "rationale": ""
@@ -254,7 +254,7 @@
     "documented": true,
     "tested": true,
     "evidence": [
-      "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — rollback migrations passed; evidence-only qualification updates are separately revertible."
+      "https://github.com/madhupadishala/Terrevo/actions/runs/37013819215 — rollback migrations passed; evidence-only qualification updates are separately revertible."
     ]
   },
   "finalQualification": {
