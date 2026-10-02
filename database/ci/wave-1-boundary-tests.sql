@@ -170,6 +170,81 @@ begin
 end
 $$;
 
+
+-- Exercise the same RLS boundary from tenant B's authenticated identity.
+-- This proves isolation in both directions, not only A -> B.
+select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000002',true);
+
+do $
+declare
+  membership_same integer;
+  membership_cross integer;
+  role_same integer;
+  role_cross integer;
+  org_assignment_same integer;
+  org_assignment_cross integer;
+  employee_same integer;
+  employee_cross integer;
+begin
+  select count(*) into membership_same
+    from public.tenant_memberships
+   where tenant_id='20000000-0000-4000-8000-000000000002'
+     and user_id='10000000-0000-4000-8000-000000000002';
+  if membership_same <> 1 then
+    raise exception 'TRV-TENANT-003 failed for tenant B: expected own membership row, got %', membership_same;
+  end if;
+
+  select count(*) into membership_cross
+    from public.tenant_memberships
+   where tenant_id='20000000-0000-4000-8000-000000000001';
+  if membership_cross <> 0 then
+    raise exception 'TRV-TENANT-003 failed for tenant B: tenant A membership row visible';
+  end if;
+
+  select count(*) into role_same
+    from public.user_role_assignments
+   where tenant_id='20000000-0000-4000-8000-000000000002';
+  if role_same <> 1 then
+    raise exception 'TRV-RBAC-004 failed for tenant B: expected own role assignment row, got %', role_same;
+  end if;
+
+  select count(*) into role_cross
+    from public.user_role_assignments
+   where tenant_id='20000000-0000-4000-8000-000000000001';
+  if role_cross <> 0 then
+    raise exception 'TRV-RBAC-004 failed for tenant B: tenant A role assignment visible';
+  end if;
+
+  select count(*) into org_assignment_same
+    from public.user_org_assignments
+   where tenant_id='20000000-0000-4000-8000-000000000002';
+  if org_assignment_same <> 1 then
+    raise exception 'TRV-ORG-004/RBAC-004 failed for tenant B: expected own organization assignment row, got %', org_assignment_same;
+  end if;
+
+  select count(*) into org_assignment_cross
+    from public.user_org_assignments
+   where tenant_id='20000000-0000-4000-8000-000000000001';
+  if org_assignment_cross <> 0 then
+    raise exception 'TRV-ORG-004/RBAC-004 failed for tenant B: tenant A organization assignment visible';
+  end if;
+
+  select count(*) into employee_same
+    from public.employees
+   where tenant_id='20000000-0000-4000-8000-000000000002';
+  if employee_same <> 1 then
+    raise exception 'TRV-MST-006 failed for tenant B: expected own employee row, got %', employee_same;
+  end if;
+
+  select count(*) into employee_cross
+    from public.employees
+   where tenant_id='20000000-0000-4000-8000-000000000001';
+  if employee_cross <> 0 then
+    raise exception 'TRV-MST-006 failed for tenant B: tenant A employee row visible';
+  end if;
+end
+$;
+
 reset role;
 
 -- Sprint 5: owner must never be able to approve own submitted plan.
