@@ -13,7 +13,7 @@
     "TRV-TENANT-003",
     "TRV-TENANT-004"
   ],
-  "exactCommit": "ba7fe7c15d082eb2102c887f480440a07d628889",
+  "exactCommit": "1f5e09826b928890924e748def7700d4aada0549",
   "owner": "madhupadishala",
   "reviewers": [
     "OpenAI GPT-5.6 Sol",
@@ -61,7 +61,7 @@
   "automatedCheckApplicability": {
     "relevant_e2e": {
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "rationale": "Wave 1 requalification changes backend/API/database qualification only; no user-facing workflow or UI behavior changed. Relevant regression coverage is unit/API plus transactional database boundary testing."
+      "rationale": "Wave 1 qualification changes backend/API/database verification only; no user-facing workflow or UI behavior changed. Relevant regression coverage is unit/API plus transactional database boundary testing."
     },
     "design_verification": {
       "reviewer": "OpenAI GPT-5.6 Sol",
@@ -69,16 +69,16 @@
     },
     "browser_verification": {
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "rationale": "No browser-visible behavior changed in Wave 1 requalification; browser verification is therefore not applicable to this evidence-only qualification."
+      "rationale": "No browser-visible behavior changed in Wave 1 requalification."
     }
   },
   "impactEvidence": {
     "database": {
       "forward_migration": [
-        "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — database-migrations / Apply all forward migrations: success."
+        "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — forward migrations passed."
       ],
       "reverse_migration": [
-        "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — database-migrations / Apply all rollback migrations in reverse: success."
+        "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — reverse migrations passed."
       ]
     }
   },
@@ -91,13 +91,13 @@
           "docs/qa/WAVE-1-REQUALIFICATION.md"
         ],
         "assumptions": [
-          "Wave 1 preserves proven runtime behavior and limits the change to qualification tests, CI wiring and evidence."
+          "Runtime behavior is preserved; qualification changes are limited to tests, CI and evidence."
         ],
         "smallest_correct_change": [
-          "PR #46 contains only requirement-driven qualification additions for Sprints 1–5."
+          "PR #46 remains limited to Wave 1 qualification scope."
         ],
         "verification": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992"
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862"
         ]
       },
       "rationale": ""
@@ -107,13 +107,13 @@
       "reviewer": "OpenAI GPT-5.6 Sol",
       "evidence": {
         "reuse_review": [
-          "Existing runtime modules, repositories, services and test harnesses were retained."
+          "Existing runtime modules and test harnesses retained."
         ],
         "duplication_review": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — quality-security duplication/dead-code checks passed."
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — quality-security checks passed."
         ],
         "maintainability_review": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — quality-security and foundation jobs passed."
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — quality-security and foundation checks passed."
         ]
       },
       "rationale": ""
@@ -122,7 +122,7 @@
       "status": "NOT_APPLICABLE",
       "reviewer": "OpenAI GPT-5.6 Sol",
       "evidence": {},
-      "rationale": "Wave 1 requalification introduces no product UI or design-system change."
+      "rationale": "No product UI or design-system surface changed."
     },
     "architecture": {
       "status": "PASS",
@@ -132,7 +132,7 @@
           "docs/qa/WAVE-1-REQUALIFICATION.md"
         ],
         "dependency_direction": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — Architecture and circular dependency checks passed."
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — architecture and circular-dependency checks passed."
         ],
         "shared_services_review": [
           "docs/qa/WAVE-1-REQUALIFICATION.md"
@@ -153,30 +153,30 @@
           "database/ci/wave-1-boundary-tests.sql"
         ],
         "retry_edge_cases": [
-          "docs/qa/WAVE-1-REQUALIFICATION.md — retry/offline semantics are not introduced by Sprints 1–5; the qualification explicitly covers relevant failure, state and rollback paths."
+          "docs/qa/WAVE-1-REQUALIFICATION.md — no retry/offline write protocol is introduced in Sprints 1–5; applicable failure/state paths are covered."
         ],
         "state_abuse": [
           "apps/api/test/tour-approval.test.ts",
           "database/ci/wave-1-boundary-tests.sql"
         ],
         "rollback": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — all rollback migrations applied successfully in reverse."
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — reverse migrations passed."
         ]
       },
       "rationale": ""
     },
     "coderabbit": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "reviewer": "CodeRabbit",
       "evidence": {
         "review_url_or_id": [
-          "https://github.com/madhupadishala/Terrevo/pull/46#pullrequestreview-5384310313"
+          "https://github.com/madhupadishala/Terrevo/pull/46#pullrequestreview-5388705700"
         ],
         "unresolved_material_findings_zero": [
-          "CodeRabbit APPROVED exact implementation commit ba7fe7c15d082eb2102c887f480440a07d628889; authoritative CodeRabbit commit status is success."
+          "Not yet satisfied for the corrected evidence head."
         ]
       },
-      "rationale": ""
+      "rationale": "Current exact commit review requested evidence corrections; clean approval is required before qualification."
     },
     "hacker": {
       "status": "PASS",
@@ -191,7 +191,7 @@
           "database/ci/wave-1-boundary-tests.sql"
         ],
         "replay_injection": [
-          "docs/qa/WAVE-1-REQUALIFICATION.md — no client-controlled replay/injection bypass was introduced; server authorization, input validation and database privilege boundaries were exercised by the qualifying tests."
+          "docs/qa/WAVE-1-REQUALIFICATION.md — server authorization/input validation and database privilege boundaries are the applicable abuse controls for Wave 1."
         ],
         "tamper_workflow_bypass": [
           "apps/api/test/tour-approval.test.ts",
@@ -201,7 +201,7 @@
       "rationale": ""
     },
     "evidence": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "reviewer": "OpenAI GPT-5.6 Sol",
       "evidence": {
         "requirements_traceability": [
@@ -211,23 +211,23 @@
           "apps/api/test/identity-tenant.test.ts",
           "apps/api/test/tour-approval.test.ts",
           "database/ci/wave-1-boundary-tests.sql",
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992"
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862"
         ],
         "exact_commit": [
-          "ba7fe7c15d082eb2102c887f480440a07d628889"
+          "1f5e09826b928890924e748def7700d4aada0549"
         ],
         "immutable_or_versioned_evidence": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992",
-          "https://github.com/madhupadishala/Terrevo/pull/46#pullrequestreview-5384310313"
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862",
+          "https://github.com/madhupadishala/Terrevo/pull/46#pullrequestreview-5388705700"
         ]
       },
-      "rationale": ""
+      "rationale": "Clean CodeRabbit approval and final Product Gates verification are pending."
     },
     "regulatory_knowledge": {
       "status": "NOT_APPLICABLE",
       "reviewer": "OpenAI GPT-5.6 Sol",
       "evidence": {},
-      "rationale": "Wave 1 is field-force platform foundation/workflow qualification and does not encode a pharmacovigilance regulatory decision."
+      "rationale": "Wave 1 field-force platform functionality does not encode a pharmacovigilance regulatory decision."
     },
     "modular_benchmark": {
       "status": "PASS",
@@ -237,15 +237,14 @@
           "docs/qa/WAVE-1-REQUALIFICATION.md"
         ],
         "market_benchmark": [
-          "docs/qa/WAVE-1-REQUALIFICATION.md — Wave 1 is assessed against enterprise SFA tenant, hierarchy, master-data, tour-planning and approval expectations."
+          "docs/qa/WAVE-1-REQUALIFICATION.md — enterprise SFA tenant, hierarchy, masters, tour-planning and approval expectations are assessed."
         ],
         "no_fake_controls": [
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992",
-          "https://github.com/madhupadishala/Terrevo/pull/46#pullrequestreview-5384310313"
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862"
         ],
         "integration_completeness": [
           "docs/qa/WAVE-1-REQUALIFICATION.md",
-          "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992"
+          "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862"
         ]
       },
       "rationale": ""
@@ -255,12 +254,12 @@
     "documented": true,
     "tested": true,
     "evidence": [
-      "https://github.com/madhupadishala/Terrevo/actions/runs/36911252992 — reverse migration sequence completed successfully."
+      "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — rollback migrations passed."
     ]
   },
   "finalQualification": {
-    "status": "COMPLETE",
-    "qualifiedBy": "OpenAI GPT-5.6 Sol + CodeRabbit + GitHub Actions",
-    "qualifiedAt": "2026-10-01T19:25:36Z"
+    "status": "IMPLEMENTED / NOT QUALIFIED",
+    "qualifiedBy": "",
+    "qualifiedAt": ""
   }
 }
