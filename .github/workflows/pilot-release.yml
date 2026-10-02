@@ -29,8 +29,10 @@ jobs:
       RELEASE_ID: ${{ inputs.release_id }}
       SOURCE_COMMIT: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "22"
       - run: npm install --ignore-scripts --no-audit --no-fund
@@ -48,17 +50,26 @@ jobs:
         run: npm run release:manifest
       - name: Smoke supplied pilot deployment
         run: npm run smoke:pilot
+      - name: Validate and stage pilot artifacts
+        run: |
+          set -euo pipefail
+          test -f release-manifest.json
+          test -d apps/web/dist
+          test -d .vercel-api
+          test -d apps/mobile/dist
+          rm -rf pilot-artifacts
+          mkdir -p pilot-artifacts
+          cp release-manifest.json pilot-artifacts/
+          cp -R apps/web/dist pilot-artifacts/web
+          cp -R .vercel-api pilot-artifacts/api
+          cp -R apps/mobile/dist pilot-artifacts/mobile
       - name: Retain pilot artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65e75b540449e92b4886f43607fa02
         with:
           name: ${{ inputs.release_id }}
           if-no-files-found: error
           retention-days: 30
-          path: |
-            release-manifest.json
-            apps/web/dist
-            .vercel-api
-            apps/mobile/dist
+          path: pilot-artifacts
 
   invalid-confirmation:
     if: ${{ inputs.confirm != 'PILOT' }}
