@@ -2,10 +2,24 @@ import fs from "node:fs";
 import path from "node:path";
 
 const checkId = process.argv[2];
+const outputKey = process.argv[3] || "";
 if (!["design_verification","browser_verification"].includes(checkId)) {
-  console.error("Usage: node scripts/resolve-check-applicability.mjs <design_verification|browser_verification>");
+  console.error("Usage: node scripts/resolve-check-applicability.mjs <design_verification|browser_verification> [output-key]");
   process.exit(1);
 }
+if (outputKey && !/^[A-Za-z_][A-Za-z0-9_-]*$/.test(outputKey)) {
+  console.error("Invalid output key");
+  process.exit(1);
+}
+
+const emit = required => {
+  if (!process.env.GITHUB_OUTPUT) return;
+  if (outputKey) {
+    fs.appendFileSync(process.env.GITHUB_OUTPUT,`${outputKey}=${required ? "run" : "skip"}\n`);
+  } else {
+    fs.appendFileSync(process.env.GITHUB_OUTPUT,`required=${required ? "true" : "false"}\n`);
+  }
+};
 
 const nonempty = value => typeof value === "string" && value.trim().length > 0;
 const prBody = process.env.PR_BODY || "";
@@ -44,7 +58,7 @@ if (status === "PASS") {
     console.error(`${checkId} PASS requires impact.ui=true`);
     process.exit(1);
   }
-  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,"required=true\n");
+  emit(true);
   console.log(`${checkId}: REQUIRED`);
   process.exit(0);
 }
@@ -59,7 +73,7 @@ if (status === "NOT_APPLICABLE") {
     console.error(`${checkId} cannot be NOT_APPLICABLE when impact.ui=true`);
     process.exit(1);
   }
-  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,"required=false\n");
+  emit(false);
   console.log(`${checkId}: REVIEWED NOT_APPLICABLE — ${applicability.reviewer}: ${applicability.rationale}`);
   process.exit(0);
 }
