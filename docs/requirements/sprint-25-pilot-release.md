@@ -9,10 +9,11 @@
 - TRV-PILOT-006: Pilot rollout shall have documented entry criteria, rollback decision rules, rollback steps, and post-release observation checks.
 - TRV-PILOT-007: Pilot release tooling shall not contain provider secrets or bypass UAT/security gates.
 - TRV-PILOT-008: A failed smoke/UAT/release gate shall stop promotion rather than downgrade or skip validation.
+- TRV-PILOT-009: Automatic Vercel previews shall skip non-runtime commits and deploy only when web/API/runtime/database/build-contract files change; inability to determine change scope shall fail safe by allowing deployment.
 
 ## Scope Lock
 - Responsible area: release packaging, smoke, pilot promotion controls, rollback runbook.
-- Allowed paths: `docs/requirements/sprint-25-pilot-release.md`, `docs/deployment/PILOT-RELEASE.md`, `scripts/verify-uat-closure.mjs`, `scripts/create-release-manifest.mjs`, `scripts/smoke-pilot.mjs`, `.github/workflows/pilot-release.yml`, version metadata, `docs/SPRINT-STATUS.md`.
+- Allowed paths: `docs/requirements/sprint-25-pilot-release.md`, `docs/deployment/PILOT-RELEASE.md`, `scripts/verify-uat-closure.mjs`, `scripts/create-release-manifest.mjs`, `scripts/smoke-pilot.mjs`, `scripts/vercel-ignore-build.mjs`, `.github/workflows/pilot-release.yml`, `vercel.json`, version metadata, `docs/SPRINT-STATUS.md`.
 - Forbidden paths: domain behavior, database business schema, RBAC semantics, GPS logic, analytics formulas, sync queue behavior.
 - UI CHANGE: NO
 - DATABASE CHANGE: NO
