@@ -44,6 +44,52 @@ for (const file of [
   "docs/qa/REGRESSION-MATRIX.md",
 ]) await requirePath(file);
 
+const parseMarkdownRow = (line) =>
+  line
+    .trim()
+    .slice(1, -1)
+    .split("|")
+    .map((value) => value.trim());
+
+const uatSource = await readFile("docs/qa/UAT-CLOSURE.md", "utf8");
+for (const line of uatSource.split(/\r?\n/)) {
+  if (!/^\|\s*UAT-\d{2}\s*\|/.test(line)) continue;
+  const [id, scenario, expected, status, tester, timestamp, build, evidence] =
+    parseMarkdownRow(line);
+
+  if (!["NOT RUN", "PASS", "FAIL"].includes(status)) {
+    failures.push(`invalid UAT status for ${id}: ${status}`);
+    continue;
+  }
+
+  if (!scenario || !expected) {
+    failures.push(`incomplete UAT definition for ${id}`);
+  }
+
+  if (status === "PASS") {
+    if (!tester) failures.push(`PASS UAT row missing tester: ${id}`);
+    if (!timestamp) failures.push(`PASS UAT row missing UTC date/time: ${id}`);
+    if (!build) failures.push(`PASS UAT row missing build/commit: ${id}`);
+    if (!evidence) failures.push(`PASS UAT row missing evidence: ${id}`);
+  }
+}
+
+const regressionSource = await readFile("docs/qa/REGRESSION-MATRIX.md", "utf8");
+for (const line of regressionSource.split(/\r?\n/)) {
+  if (!line.startsWith("|")) continue;
+  const [capability, automatedEvidence, manualUat] = parseMarkdownRow(line);
+  if (
+    !capability ||
+    capability === "Capability" ||
+    /^-+$/.test(capability.replace(/\s+/g, ""))
+  ) {
+    continue;
+  }
+  if (!automatedEvidence && !manualUat) {
+    failures.push(`regression matrix row has no evidence reference: ${capability}`);
+  }
+}
+
 const migrationDir = "database/migrations";
 const migrations = (await readdir(migrationDir)).filter((name) => name.endsWith(".sql"));
 const forwards = migrations.filter((name) => !name.endsWith(".down.sql"));
@@ -64,7 +110,15 @@ for (const script of ["typecheck", "test", "bundle:android"]) {
 
 for (const testDir of ["apps/api/test", "apps/mobile/test"]) {
   let entries = [];
-  try { entries = await readdir(testDir); } catch { continue; }
+  try {
+    entries = await readdir(testDir);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      failures.push(`missing required test directory: ${testDir}`);
+      continue;
+    }
+    throw error;
+  }
   for (const entry of entries.filter((name) => /\.test\.(ts|tsx|js|mjs)$/.test(name))) {
     const file = path.join(testDir, entry);
     const source = await readFile(file, "utf8");
