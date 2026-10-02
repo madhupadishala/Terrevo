@@ -70,11 +70,11 @@
       "evidence": {
         "reuse_review": [],
         "duplication_review": [
-          "GitHub Actions quality-security job 110417573380 passed jscpd duplication threshold on implementation commit 4410d8612c92e173fc70a54afc3d5f60211f1ecc"
+          "GitHub Actions quality-security job 110653534699 passed jscpd duplication threshold on implementation commit 4410d8612c92e173fc70a54afc3d5f60211f1ecc"
         ],
         "maintainability_review": []
       },
-      "rationale": "Duplication review is recorded; gate remains BLOCKED until the final independent governance review and evidence closure."
+      "rationale": "Duplication review is recorded on the final implementation commit; gate remains BLOCKED until the trusted CodeRabbit review and final evidence closure."
     },
     "product_design": {
       "status": "NOT_APPLICABLE",
@@ -117,7 +117,7 @@
         "review_url_or_id": [],
         "unresolved_material_findings_zero": []
       },
-      "rationale": "Awaiting trusted clean CodeRabbit approval on the evidence-only prequalification head."
+      "rationale": "Awaiting trusted clean CodeRabbit approval for final implementation commit 4410d8612c92e173fc70a54afc3d5f60211f1ecc."
     },
     "hacker": {
       "status": "BLOCKED",
