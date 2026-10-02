@@ -61,7 +61,16 @@ async function pagedRest(pathname) {
   process.exit(1);
 }
 
+function commitExists(commit) {
+  const result = spawnSync("git", ["cat-file", "-e", `${commit}^{commit}`], {
+    stdio: "ignore"
+  });
+  return result.status === 0;
+}
+
 function isAncestor(ancestor, descendant) {
+  if (!commitExists(ancestor) || !commitExists(descendant)) return false;
+
   const result = spawnSync("git", ["merge-base", "--is-ancestor", ancestor, descendant], {
     stdio: "ignore"
   });
