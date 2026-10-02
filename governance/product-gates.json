@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 7,
   "policyName": "Terrevo Product Development Operating System",
   "completionRule": "A sprint or change is not COMPLETE until every mandatory gate is PASS or approved NOT_APPLICABLE and all required automated checks pass for the exact qualified commit.",
   "statuses": [
@@ -175,5 +175,59 @@
   },
   "nonExemptibleGates": [
     "coderabbit"
-  ]
+  ],
+  "trustedProducers": {
+    "githubActions": {
+      "appId": 15368,
+      "slug": "github-actions"
+    },
+    "codeRabbit": {
+      "login": "coderabbitai[bot]",
+      "id": 136622811
+    }
+  },
+  "automatedCheckBindings": {
+    "typecheck": [
+      "foundation"
+    ],
+    "lint": [
+      "quality-security"
+    ],
+    "unit_tests": [
+      "foundation"
+    ],
+    "integration_tests": [
+      "database-migrations"
+    ],
+    "relevant_e2e": [],
+    "architecture": [
+      "quality-security"
+    ],
+    "security": [
+      "quality-security"
+    ],
+    "secret_scan": [
+      "secret-scan"
+    ],
+    "dependency_audit": [
+      "quality-security"
+    ],
+    "module_regression": [
+      "foundation",
+      "mobile",
+      "database-migrations"
+    ],
+    "build": [
+      "foundation"
+    ],
+    "design_verification": [
+      "design-verification"
+    ],
+    "browser_verification": [
+      "browser-verification"
+    ],
+    "evidence_verification": [
+      "quality-security"
+    ]
+  }
 }

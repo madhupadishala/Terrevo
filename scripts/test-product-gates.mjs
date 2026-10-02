@@ -5,8 +5,24 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const policy = JSON.parse(fs.readFileSync("governance/product-gates.json", "utf8"));
-
 const gateEvidence = gate => Object.fromEntries(gate.evidence.map(item => [item, [`test:${item}`]]));
+const boundJobs = [...new Set(Object.values(policy.automatedCheckBindings || {}).flat())];
+
+assert.deepEqual(
+  policy.automatedCheckBindings?.design_verification,
+  ["design-verification"],
+  "design_verification must bind to the trusted design-verification GitHub Actions job"
+);
+assert.deepEqual(
+  policy.automatedCheckBindings?.browser_verification,
+  ["browser-verification"],
+  "browser_verification must bind to the trusted browser-verification GitHub Actions job"
+);
+assert.equal(
+  policy.trustedProducers?.githubActions?.slug,
+  "github-actions",
+  "automated check bindings must rely on the trusted GitHub Actions producer"
+);
 
 const base = {
   schemaVersion: 1,
@@ -31,8 +47,17 @@ const base = {
     }
   },
   artifacts: {},
-  automatedChecks: Object.fromEntries(policy.automatedChecks.map(id => [id, "PASS"])),
-  automatedCheckApplicability: {},
+  automatedChecks: Object.fromEntries(
+    policy.automatedChecks.map(id => [
+      id,
+      (policy.automatedCheckBindings?.[id] || []).length ? "PASS" : "NOT_APPLICABLE"
+    ])
+  ),
+  automatedCheckApplicability: Object.fromEntries(
+    policy.automatedChecks
+      .filter(id => !(policy.automatedCheckBindings?.[id] || []).length)
+      .map(id => [id,{reviewer:"test",rationale:"No applicable automated surface in verifier fixture."}])
+  ),
   gates: Object.fromEntries(policy.gates.map(g => [
     g.id,
     {status:"PASS", reviewer:"test", evidence:gateEvidence(g), rationale:""}
@@ -41,6 +66,21 @@ const base = {
   finalQualification: {status:"COMPLETE", qualifiedBy:"test", qualifiedAt:"2026-10-01T00:00:00Z"}
 };
 
+const buildRuns = sha => ({
+  total_count: boundJobs.length,
+  check_runs: boundJobs.map((name,index) => ({
+    id:index+1,
+    name,
+    head_sha:sha,
+    status:"completed",
+    conclusion:"success",
+    app:{
+      id:policy.trustedProducers.githubActions.appId,
+      slug:policy.trustedProducers.githubActions.slug
+    }
+  }))
+});
+
 const writeManifest = manifest => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "terrevo-gates-"));
   const file = path.join(dir, "manifest.json");
@@ -48,13 +88,20 @@ const writeManifest = manifest => {
   return file;
 };
 
-const runFinal = (manifest, coderabbitVerified = true) =>
+const runFinal = (
+  manifest,
+  {coderabbitVerified=true, runs=buildRuns(manifest.exactCommit)}={}
+) =>
   spawnSync(
     process.execPath,
     ["scripts/verify-product-gates.mjs", writeManifest(manifest)],
     {
       encoding:"utf8",
-      env:{...process.env, CODERABBIT_STATUS_VERIFIED: coderabbitVerified ? "true" : "false"}
+      env:{
+        ...process.env,
+        CODERABBIT_REVIEW_VERIFIED: coderabbitVerified ? "true" : "false",
+        AUTOMATED_CHECK_RUNS_JSON: JSON.stringify(runs)
+      }
     }
   );
 
@@ -62,13 +109,12 @@ const runStructure = manifest =>
   spawnSync(process.execPath, ["scripts/verify-evidence-structure.mjs", writeManifest(manifest)], {encoding:"utf8"});
 
 assert.equal(runFinal(structuredClone(base)).status, 0, "valid manifest should pass final verifier");
-assert.notEqual(
-  runFinal(structuredClone(base), false).status,
-  0,
-  "CodeRabbit PASS must fail without authoritative status verification"
-);
 assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest should pass structure verifier");
 
+{
+  const m=structuredClone(base);
+  assert.notEqual(runFinal(m,{coderabbitVerified:false}).status,0,"trusted CodeRabbit review must be required");
+}
 {
   const m=structuredClone(base);
   m.exactCommit="not-a-sha";
@@ -92,6 +138,12 @@ assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest shou
 }
 {
   const m=structuredClone(base);
+  m.gates.coderabbit.status="NOT_APPLICABLE";
+  m.gates.coderabbit.rationale="incorrect exemption";
+  assert.notEqual(runFinal(m).status,0,"CodeRabbit gate is non-exemptible");
+}
+{
+  const m=structuredClone(base);
   m.finalQualification.qualifiedBy="";
   assert.notEqual(runFinal(m).status,0,"missing qualifiedBy must fail");
 }
@@ -112,21 +164,20 @@ assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest shou
 }
 {
   const m=structuredClone(base);
-  m.automatedChecks.relevant_e2e="NOT_APPLICABLE";
-  assert.notEqual(runFinal(m).status,0,"exemptible check requires reviewed applicability");
-  m.automatedCheckApplicability.relevant_e2e={reviewer:"test",rationale:"No E2E surface changed."};
-  assert.equal(runFinal(m).status,0,"reviewed exemptible check should pass");
+  delete m.impact.offlineSync;
+  assert.notEqual(runFinal(m).status,0,"missing impact field must fail");
+}
+{
+  const m=structuredClone(base);
+  m.impact.ui="false";
+  assert.notEqual(runFinal(m).status,0,"non-boolean impact field must fail");
 }
 {
   const m=structuredClone(base);
   m.impact.ui=true;
   m.gates.product_design.status="NOT_APPLICABLE";
   m.gates.product_design.rationale="incorrect exemption";
-  m.automatedChecks.design_verification="NOT_APPLICABLE";
-  m.automatedChecks.browser_verification="NOT_APPLICABLE";
-  m.automatedCheckApplicability.design_verification={reviewer:"test",rationale:"incorrect"};
-  m.automatedCheckApplicability.browser_verification={reviewer:"test",rationale:"incorrect"};
-  assert.notEqual(runFinal(m).status,0,"UI impact cannot exempt design/browser qualification");
+  assert.notEqual(runFinal(m).status,0,"UI impact cannot exempt Product Design Guardian");
 }
 {
   const m=structuredClone(base);
@@ -143,6 +194,30 @@ assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest shou
 }
 {
   const m=structuredClone(base);
+  const runs=buildRuns(m.exactCommit);
+  runs.check_runs=runs.check_runs.filter(r=>r.name!=="foundation");
+  assert.notEqual(runFinal(m,{runs}).status,0,"missing trusted job must fail automated PASS");
+}
+{
+  const m=structuredClone(base);
+  const runs=buildRuns(m.exactCommit);
+  runs.check_runs[0].head_sha="b".repeat(40);
+  assert.notEqual(runFinal(m,{runs}).status,0,"check run from wrong SHA must fail");
+}
+{
+  const m=structuredClone(base);
+  const runs=buildRuns(m.exactCommit);
+  runs.check_runs[0].conclusion="failure";
+  assert.notEqual(runFinal(m,{runs}).status,0,"failed check run must fail");
+}
+{
+  const m=structuredClone(base);
+  const runs=buildRuns(m.exactCommit);
+  runs.check_runs[0].app.id=999;
+  assert.notEqual(runFinal(m,{runs}).status,0,"untrusted GitHub App must fail");
+}
+{
+  const m=structuredClone(base);
   m.artifacts={architecture:"missing.md"};
   assert.notEqual(runStructure(m).status,0,"artifact group must be array");
 }
@@ -155,27 +230,6 @@ assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest shou
   const m=structuredClone(base);
   m.artifacts={architecture:["../outside.md"]};
   assert.notEqual(runStructure(m).status,0,"artifact path traversal must fail");
-}
-
-{
-  const m=structuredClone(base);
-  delete m.impact.offlineSync;
-  assert.notEqual(runFinal(m).status,0,"missing impact field must fail");
-}
-{
-  const m=structuredClone(base);
-  m.impact.ui="false";
-  assert.notEqual(runFinal(m).status,0,"non-boolean impact field must fail");
-}
-{
-  const m=structuredClone(base);
-  m.gates.coderabbit.status="NOT_APPLICABLE";
-  m.gates.coderabbit.rationale="incorrect exemption";
-  assert.notEqual(runFinal(m).status,0,"CodeRabbit gate is non-exemptible");
-}
-{
-  const m=structuredClone(base);
-  assert.notEqual(runFinal(m, false).status,0,"authoritative CodeRabbit status must be required");
 }
 
 console.log("PRODUCT GATE VERIFIER TESTS: PASS");

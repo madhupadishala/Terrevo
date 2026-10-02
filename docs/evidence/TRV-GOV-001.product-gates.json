@@ -5,11 +5,11 @@
   "requirementIds": [
     "TRV-GOV-001"
   ],
-  "exactCommit": "2f62f286fd02825bda1ffc3b58a78e4d28555663",
+  "exactCommit": "4410d8612c92e173fc70a54afc3d5f60211f1ecc",
   "owner": "madhupadishala",
   "reviewers": [
     "OpenAI GPT-5.6 Sol",
-    "CodeRabbit pending"
+    "CodeRabbit pending final qualification"
   ],
   "impact": {
     "ui": false,
@@ -70,11 +70,11 @@
       "evidence": {
         "reuse_review": [],
         "duplication_review": [
-          "GitHub Actions quality-security job 110417573380 passed jscpd duplication threshold on implementation commit 2f62f286fd02825bda1ffc3b58a78e4d28555663"
+          "GitHub Actions quality-security job 110653534699 passed jscpd duplication threshold on implementation commit 4410d8612c92e173fc70a54afc3d5f60211f1ecc"
         ],
         "maintainability_review": []
       },
-      "rationale": "Duplication review is recorded; gate remains BLOCKED until the final independent governance review and evidence closure."
+      "rationale": "Duplication review is recorded on the final implementation commit; gate remains BLOCKED until the trusted CodeRabbit review and final evidence closure."
     },
     "product_design": {
       "status": "NOT_APPLICABLE",
@@ -117,7 +117,7 @@
         "review_url_or_id": [],
         "unresolved_material_findings_zero": []
       },
-      "rationale": "Awaiting fresh independent review on the hardened governance head."
+      "rationale": "Implementation is frozen at the exact qualified candidate; awaiting trusted clean CodeRabbit approval on the evidence-only qualification path."
     },
     "hacker": {
       "status": "BLOCKED",
@@ -198,5 +198,12 @@
       "forward_migration": [],
       "reverse_migration": []
     }
+  },
+  "automatedCheckScopes": {
+    "lint": "Core qualification scope only: apps/api/src, Wave 1 API tests, and identity/tenant/organization/rbac/masters/tour-planning/tour-approval modules. Excludes apps/web and non-core modules.",
+    "architecture": "Core qualification scope only: apps/api/src plus identity/tenant/organization/rbac/masters/tour-planning/tour-approval modules. Excludes apps/web and non-core modules.",
+    "dead_code": "Knip runs separate core and apps/web analyses.",
+    "duplication": "Core qualification scope only: apps/api/src plus identity/tenant/organization/rbac/masters/tour-planning/tour-approval modules. Excludes apps/web and non-core modules.",
+    "module_regression": "Foundation, mobile, and database-migrations jobs together provide regression coverage for the currently qualified scope."
   }
 }
