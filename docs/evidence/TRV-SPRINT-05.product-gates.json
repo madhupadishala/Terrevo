@@ -143,7 +143,7 @@
       "rationale": ""
     },
     "warpath": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "reviewer": "OpenAI GPT-5.6 Sol",
       "evidence": {
         "failure_paths": [
@@ -162,7 +162,7 @@
           "https://github.com/madhupadishala/Terrevo/actions/runs/36970795862 — reverse migrations passed."
         ]
       },
-      "rationale": ""
+      "rationale": "Exact-commit CI evidence is recorded, but this gate remains staged BLOCKED until the corrected evidence package receives a clean CodeRabbit review and the final qualification promotion is performed."
     },
     "coderabbit": {
       "status": "BLOCKED",
@@ -178,7 +178,7 @@
       "rationale": "Current exact commit review requested evidence corrections; clean approval is required before qualification."
     },
     "hacker": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "reviewer": "OpenAI GPT-5.6 Sol",
       "evidence": {
         "authorization_abuse": [
@@ -197,7 +197,7 @@
           "database/ci/wave-1-boundary-tests.sql"
         ]
       },
-      "rationale": ""
+      "rationale": "Exact-commit CI evidence is recorded, but this gate remains staged BLOCKED until the corrected evidence package receives a clean CodeRabbit review and the final qualification promotion is performed."
     },
     "evidence": {
       "status": "BLOCKED",
