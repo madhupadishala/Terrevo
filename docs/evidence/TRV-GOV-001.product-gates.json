@@ -5,7 +5,7 @@
   "requirementIds": [
     "TRV-GOV-001"
   ],
-  "exactCommit": "2f62f286fd02825bda1ffc3b58a78e4d28555663",
+  "exactCommit": "28c82ce771d31a08586232c6341fb01eacb8e842",
   "owner": "madhupadishala",
   "reviewers": [
     "OpenAI GPT-5.6 Sol",
@@ -70,7 +70,7 @@
       "evidence": {
         "reuse_review": [],
         "duplication_review": [
-          "GitHub Actions quality-security job 110417573380 passed jscpd duplication threshold on implementation commit 2f62f286fd02825bda1ffc3b58a78e4d28555663"
+          "GitHub Actions quality-security job 110417573380 passed jscpd duplication threshold on implementation commit 28c82ce771d31a08586232c6341fb01eacb8e842"
         ],
         "maintainability_review": []
       },
@@ -117,7 +117,7 @@
         "review_url_or_id": [],
         "unresolved_material_findings_zero": []
       },
-      "rationale": "Awaiting fresh independent review on the hardened governance head."
+      "rationale": "Awaiting trusted clean CodeRabbit approval on the evidence-only qualification head."
     },
     "hacker": {
       "status": "BLOCKED",
