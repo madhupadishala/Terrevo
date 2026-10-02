@@ -38,9 +38,38 @@ drop function if exists public.capture_security_audit_event();
 
 do $audit$
 begin
-  if to_regclass('public.security_audit_events') is not null
-     and to_regclass('public.security_audit_events_archived_0023') is null then
-    alter table public.security_audit_events rename to security_audit_events_archived_0023;
+  if to_regclass('public.security_audit_events') is not null then
+    if to_regclass('public.security_audit_events_archived_0023') is null then
+      alter table public.security_audit_events rename to security_audit_events_archived_0023;
+    else
+      insert into public.security_audit_events_archived_0023 (
+        id,
+        tenant_id,
+        actor_user_id,
+        table_name,
+        record_id,
+        operation,
+        occurred_at,
+        row_before,
+        row_after,
+        transaction_id
+      )
+      select
+        id,
+        tenant_id,
+        actor_user_id,
+        table_name,
+        record_id,
+        operation,
+        occurred_at,
+        row_before,
+        row_after,
+        transaction_id
+      from public.security_audit_events
+      on conflict (id) do nothing;
+
+      drop table public.security_audit_events;
+    end if;
   end if;
 end
 $audit$;
