@@ -20,7 +20,7 @@
 | Analytics | `analytics.test.ts` | UAT-11 |
 | Offline/sync | `apps/mobile/test/sync.test.ts` | UAT-12..14 |
 | Security boundary | `security.test.ts` | UAT-15 |
-| Audit migration | full PostgreSQL forward/reverse CI | UAT-16 |
+| Audit migration | PostgreSQL 16 (`migration-roundtrip` job): full forward/reverse CI | UAT-16 |
 
 ## Closure policy
 A green automated matrix establishes regression readiness only. It does not convert manual rows to PASS.
