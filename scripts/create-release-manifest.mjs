@@ -1,9 +1,26 @@
+import { execFileSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 
 const root = JSON.parse(await readFile("package.json", "utf8"));
 const mobile = JSON.parse(await readFile("apps/mobile/package.json", "utf8"));
 const app = JSON.parse(await readFile("apps/mobile/app.json", "utf8"));
-const sourceCommit = process.env.GITHUB_SHA ?? process.env.SOURCE_COMMIT ?? "local";
+const checkedOutCommit = execFileSync("git", ["rev-parse", "HEAD"], {
+  encoding: "utf8",
+}).trim();
+if (!/^[0-9a-f]{40}$/i.test(checkedOutCommit)) {
+  throw new Error("Unable to resolve an immutable checked-out Git commit.");
+}
+
+const suppliedCommit = process.env.GITHUB_SHA ?? process.env.SOURCE_COMMIT;
+const sourceCommit = suppliedCommit ?? checkedOutCommit;
+if (!/^[0-9a-f]{40}$/i.test(sourceCommit)) {
+  throw new Error("Release source commit must be a full 40-character Git SHA.");
+}
+if (sourceCommit.toLowerCase() !== checkedOutCommit.toLowerCase()) {
+  throw new Error(
+    `Release source commit ${sourceCommit} does not match checked-out commit ${checkedOutCommit}.`,
+  );
+}
 const releaseId = process.env.RELEASE_ID ?? `terrevo-${root.version}`;
 
 const manifest = {
