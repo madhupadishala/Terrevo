@@ -98,16 +98,23 @@ for (const check of policy.automatedChecks) {
     }
 
     for (const jobName of bindings) {
-      const match = checkRuns.find(run =>
-        run?.name === jobName &&
-        run?.head_sha === manifest.exactCommit &&
-        run?.status === "completed" &&
-        run?.conclusion === "success" &&
-        run?.app?.id === actionsProducer.appId &&
-        run?.app?.slug === actionsProducer.slug
-      );
-      if (!match) {
-        failures.push(`automated check ${check} lacks trusted successful exact-commit job: ${jobName}`);
+      const latest = checkRuns
+        .filter(run =>
+          run?.name === jobName &&
+          run?.head_sha === manifest.exactCommit &&
+          run?.app?.id === actionsProducer.appId &&
+          run?.app?.slug === actionsProducer.slug
+        )
+        .sort((a, b) => {
+          const aCompleted = Date.parse(a?.completed_at || "") || 0;
+          const bCompleted = Date.parse(b?.completed_at || "") || 0;
+          if (aCompleted !== bCompleted) return aCompleted - bCompleted;
+          return (a?.id || 0) - (b?.id || 0);
+        })
+        .at(-1);
+
+      if (!latest || latest.status !== "completed" || latest.conclusion !== "success") {
+        failures.push(`automated check ${check} lacks trusted successful latest exact-commit job: ${jobName}`);
       }
     }
     continue;
