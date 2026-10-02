@@ -80,54 +80,12 @@ jobs:
           persist-credentials: false
       - name: Resolve UI verification applicability from evidence
         id: resolve
-        shell: bash
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
-          manifest="$(printf '%s\n' "$PR_BODY" | sed -n 's/^- Evidence manifest: `\([^`]*\)`.*/\1/p' | head -n1)"
-          test -n "$manifest" || { echo "Evidence manifest path missing from PR body"; exit 1; }
-          test -f "$manifest" || { echo "Evidence manifest does not exist: $manifest"; exit 1; }
-
-          evidence_root="$(realpath docs/evidence)"
-          manifest_real="$(realpath "$manifest")"
-          case "$manifest_real" in
-            "$evidence_root"/*.product-gates.json) ;;
-            *) echo "Evidence manifest must resolve inside docs/evidence"; exit 1 ;;
-          esac
-
-          MANIFEST="$manifest_real" node --input-type=module - <<'NODE'
-          import fs from "node:fs";
-
-          const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST, "utf8"));
-          const nonempty = value => typeof value === "string" && value.trim().length > 0;
-
-          if (typeof manifest.impact?.ui !== "boolean") {
-            console.error("impact.ui must be an explicit boolean");
-            process.exit(1);
-          }
-
-          const resolve = id => {
-            if (manifest.impact.ui === true) return "run";
-
-            const status = manifest.automatedChecks?.[id];
-            const applicability = manifest.automatedCheckApplicability?.[id];
-            if (
-              status !== "NOT_APPLICABLE" ||
-              !nonempty(applicability?.reviewer) ||
-              !nonempty(applicability?.rationale)
-            ) {
-              console.error(
-                `${id} may skip only when the evidence manifest records reviewed NOT_APPLICABLE`
-              );
-              process.exit(1);
-            }
-            return "skip";
-          };
-
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `design=${resolve("design_verification")}\n`);
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `browser=${resolve("browser_verification")}\n`);
-          NODE
+          node scripts/resolve-check-applicability.mjs design_verification design
+          node scripts/resolve-check-applicability.mjs browser_verification browser
 
   design-verification:
     needs: ui-applicability
