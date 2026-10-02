@@ -175,7 +175,7 @@ $$;
 -- This proves isolation in both directions, not only A -> B.
 select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000002',true);
 
-do $
+do $wave1_tenant_b$
 declare
   membership_same integer;
   membership_cross integer;
@@ -243,7 +243,7 @@ begin
     raise exception 'TRV-MST-006 failed for tenant B: tenant A employee row visible';
   end if;
 end
-$;
+$wave1_tenant_b$;
 
 reset role;
 
