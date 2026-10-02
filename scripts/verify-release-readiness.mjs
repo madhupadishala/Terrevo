@@ -52,10 +52,26 @@ const parseMarkdownRow = (line) =>
     .map((value) => value.trim());
 
 const uatSource = await readFile("docs/qa/UAT-CLOSURE.md", "utf8");
+const requiredUatIds = new Set(
+  Array.from({ length: 16 }, (_, index) =>
+    `UAT-${String(index + 1).padStart(2, "0")}`,
+  ),
+);
+const seenUatIds = new Set();
 for (const line of uatSource.split(/\r?\n/)) {
   if (!/^\|\s*UAT-\d{2}\s*\|/.test(line)) continue;
   const [id, scenario, expected, status, tester, timestamp, build, evidence] =
     parseMarkdownRow(line);
+
+  if (!requiredUatIds.has(id)) {
+    failures.push(`unexpected UAT scenario ID: ${id}`);
+    continue;
+  }
+  if (seenUatIds.has(id)) {
+    failures.push(`duplicate UAT scenario ID: ${id}`);
+    continue;
+  }
+  seenUatIds.add(id);
 
   if (!["NOT RUN", "PASS", "FAIL"].includes(status)) {
     failures.push(`invalid UAT status for ${id}: ${status}`);
@@ -72,6 +88,10 @@ for (const line of uatSource.split(/\r?\n/)) {
     if (!build) failures.push(`PASS UAT row missing build/commit: ${id}`);
     if (!evidence) failures.push(`PASS UAT row missing evidence: ${id}`);
   }
+} 
+
+for (const id of requiredUatIds) {
+  if (!seenUatIds.has(id)) failures.push(`missing blocking UAT scenario: ${id}`);
 }
 
 const regressionSource = await readFile("docs/qa/REGRESSION-MATRIX.md", "utf8");
