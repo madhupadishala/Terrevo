@@ -1,0 +1,80 @@
+name: Pilot Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: HTTPS pilot deployment URL to smoke
+        required: true
+        type: string
+      release_id:
+        description: Immutable release identifier
+        required: true
+        type: string
+      confirm:
+        description: Type PILOT to confirm packaging and smoke
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  pilot:
+    if: ${{ inputs.confirm == 'PILOT' }}
+    environment: pilot
+    runs-on: ubuntu-latest
+    env:
+      PILOT_BASE_URL: ${{ inputs.base_url }}
+      RELEASE_ID: ${{ inputs.release_id }}
+      SOURCE_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Full release verification
+        run: npm run verify:release
+      - name: Blocking UAT evidence verification
+        run: npm run verify:uat
+      - name: Install mobile dependencies
+        working-directory: apps/mobile
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Android release export
+        working-directory: apps/mobile
+        run: npm run bundle:android
+      - name: Create immutable release manifest
+        run: npm run release:manifest
+      - name: Smoke supplied pilot deployment
+        run: npm run smoke:pilot
+      - name: Validate and stage pilot artifacts
+        run: |
+          set -euo pipefail
+          test -f release-manifest.json
+          test -d apps/web/dist
+          test -d .vercel-api
+          test -d apps/mobile/dist
+          rm -rf pilot-artifacts
+          mkdir -p pilot-artifacts
+          cp release-manifest.json pilot-artifacts/
+          cp -R apps/web/dist pilot-artifacts/web
+          cp -R .vercel-api pilot-artifacts/api
+          cp -R apps/mobile/dist pilot-artifacts/mobile
+      - name: Retain pilot artifacts
+        uses: actions/upload-artifact@ea165f8d65e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ inputs.release_id }}
+          if-no-files-found: error
+          retention-days: 30
+          path: pilot-artifacts
+
+  invalid-confirmation:
+    if: ${{ inputs.confirm != 'PILOT' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Pilot release blocked: confirmation must be exactly PILOT."
+          exit 1

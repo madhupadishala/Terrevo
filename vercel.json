@@ -12,5 +12,11 @@
       "source": "/api/:path*",
       "destination": "/api?__terrevo_path=:path*"
     }
-  ]
+  ],
+  "ignoreCommand": "node scripts/vercel-ignore-build.mjs",
+  "git": {
+    "deploymentEnabled": {
+      "feature/sprint-25-pilot-release": false
+    }
+  }
 }

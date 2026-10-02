@@ -1,6 +1,6 @@
 {
   "name": "terrevo",
-  "version": "0.20.0",
+  "version": "0.29.0",
   "private": true,
   "description": "Terrevo field-force automation platform",
   "type": "module",
@@ -15,7 +15,11 @@
     "test": "node --experimental-strip-types --test apps/api/test/*.test.ts",
     "verify": "npm run verify:foundation && npm run typecheck && npm test && npm run build",
     "verify:release-readiness": "node scripts/verify-release-readiness.mjs",
-    "verify:release": "npm run verify && npm run verify:release-readiness"
+    "verify:release": "npm run verify && npm run verify:release-readiness",
+    "verify:uat": "node scripts/verify-uat-closure.mjs",
+    "release:manifest": "node scripts/create-release-manifest.mjs",
+    "smoke:pilot": "node scripts/smoke-pilot.mjs",
+    "verify:pilot": "npm run verify:release && npm run verify:uat"
   },
   "engines": {
     "node": ">=22"

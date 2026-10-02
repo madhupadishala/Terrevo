@@ -32,6 +32,7 @@ const requiredRequirements = [
   "docs/requirements/sprint-22-offline-sync.md",
   "docs/requirements/sprint-23-security-audit.md",
   "docs/requirements/sprint-24-regression-uat-closure.md",
+  "docs/requirements/sprint-25-pilot-release.md",
 ];
 
 for (const file of requiredRequirements) await requirePath(file);
@@ -42,6 +43,11 @@ for (const file of [
   "docs/qa/SPRINT-GATE.md",
   "docs/qa/UAT-CLOSURE.md",
   "docs/qa/REGRESSION-MATRIX.md",
+  ".github/workflows/pilot-release.yml",
+  "docs/deployment/PILOT-RELEASE.md",
+  "scripts/verify-uat-closure.mjs",
+  "scripts/create-release-manifest.mjs",
+  "scripts/smoke-pilot.mjs",
 ]) await requirePath(file);
 
 const parseMarkdownRow = (line) =>
@@ -77,11 +83,7 @@ for (const line of uatSource.split(/\r?\n/)) {
     failures.push(`invalid UAT status for ${id}: ${status}`);
     continue;
   }
-
-  if (!scenario || !expected) {
-    failures.push(`incomplete UAT definition for ${id}`);
-  }
-
+  if (!scenario || !expected) failures.push(`incomplete UAT definition for ${id}`);
   if (status === "PASS") {
     if (!tester) failures.push(`PASS UAT row missing tester: ${id}`);
     if (!timestamp) failures.push(`PASS UAT row missing UTC date/time: ${id}`);
@@ -98,13 +100,7 @@ const regressionSource = await readFile("docs/qa/REGRESSION-MATRIX.md", "utf8");
 for (const line of regressionSource.split(/\r?\n/)) {
   if (!line.startsWith("|")) continue;
   const [capability, automatedEvidence, manualUat] = parseMarkdownRow(line);
-  if (
-    !capability ||
-    capability === "Capability" ||
-    /^-+$/.test(capability.replace(/\s+/g, ""))
-  ) {
-    continue;
-  }
+  if (!capability || capability === "Capability" || /^-+$/.test(capability.replace(/\s+/g, ""))) continue;
   if (!automatedEvidence && !manualUat) {
     failures.push(`regression matrix row has no evidence reference: ${capability}`);
   }

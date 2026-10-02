@@ -2,7 +2,7 @@
   "expo": {
     "name": "Terrevo Field",
     "slug": "terrevo-field",
-    "version": "0.20.0",
+    "version": "0.29.0",
     "orientation": "portrait",
     "scheme": "terrevo",
     "userInterfaceStyle": "light",
