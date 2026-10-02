@@ -18,7 +18,7 @@ A manual scenario can be changed to **PASS** only when all four fields are recor
 | UAT-09 | Expenses | Line totals, submit, and manager decision remain scoped | NOT RUN |  |  |  |  |
 | UAT-10 | Joint work | Join/leave evidence is explicit and cannot be inferred from plan alone | NOT RUN |  |  |  |  |
 | UAT-11 | Manager command center + analytics | Manager sees only permitted tenant/team data and selected report window | NOT RUN |  |  |  |  |
-| UAT-12 | Network loss during retry-safe write | Durable queue survives restart and replays exact operation once | NOT RUN |  |  |  |  |
+| UAT-12 | Network loss during retry-safe write | Durable queue survives restart; retries preserve the original operation identity and produce one logical effect even if delivery repeats | NOT RUN |  |  |  |  |
 | UAT-13 | Network loss during GPS/time authoritative action | Action is not silently replayed; user is prompted for manual recovery | NOT RUN |  |  |  |  |
 | UAT-14 | Tenant switch with queued items | No queued operation crosses user/tenant boundary | NOT RUN |  |  |  |  |
 | UAT-15 | Oversized/malformed API body | Request fails closed; no mutation occurs | NOT RUN |  |  |  |  |
