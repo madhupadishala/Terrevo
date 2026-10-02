@@ -51,14 +51,87 @@ jobs:
         run: npm run test:product-gates
       - name: Governance evidence structure
         run: npm run verify:evidence-structure -- docs/evidence/TRV-GOV-001.product-gates.json
-      - name: Secret scan
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Scan exact change range for secrets
+        uses: trufflesecurity/trufflehog@6f3c981e7b77f235fd2702dd74af25fc4b72bf11 # v3.96.0
+        with:
+          base: ${{ github.event.pull_request.base.sha || github.event.before }}
+          head: ${{ github.event.pull_request.head.sha || github.sha }}
+          extra_args: --results=verified,unknown
 
+  ui-applicability:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      design: ${{ steps.resolve.outputs.design }}
+      browser: ${{ steps.resolve.outputs.browser }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Resolve UI verification applicability from evidence
+        id: resolve
+        shell: bash
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          manifest="$(printf '%s\n' "$PR_BODY" | sed -n 's/^- Evidence manifest: `\([^`]*\)`.*/\1/p' | head -n1)"
+          test -n "$manifest" || { echo "Evidence manifest path missing from PR body"; exit 1; }
+          test -f "$manifest" || { echo "Evidence manifest does not exist: $manifest"; exit 1; }
+
+          evidence_root="$(realpath docs/evidence)"
+          manifest_real="$(realpath "$manifest")"
+          case "$manifest_real" in
+            "$evidence_root"/*.product-gates.json) ;;
+            *) echo "Evidence manifest must resolve inside docs/evidence"; exit 1 ;;
+          esac
+
+          MANIFEST="$manifest_real" node --input-type=module - <<'NODE'
+          import fs from "node:fs";
+
+          const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST, "utf8"));
+          const nonempty = value => typeof value === "string" && value.trim().length > 0;
+
+          if (typeof manifest.impact?.ui !== "boolean") {
+            console.error("impact.ui must be an explicit boolean");
+            process.exit(1);
+          }
+
+          const resolve = id => {
+            if (manifest.impact.ui === true) return "run";
+
+            const status = manifest.automatedChecks?.[id];
+            const applicability = manifest.automatedCheckApplicability?.[id];
+            if (
+              status !== "NOT_APPLICABLE" ||
+              !nonempty(applicability?.reviewer) ||
+              !nonempty(applicability?.rationale)
+            ) {
+              console.error(
+                `${id} may skip only when the evidence manifest records reviewed NOT_APPLICABLE`
+              );
+              process.exit(1);
+            }
+            return "skip";
+          };
+
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `design=${resolve("design_verification")}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `browser=${resolve("browser_verification")}\n`);
+          NODE
 
   design-verification:
-    if: "${{ github.event_name == 'pull_request' && contains(github.event.pull_request.body, 'UI CHANGE: YES') }}"
+    needs: ui-applicability
+    if: needs.ui-applicability.outputs.design == 'run'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -77,7 +150,8 @@ jobs:
           node scripts/verify-ui-design.mjs
 
   browser-verification:
-    if: "${{ github.event_name == 'pull_request' && contains(github.event.pull_request.body, 'UI CHANGE: YES') }}"
+    needs: ui-applicability
+    if: needs.ui-applicability.outputs.browser == 'run'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
