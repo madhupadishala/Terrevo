@@ -90,12 +90,12 @@
       "rationale": ""
     },
     "warpath": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "reviewer": "OpenAI GPT-5.6 Sol",
       "evidence": [
         "database/ci/wave-2-boundary-tests.sql"
       ],
-      "rationale": ""
+      "rationale": "Qualification fixture is implemented, but exact-commit execution results and independent review conclusions are still pending."
     },
     "coderabbit": {
       "status": "BLOCKED",
@@ -104,12 +104,12 @@
       "rationale": "Independent review pending."
     },
     "hacker": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "reviewer": "OpenAI GPT-5.6 Sol",
       "evidence": [
         "database/ci/wave-2-boundary-tests.sql"
       ],
-      "rationale": ""
+      "rationale": "Qualification fixture is implemented, but exact-commit execution results and independent review conclusions are still pending."
     },
     "evidence": {
       "status": "BLOCKED",
@@ -145,5 +145,19 @@
     "status": "IMPLEMENTED / NOT QUALIFIED",
     "qualifiedBy": "",
     "qualifiedAt": ""
+  },
+  "automatedCheckApplicability": {
+    "relevant_e2e": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "This requalification change adds qualification evidence and boundary tests without changing an end-user workflow; workflow E2E remains outside this audit delta and is not claimed as executed evidence."
+    },
+    "design_verification": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "No product UI or design surface is changed by this requalification scope."
+    },
+    "browser_verification": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "No browser-visible product behavior is changed by this requalification scope."
+    }
   }
 }
