@@ -9,7 +9,7 @@
   "owner": "madhupadishala",
   "reviewers": [
     "OpenAI GPT-5.6 Sol",
-    "CodeRabbit pending"
+    "CodeRabbit pending final qualification"
   ],
   "impact": {
     "ui": false,
@@ -117,7 +117,7 @@
         "review_url_or_id": [],
         "unresolved_material_findings_zero": []
       },
-      "rationale": "Awaiting trusted clean CodeRabbit approval for final implementation commit 4410d8612c92e173fc70a54afc3d5f60211f1ecc."
+      "rationale": "Implementation is frozen at the exact qualified candidate; awaiting trusted clean CodeRabbit approval on the evidence-only qualification path."
     },
     "hacker": {
       "status": "BLOCKED",
