@@ -165,7 +165,7 @@ begin
    where tenant_id='82000000-0000-4000-8000-000000000001'
      and employee_id='84000000-0000-4000-8000-000000000001'
      and sample_id='85000000-0000-4000-8000-000000000003';
-  if v_balance<>10 then raise exception 'TRV-INV-001/007 failed: expected balance 10, got %',v_balance; end if;
+  if v_balance is distinct from 10 then raise exception 'TRV-INV-001/007 failed: expected balance 10, got %',v_balance; end if;
 end
 $$;
 
