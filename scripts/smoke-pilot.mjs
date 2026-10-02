@@ -19,8 +19,21 @@ if (!(response.headers.get("content-security-policy") ?? "").includes("default-s
 if (!(response.headers.get("strict-transport-security") ?? "").includes("max-age=")) failures.push("HSTS missing");
 
 let body;
-try { body = await response.json(); } catch { failures.push("health response is not JSON"); }
-if (body && !["ok", "degraded"].includes(body.status)) failures.push("unexpected health status body");
+try {
+  body = await response.json();
+} catch {
+  failures.push("health response is not JSON");
+}
+
+if (!body || typeof body !== "object" || Array.isArray(body)) {
+  failures.push("health response body is missing or invalid");
+} else {
+  if (body.status !== "ok") failures.push(`health status body is ${body.status ?? "missing"}`);
+  if (body.web !== "ready") failures.push("web readiness is not ready");
+  if (body.apiAdapter !== "ready") failures.push("API adapter readiness is not ready");
+  if (body.provider?.identity !== "configured") failures.push("identity provider is not configured");
+  if (body.provider?.serverMutations !== "configured") failures.push("server mutation provider is not configured");
+}
 
 if (failures.length) {
   console.error("Pilot smoke failed:");
