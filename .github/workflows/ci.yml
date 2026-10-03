@@ -65,7 +65,7 @@ jobs:
           declare -a manifests=()
 
           parse_manifest() {
-            printf '%s\n' "$1" | sed -n 's/^- Evidence manifest: \`\([^\`]*\)\`.*/\1/p' | head -n1
+            printf '%s\n' "$1" | sed -n 's/^- Evidence manifest: `\([^`]*\)`.*/\1/p' | head -n1
           }
 
           if [ "$EVENT_NAME" = "pull_request" ]; then
