@@ -59,7 +59,7 @@ const base = {
   automatedCheckApplicability: Object.fromEntries(
     policy.automatedChecks
       .filter(id => !(policy.automatedCheckBindings?.[id] || []).length)
-      .map(id => [id,{reviewer:"test",rationale:"No applicable automated surface in verifier fixture.",approval:{status:"APPROVED",approvedBy:"test",approvedAt:"2026-10-01T00:00:00Z",evidence:["test applicability approval"]}}])
+      .map(id => [id,{reviewer:"test",rationale:"No applicable automated surface in verifier fixture."}])
   ),
   gates: Object.fromEntries(policy.gates.map(g => [
     g.id,
@@ -235,8 +235,9 @@ assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest shou
   assert.notEqual(runFinal(m).status,0,"offline/sync impact requires idempotency evidence");
 }
 {
-  const m=structuredClone(base); m.automatedChecks.relevant_e2e="NOT_APPLICABLE"; m.automatedCheckApplicability.relevant_e2e.approval.status="PENDING";
-  assert.notEqual(runFinal(m).status,0,"NOT_APPLICABLE automated check requires explicit approved reviewer decision");
+  const m=structuredClone(base);
+  m.automatedChecks.relevant_e2e="NOT_APPLICABLE";
+  assert.notEqual(runFinal(m,{coderabbitVerified:false}).status,0,"NOT_APPLICABLE automated check requires trusted CodeRabbit-reviewed applicability");
 }
 {
   const m=structuredClone(base);

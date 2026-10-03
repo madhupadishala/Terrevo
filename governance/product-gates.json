@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "policyName": "Terrevo Product Development Operating System",
   "completionRule": "A sprint or change is not COMPLETE until every mandatory gate is PASS or approved NOT_APPLICABLE and all required automated checks pass for the exact qualified commit.",
   "statuses": [
@@ -256,5 +256,9 @@
     "evidence_verification": [
       "quality-security"
     ]
+  },
+  "applicabilityApproval": {
+    "producer": "trusted CodeRabbit GitHub review",
+    "rule": "Every NOT_APPLICABLE automated-check or gate declaration must exist unchanged in the CodeRabbit-approved implementation commit; evidence-only commits may not add or modify those declarations."
   }
 }

@@ -164,53 +164,23 @@
   "automatedCheckApplicability": {
     "integration_tests": {
       "reviewer": "",
-      "rationale": "",
-      "approval": {
-        "status": "",
-        "approvedBy": "",
-        "approvedAt": "",
-        "evidence": []
-      }
+      "rationale": ""
     },
     "relevant_e2e": {
       "reviewer": "",
-      "rationale": "",
-      "approval": {
-        "status": "",
-        "approvedBy": "",
-        "approvedAt": "",
-        "evidence": []
-      }
+      "rationale": ""
     },
     "security": {
       "reviewer": "",
-      "rationale": "",
-      "approval": {
-        "status": "",
-        "approvedBy": "",
-        "approvedAt": "",
-        "evidence": []
-      }
+      "rationale": ""
     },
     "design_verification": {
       "reviewer": "",
-      "rationale": "",
-      "approval": {
-        "status": "",
-        "approvedBy": "",
-        "approvedAt": "",
-        "evidence": []
-      }
+      "rationale": ""
     },
     "browser_verification": {
       "reviewer": "",
-      "rationale": "",
-      "approval": {
-        "status": "",
-        "approvedBy": "",
-        "approvedAt": "",
-        "evidence": []
-      }
+      "rationale": ""
     }
   },
   "impactEvidence": {

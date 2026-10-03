@@ -179,51 +179,19 @@
   "automatedCheckApplicability": {
     "integration_tests": {
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "rationale": "Governance enforcement changes do not alter a product/runtime integration contract; repository and workflow regression remain mandatory.",
-      "approval": {
-        "status": "APPROVED",
-        "approvedBy": "OpenAI GPT-5.6 Sol",
-        "approvedAt": "2026-10-03T13:20:00Z",
-        "evidence": [
-          "TRV-GOV-001 explicit applicability approval for integration_tests: Governance enforcement changes do not alter a product/runtime integration contract; repository and workflow regression remain mandatory."
-        ]
-      }
+      "rationale": "Governance enforcement changes do not alter a product/runtime integration contract; repository and workflow regression remain mandatory."
     },
     "relevant_e2e": {
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "rationale": "No end-user workflow is introduced by governance enforcement.",
-      "approval": {
-        "status": "APPROVED",
-        "approvedBy": "OpenAI GPT-5.6 Sol",
-        "approvedAt": "2026-10-03T13:20:00Z",
-        "evidence": [
-          "TRV-GOV-001 explicit applicability approval for relevant_e2e: No end-user workflow is introduced by governance enforcement."
-        ]
-      }
+      "rationale": "No end-user workflow is introduced by governance enforcement."
     },
     "design_verification": {
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "rationale": "No product UI is changed.",
-      "approval": {
-        "status": "APPROVED",
-        "approvedBy": "OpenAI GPT-5.6 Sol",
-        "approvedAt": "2026-10-03T13:20:00Z",
-        "evidence": [
-          "TRV-GOV-001 explicit applicability approval for design_verification: No product UI is changed."
-        ]
-      }
+      "rationale": "No product UI is changed."
     },
     "browser_verification": {
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "rationale": "No browser-visible product behavior is changed.",
-      "approval": {
-        "status": "APPROVED",
-        "approvedBy": "OpenAI GPT-5.6 Sol",
-        "approvedAt": "2026-10-03T13:20:00Z",
-        "evidence": [
-          "TRV-GOV-001 explicit applicability approval for browser_verification: No browser-visible product behavior is changed."
-        ]
-      }
+      "rationale": "No browser-visible product behavior is changed."
     }
   },
   "impactEvidence": {
