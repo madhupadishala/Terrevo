@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { validateApplicabilityApproval } from "./applicability-approval.mjs";
 
 const manifestArg = process.argv[2] || process.env.PRODUCT_GATE_MANIFEST;
 if (!manifestArg) {
@@ -13,7 +14,7 @@ const failures = [];
 const nonempty = value => typeof value === "string" && value.trim().length > 0;
 const validEvidenceList = value => Array.isArray(value) && value.length > 0 && value.every(nonempty);
 const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
-const impactKeys = ["ui","database","apiContract","securityTenant","offlineSync","regulatoryDomain"];
+const impactKeys = ["ui","architecture","database","apiContract","securityTenant","offlineSync","regulatoryDomain"];
 const nonExemptibleGates = new Set(policy.nonExemptibleGates || []);
 const exemptible = new Set(policy.exemptibleAutomatedChecks || []);
 
@@ -82,6 +83,9 @@ if (manifest.gates?.coderabbit?.status === "PASS" && process.env.CODERABBIT_REVI
 const automatedRuns = loadAutomatedRuns();
 const actionsProducer = policy.trustedProducers?.githubActions || {};
 const checkRuns = Array.isArray(automatedRuns?.check_runs) ? automatedRuns.check_runs : [];
+const workflowRuns = Array.isArray(automatedRuns?.workflow_runs) ? automatedRuns.workflow_runs : [];
+const trustedWorkflowPath = actionsProducer.workflowPath;
+const trustedWorkflowEvent = actionsProducer.event || "push";
 
 for (const check of policy.automatedChecks) {
   const status = manifest.automatedChecks?.[check];
@@ -105,17 +109,20 @@ for (const check of policy.automatedChecks) {
           run?.app?.id === actionsProducer.appId &&
           run?.app?.slug === actionsProducer.slug
         )
-        .sort((a, b) => {
-          const aCompleted = Date.parse(a?.completed_at || "") || 0;
-          const bCompleted = Date.parse(b?.completed_at || "") || 0;
-          if (aCompleted !== bCompleted) return aCompleted - bCompleted;
-          return (a?.id || 0) - (b?.id || 0);
-        })
+        .sort((a, b) => (a?.id || 0) - (b?.id || 0))
         .at(-1);
 
       if (!latest || latest.status !== "completed" || latest.conclusion !== "success") {
         failures.push(`automated check ${check} lacks trusted successful latest exact-commit job: ${jobName}`);
+        continue;
       }
+      const workflow = workflowRuns.find(run =>
+        run?.check_suite_id === latest?.check_suite?.id &&
+        run?.head_sha === manifest.exactCommit &&
+        run?.path === trustedWorkflowPath &&
+        run?.event === trustedWorkflowEvent
+      );
+      if (!workflow) failures.push(`automated check ${check} latest job is not proven to come from trusted workflow ${trustedWorkflowPath} via ${trustedWorkflowEvent}: ${jobName}`);
     }
     continue;
   }
@@ -130,36 +137,16 @@ for (const check of policy.automatedChecks) {
   }
 
   const applicability = manifest.automatedCheckApplicability?.[check];
-  if (!nonempty(applicability?.reviewer) || !nonempty(applicability?.rationale)) {
-    failures.push(`automated check ${check} NOT_APPLICABLE requires reviewer and rationale`);
-  }
+  for (const failure of validateApplicabilityApproval(applicability, `automated check ${check}`)) failures.push(failure);
 }
 
 const impact = isRecord(manifest.impact) ? manifest.impact : {};
 
-if (impact.ui === true) {
-  if (manifest.gates?.product_design?.status !== "PASS") failures.push("UI impact requires Product Design Guardian PASS");
-  for (const check of ["design_verification","browser_verification"]) {
-    if (manifest.automatedChecks?.[check] !== "PASS") failures.push(`UI impact requires automated check ${check} PASS`);
-  }
-}
-
-if (impact.database === true) {
-  if (manifest.automatedChecks?.integration_tests !== "PASS") failures.push("database impact requires integration_tests PASS");
-  for (const key of policy.impactRequirements?.database?.requiredEvidenceKeys || []) {
-    if (!validEvidenceList(manifest.impactEvidence?.database?.[key])) {
-      failures.push(`database impact requires evidence: ${key}`);
-    }
-  }
-}
-
-if (impact.securityTenant === true) {
-  if (manifest.gates?.hacker?.status !== "PASS") failures.push("security/tenant impact requires Hacker Gate PASS");
-  if (manifest.automatedChecks?.security !== "PASS") failures.push("security/tenant impact requires security automated check PASS");
-}
-
-if (impact.regulatoryDomain === true && manifest.gates?.regulatory_knowledge?.status !== "PASS") {
-  failures.push("regulatory domain impact requires Regulatory Knowledge Gate PASS");
+for (const [impactKey, requirement] of Object.entries(policy.impactRequirements || {})) {
+  if (impact[impactKey] !== true) continue;
+  if (requirement.requiredGate && manifest.gates?.[requirement.requiredGate]?.status !== "PASS") failures.push(`${impactKey} impact requires gate ${requirement.requiredGate} PASS`);
+  for (const check of requirement.requiredAutomatedChecks || []) if (manifest.automatedChecks?.[check] !== "PASS") failures.push(`${impactKey} impact requires automated check ${check} PASS`);
+  for (const key of requirement.requiredEvidenceKeys || []) if (!validEvidenceList(manifest.impactEvidence?.[impactKey]?.[key])) failures.push(`${impactKey} impact requires evidence: ${key}`);
 }
 
 if (manifest.finalQualification?.status !== "COMPLETE") failures.push("finalQualification.status must be COMPLETE");

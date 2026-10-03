@@ -137,7 +137,11 @@ for (let page = 1; page <= 50; page += 1) {
       repository(owner:$owner,name:$name) {
         pullRequest(number:$number) {
           reviewThreads(first:100,after:$after) {
-            nodes { isResolved }
+            nodes {
+              isResolved
+              isOutdated
+              comments(first:1) { nodes { author { login } } }
+            }
             pageInfo { hasNextPage endCursor }
           }
         }
@@ -169,7 +173,11 @@ for (let page = 1; page <= 50; page += 1) {
     console.error("Review-thread payload missing");
     process.exit(1);
   }
-  unresolvedCount += (threads.nodes || []).filter(thread => !thread.isResolved).length;
+  unresolvedCount += (threads.nodes || []).filter(thread =>
+    !thread.isResolved &&
+    !thread.isOutdated &&
+    thread.comments?.nodes?.[0]?.author?.login === trusted.login
+  ).length;
   if (!threads.pageInfo?.hasNextPage) break;
   cursor = threads.pageInfo.endCursor;
   if (!cursor || page === 50) {
@@ -179,10 +187,10 @@ for (let page = 1; page <= 50; page += 1) {
 }
 
 if (unresolvedCount > 0) {
-  console.error(`Unresolved review threads remain: ${unresolvedCount}`);
+  console.error(`Unresolved current CodeRabbit review threads remain: ${unresolvedCount}`);
   process.exit(1);
 }
 
 console.log(
-  `Trusted CodeRabbit approval: PASS — review ${latestReview.id} on ${latestReview.commit_id}; zero unresolved threads`
+  `Trusted CodeRabbit approval: PASS — review ${latestReview.id} on ${latestReview.commit_id}; zero unresolved current CodeRabbit threads`
 );

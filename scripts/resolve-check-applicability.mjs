@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { validateApplicabilityApproval } from "./applicability-approval.mjs";
 
 const checkId = process.argv[2];
 const outputKey = process.argv[3] || "";
@@ -65,8 +66,9 @@ if (status === "PASS") {
 
 if (status === "NOT_APPLICABLE") {
   const applicability = manifest.automatedCheckApplicability?.[checkId];
-  if (!nonempty(applicability?.reviewer) || !nonempty(applicability?.rationale)) {
-    console.error(`${checkId} NOT_APPLICABLE requires reviewer and rationale`);
+  const approvalFailures = validateApplicabilityApproval(applicability, checkId);
+  if (approvalFailures.length) {
+    for (const failure of approvalFailures) console.error(failure);
     process.exit(1);
   }
   if (manifest.impact.ui !== false) {

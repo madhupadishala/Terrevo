@@ -34,6 +34,7 @@ const base = {
   reviewers: ["test"],
   impact: {
     ui: false,
+    architecture: false,
     database: false,
     apiContract: false,
     securityTenant: false,
@@ -44,7 +45,9 @@ const base = {
     database: {
       forward_migration: ["test forward migration"],
       reverse_migration: ["test reverse migration"]
-    }
+    },
+    apiContract: { compatibility: ["test compatibility evidence"] },
+    offlineSync: { retry: ["test retry evidence"], idempotency: ["test idempotency evidence"] }
   },
   artifacts: {},
   automatedChecks: Object.fromEntries(
@@ -56,7 +59,7 @@ const base = {
   automatedCheckApplicability: Object.fromEntries(
     policy.automatedChecks
       .filter(id => !(policy.automatedCheckBindings?.[id] || []).length)
-      .map(id => [id,{reviewer:"test",rationale:"No applicable automated surface in verifier fixture."}])
+      .map(id => [id,{reviewer:"test",rationale:"No applicable automated surface in verifier fixture.",approval:{status:"APPROVED",approvedBy:"test",approvedAt:"2026-10-01T00:00:00Z",evidence:["test applicability approval"]}}])
   ),
   gates: Object.fromEntries(policy.gates.map(g => [
     g.id,
@@ -66,20 +69,14 @@ const base = {
   finalQualification: {status:"COMPLETE", qualifiedBy:"test", qualifiedAt:"2026-10-01T00:00:00Z"}
 };
 
-const buildRuns = sha => ({
-  total_count: boundJobs.length,
-  check_runs: boundJobs.map((name,index) => ({
-    id:index+1,
-    name,
-    head_sha:sha,
-    status:"completed",
-    conclusion:"success",
-    app:{
-      id:policy.trustedProducers.githubActions.appId,
-      slug:policy.trustedProducers.githubActions.slug
-    }
-  }))
-});
+const buildRuns = sha => {
+  const check_runs = boundJobs.map((name,index) => ({
+    id:index+1,name,head_sha:sha,status:"completed",conclusion:"success",completed_at:"2026-10-01T00:00:00Z",
+    check_suite:{id:index+1000},
+    app:{id:policy.trustedProducers.githubActions.appId,slug:policy.trustedProducers.githubActions.slug}
+  }));
+  return {total_count:check_runs.length,check_runs,workflow_runs:check_runs.map(run=>({id:run.id+10000,check_suite_id:run.check_suite.id,head_sha:sha,path:policy.trustedProducers.githubActions.workflowPath,event:policy.trustedProducers.githubActions.event}))};
+};
 
 const writeManifest = manifest => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "terrevo-gates-"));
@@ -215,6 +212,31 @@ assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest shou
   const runs=buildRuns(m.exactCommit);
   runs.check_runs[0].app.id=999;
   assert.notEqual(runFinal(m,{runs}).status,0,"untrusted GitHub App must fail");
+}
+{
+  const m=structuredClone(base); const runs=buildRuns(m.exactCommit); runs.workflow_runs[0].path=".github/workflows/untrusted.yml";
+  assert.notEqual(runFinal(m,{runs}).status,0,"check run from untrusted workflow must fail");
+}
+{
+  const m=structuredClone(base); const runs=buildRuns(m.exactCommit);
+  runs.check_runs.push({...structuredClone(runs.check_runs[0]),id:9999,status:"in_progress",conclusion:null,completed_at:null,check_suite:{id:9999}});
+  assert.notEqual(runFinal(m,{runs}).status,0,"newer in-progress re-run must block PASS");
+}
+{
+  const m=structuredClone(base); m.impact.architecture=true; m.gates.architecture.status="NOT_APPLICABLE"; m.gates.architecture.rationale="incorrect exemption";
+  assert.notEqual(runFinal(m).status,0,"architecture impact requires Architecture Guardian PASS");
+}
+{
+  const m=structuredClone(base); m.impact.apiContract=true; m.impactEvidence.apiContract.compatibility=[];
+  assert.notEqual(runFinal(m).status,0,"API contract impact requires compatibility evidence");
+}
+{
+  const m=structuredClone(base); m.impact.offlineSync=true; m.impactEvidence.offlineSync.idempotency=[];
+  assert.notEqual(runFinal(m).status,0,"offline/sync impact requires idempotency evidence");
+}
+{
+  const m=structuredClone(base); m.automatedChecks.relevant_e2e="NOT_APPLICABLE"; m.automatedCheckApplicability.relevant_e2e.approval.status="PENDING";
+  assert.notEqual(runFinal(m).status,0,"NOT_APPLICABLE automated check requires explicit approved reviewer decision");
 }
 {
   const m=structuredClone(base);
