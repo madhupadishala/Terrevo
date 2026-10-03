@@ -14,7 +14,8 @@
     "apiContract": false,
     "securityTenant": false,
     "offlineSync": false,
-    "regulatoryDomain": false
+    "regulatoryDomain": false,
+    "architecture": false
   },
   "artifacts": {
     "urs": [],
@@ -163,29 +164,66 @@
   "automatedCheckApplicability": {
     "integration_tests": {
       "reviewer": "",
-      "rationale": ""
+      "rationale": "",
+      "approval": {
+        "status": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "evidence": []
+      }
     },
     "relevant_e2e": {
       "reviewer": "",
-      "rationale": ""
+      "rationale": "",
+      "approval": {
+        "status": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "evidence": []
+      }
     },
     "security": {
       "reviewer": "",
-      "rationale": ""
+      "rationale": "",
+      "approval": {
+        "status": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "evidence": []
+      }
     },
     "design_verification": {
       "reviewer": "",
-      "rationale": ""
+      "rationale": "",
+      "approval": {
+        "status": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "evidence": []
+      }
     },
     "browser_verification": {
       "reviewer": "",
-      "rationale": ""
+      "rationale": "",
+      "approval": {
+        "status": "",
+        "approvedBy": "",
+        "approvedAt": "",
+        "evidence": []
+      }
     }
   },
   "impactEvidence": {
     "database": {
       "forward_migration": [],
       "reverse_migration": []
+    },
+    "apiContract": {
+      "compatibility": []
+    },
+    "offlineSync": {
+      "retry": [],
+      "idempotency": []
     }
   },
   "automatedCheckScopes": {

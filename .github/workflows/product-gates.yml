@@ -176,9 +176,41 @@ jobs:
             }
           }
 
+          const workflowRuns = [];
+          let workflowPage = 1;
+          while (true) {
+            const url = new URL(`https://api.github.com/repos/${process.env.REPOSITORY}/actions/runs`);
+            url.searchParams.set("head_sha", manifest.exactCommit);
+            url.searchParams.set("per_page", "100");
+            url.searchParams.set("page", String(workflowPage));
+            const response = await fetch(url, {
+              headers: {
+                Authorization: `Bearer ${process.env.GH_TOKEN}`,
+                Accept: "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28"
+              }
+            });
+            if (!response.ok) {
+              console.error(`Failed to load workflow runs: ${response.status}`);
+              process.exit(1);
+            }
+            const payload = await response.json();
+            if (!Array.isArray(payload.workflow_runs)) {
+              console.error("Invalid workflow-run payload");
+              process.exit(1);
+            }
+            workflowRuns.push(...payload.workflow_runs);
+            if (payload.workflow_runs.length < 100) break;
+            workflowPage += 1;
+            if (workflowPage > 50) {
+              console.error("Workflow-run pagination exceeded safety limit");
+              process.exit(1);
+            }
+          }
+
           fs.writeFileSync(
             process.env.CHECK_FILE,
-            JSON.stringify({total_count: allRuns.length, check_runs: allRuns})
+            JSON.stringify({total_count: allRuns.length, check_runs: allRuns, workflow_runs: workflowRuns})
           );
           NODE
           echo "AUTOMATED_CHECK_RUNS_FILE=$check_file" >> "$GITHUB_ENV"

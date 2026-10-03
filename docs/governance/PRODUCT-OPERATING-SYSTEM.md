@@ -101,7 +101,9 @@ Standard terminology: **Module, Screen, Tab, Sub-navigation**.
 9. Regulatory Knowledge Gate
 10. Modular & Benchmark Completeness Gate
 
-All are mandatory. NOT_APPLICABLE is a reviewed outcome, never a silent skip.
+All are mandatory. NOT_APPLICABLE is a reviewed outcome, never a silent skip. Automated-check exemptions require an explicit approval record whose approver matches the named reviewer, includes a timestamp, rationale and evidence; a reviewer name alone is not approval.
+
+Impact declarations are fail-closed. UI, architecture, database, API-contract, security/tenant, offline/sync and regulatory/domain impacts activate their corresponding mandatory gates, checks and evidence requirements. Architecture-impacting changes require Architecture Guardian PASS; API-contract changes require compatibility evidence and integration checks; offline/sync changes require Warpath PASS plus retry and idempotency evidence.
 
 ## Definition of Done
 A sprint/change can be marked COMPLETE only when:

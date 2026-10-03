@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { validateApplicabilityApproval } from "./applicability-approval.mjs";
 
 const manifestArg = process.argv[2] || process.env.PRODUCT_GATE_MANIFEST;
 if (!manifestArg) {
@@ -31,7 +32,7 @@ if (!Array.isArray(manifest.requirementIds) || manifest.requirementIds.length ==
 if (new Set(manifest.requirementIds || []).size !== (manifest.requirementIds || []).length) failures.push("requirementIds must be unique");
 if (!/^[0-9a-f]{40}$/.test(manifest.exactCommit || "")) failures.push("exactCommit must be a full 40-character SHA");
 
-const impactKeys=["ui","database","apiContract","securityTenant","offlineSync","regulatoryDomain"];
+const impactKeys=["ui","architecture","database","apiContract","securityTenant","offlineSync","regulatoryDomain"];
 if (!isRecord(manifest.impact)) {
   failures.push("impact must be an object");
 } else {
@@ -72,7 +73,7 @@ for (const check of policy.automatedChecks) {
   if (status === "NOT_APPLICABLE") {
     if (!exemptible.has(check)) failures.push(`automated check ${check} cannot be NOT_APPLICABLE`);
     const applicability = manifest.automatedCheckApplicability?.[check];
-    if (!nonempty(applicability?.reviewer) || !nonempty(applicability?.rationale)) failures.push(`automated check ${check} NOT_APPLICABLE requires reviewer and rationale`);
+    failures.push(...validateApplicabilityApproval(applicability, `automated check ${check}`));
   }
 }
 
