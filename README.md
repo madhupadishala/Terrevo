@@ -39,7 +39,7 @@ Every change must pass:
 9. Regulatory Knowledge Gate
 10. Modular & Benchmark Completeness Gate
 
-A gate may be recorded as `NOT_APPLICABLE` only when the evidence manifest contains a specific rationale and reviewer. It is never equivalent to skipping the gate.
+A gate may be recorded as `NOT_APPLICABLE` only when the evidence manifest contains a specific rationale and reviewer **and that declaration exists unchanged in the implementation commit that receives a trusted CodeRabbit `APPROVED` review**. Evidence-only commits may not add or modify a `NOT_APPLICABLE` declaration. It is never equivalent to skipping the gate.
 
 ## Release checks
 
@@ -91,7 +91,7 @@ A sprint is complete only when:
 - acceptance criteria are satisfied;
 - the exact implementation commit is identified;
 - all applicable mandatory gates are PASS;
-- any NOT_APPLICABLE gate has approved rationale;
+- any NOT_APPLICABLE gate has its rationale and reviewer bound unchanged to the trusted CodeRabbit-approved implementation commit;
 - automated CI/release checks are green;
 - CodeRabbit has no unresolved material finding;
 - required design/browser/security/regression evidence is attached;

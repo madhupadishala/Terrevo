@@ -5,6 +5,7 @@ on:
     branches: ['**']
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   foundation:
@@ -49,8 +50,93 @@ jobs:
         run: npm run check:dependency-audit
       - name: Product-gate verifier negative tests
         run: npm run test:product-gates
-      - name: Governance evidence structure
-        run: npm run verify:evidence-structure -- docs/evidence/TRV-GOV-001.product-gates.json
+      - name: Resolve and validate governance evidence structure
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          declare -a manifests=()
+
+          parse_manifest() {
+            printf '%s\n' "$1" | sed -n 's/^- Evidence manifest: \`\([^\`]*\)\`.*/\1/p' | head -n1
+          }
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            selected="$(parse_manifest "$PR_BODY")"
+            test -n "$selected" || { echo "Evidence manifest path missing from PR body"; exit 1; }
+            manifests+=("$selected")
+          else
+            selected="$(node --input-type=module - <<'NODE'
+          const [owner] = process.env.REPOSITORY.split("/");
+          const url = new URL(`https://api.github.com/repos/${process.env.REPOSITORY}/pulls`);
+          url.searchParams.set("state","open");
+          url.searchParams.set("head",`${owner}:${process.env.HEAD_REF}`);
+          const response = await fetch(url,{
+            headers:{
+              Authorization:`Bearer ${process.env.GH_TOKEN}`,
+              Accept:"application/vnd.github+json",
+              "X-GitHub-Api-Version":"2022-11-28"
+            }
+          });
+          if (!response.ok) {
+            console.error(`Unable to resolve push PR context: ${response.status}`);
+            process.exit(1);
+          }
+          const prs = await response.json();
+          if (!Array.isArray(prs)) {
+            console.error("Invalid pull-request payload");
+            process.exit(1);
+          }
+          if (prs.length > 1) {
+            console.error("Push branch maps to multiple open PRs; evidence manifest is ambiguous");
+            process.exit(1);
+          }
+          const body = prs[0]?.body || "";
+          const match = body.match(/^- Evidence manifest: \`([^\`]+)\`\s*$/m);
+          process.stdout.write(match?.[1] || "");
+          NODE
+            )"
+
+            if [ -n "$selected" ]; then
+              manifests+=("$selected")
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+                base="$(git rev-parse "$HEAD_SHA^" 2>/dev/null || true)"
+              fi
+              if [ -n "$base" ]; then
+                while IFS= read -r -d '' manifest; do
+                  manifests+=("$manifest")
+                done < <(git diff --no-renames --name-only -z "$base" "$HEAD_SHA" -- 'docs/evidence/*.product-gates.json')
+              fi
+            fi
+          fi
+
+          if [ "${#manifests[@]}" -eq 0 ]; then
+            echo "No evidence manifest selected by push context; PR qualification will validate its declared manifest."
+            exit 0
+          fi
+
+          evidence_root="$(realpath docs/evidence)"
+          for manifest in "${manifests[@]}"; do
+            test -f "$manifest" || { echo "Evidence manifest does not exist: $manifest"; exit 1; }
+            manifest_real="$(realpath "$manifest")"
+            case "$manifest_real" in
+              "$evidence_root"/*.product-gates.json) ;;
+              *)
+                echo "Evidence manifest must resolve inside docs/evidence and end in .product-gates.json"
+                exit 1
+                ;;
+            esac
+            npm run verify:evidence-structure -- "$manifest"
+          done
   secret-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 15

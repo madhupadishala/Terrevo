@@ -46,7 +46,7 @@ Every change must pass all ten mandatory gates:
 9. Regulatory Knowledge
 10. Modular & Benchmark Completeness
 
-A gate may be `NOT_APPLICABLE` only with a specific rationale and reviewer in the evidence manifest. Never silently skip a gate.
+A gate may be `NOT_APPLICABLE` only with a specific rationale and reviewer in the evidence manifest **and only when that declaration exists unchanged in the implementation commit that receives a trusted CodeRabbit `APPROVED` review**. Evidence-only commits may not add or modify the declaration. Never silently skip a gate.
 
 ## Design before implementation
 
