@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { validateApplicabilityApproval } from "./applicability-approval.mjs";
 
 const manifestArg = process.argv[2] || process.env.PRODUCT_GATE_MANIFEST;
 if (!manifestArg) {
@@ -137,7 +136,12 @@ for (const check of policy.automatedChecks) {
   }
 
   const applicability = manifest.automatedCheckApplicability?.[check];
-  for (const failure of validateApplicabilityApproval(applicability, `automated check ${check}`)) failures.push(failure);
+  if (!nonempty(applicability?.reviewer) || !nonempty(applicability?.rationale)) {
+    failures.push(`automated check ${check} NOT_APPLICABLE requires reviewer and rationale`);
+  }
+  if (process.env.CODERABBIT_REVIEW_VERIFIED !== "true") {
+    failures.push(`automated check ${check} NOT_APPLICABLE requires a trusted CodeRabbit-reviewed applicability declaration`);
+  }
 }
 
 const impact = isRecord(manifest.impact) ? manifest.impact : {};

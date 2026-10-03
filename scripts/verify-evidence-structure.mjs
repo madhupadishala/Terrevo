@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { validateApplicabilityApproval } from "./applicability-approval.mjs";
 
 const manifestArg = process.argv[2] || process.env.PRODUCT_GATE_MANIFEST;
 if (!manifestArg) {
@@ -73,7 +72,9 @@ for (const check of policy.automatedChecks) {
   if (status === "NOT_APPLICABLE") {
     if (!exemptible.has(check)) failures.push(`automated check ${check} cannot be NOT_APPLICABLE`);
     const applicability = manifest.automatedCheckApplicability?.[check];
-    failures.push(...validateApplicabilityApproval(applicability, `automated check ${check}`));
+    if (!nonempty(applicability?.reviewer) || !nonempty(applicability?.rationale)) {
+      failures.push(`automated check ${check} NOT_APPLICABLE requires reviewer and rationale`);
+    }
   }
 }
 

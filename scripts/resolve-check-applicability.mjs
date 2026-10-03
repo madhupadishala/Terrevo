@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { validateApplicabilityApproval } from "./applicability-approval.mjs";
+import { spawnSync } from "node:child_process";
 
 const checkId = process.argv[2];
 const outputKey = process.argv[3] || "";
@@ -66,17 +66,35 @@ if (status === "PASS") {
 
 if (status === "NOT_APPLICABLE") {
   const applicability = manifest.automatedCheckApplicability?.[checkId];
-  const approvalFailures = validateApplicabilityApproval(applicability, checkId);
-  if (approvalFailures.length) {
-    for (const failure of approvalFailures) console.error(failure);
+  if (!nonempty(applicability?.reviewer) || !nonempty(applicability?.rationale)) {
+    console.error(`${checkId} NOT_APPLICABLE requires reviewer and rationale`);
     process.exit(1);
   }
   if (manifest.impact.ui !== false) {
     console.error(`${checkId} cannot be NOT_APPLICABLE when impact.ui=true`);
     process.exit(1);
   }
+
+  const baseSha = process.env.BASE_SHA || "";
+  const headSha = process.env.HEAD_SHA || "";
+  if (!/^[0-9a-f]{40}$/.test(baseSha) || !/^[0-9a-f]{40}$/.test(headSha)) {
+    console.error(`${checkId} NOT_APPLICABLE requires BASE_SHA and HEAD_SHA for deterministic UI-scope verification`);
+    process.exit(1);
+  }
+  const diff = spawnSync("git", ["diff", "--no-renames", "--name-only", "-z", baseSha, headSha], {encoding:"utf8"});
+  if (diff.status !== 0) {
+    console.error(`${checkId} could not verify UI applicability from git diff`);
+    process.exit(1);
+  }
+  const uiPrefixes = ["apps/web/","apps/mobile/","packages/ui/","packages/design-system/"];
+  const changedUi = diff.stdout.split("\0").filter(Boolean).filter(file => uiPrefixes.some(prefix => file.startsWith(prefix)));
+  if (changedUi.length) {
+    console.error(`${checkId} cannot be NOT_APPLICABLE because UI paths changed: ${changedUi.join(", ")}`);
+    process.exit(1);
+  }
+
   emit(false);
-  console.log(`${checkId}: REVIEWED NOT_APPLICABLE — ${applicability.reviewer}: ${applicability.rationale}`);
+  console.log(`${checkId}: DETERMINISTIC NOT_APPLICABLE — no UI paths changed; final acceptance still requires trusted CodeRabbit review`);
   process.exit(0);
 }
 

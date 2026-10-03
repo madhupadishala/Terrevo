@@ -93,6 +93,32 @@ function changedPaths(from, to) {
   return result.stdout.split("\0").filter(Boolean);
 }
 
+function manifestAtCommit(commit, manifestPath) {
+  const result = spawnSync("git", ["show", `${commit}:${manifestPath}`], { encoding:"utf8" });
+  if (result.status !== 0) {
+    console.error(`Unable to load reviewed manifest ${manifestPath} at ${commit}`);
+    process.exit(1);
+  }
+  try {
+    return JSON.parse(result.stdout);
+  } catch (error) {
+    console.error(`Reviewed manifest is invalid JSON: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]));
+  }
+  return value;
+}
+
+function sameJson(a,b) {
+  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+}
+
 const reviews = await pagedRest(`pulls/${prNumber}/reviews`);
 const trustedReviews = reviews
   .filter(review =>
@@ -126,6 +152,31 @@ if (invalidPostReviewChanges.length) {
   console.error(`Non-evidence changes exist after CodeRabbit-reviewed commit ${latestReview.commit_id}:`);
   for (const file of invalidPostReviewChanges) console.error(`- ${file}`);
   process.exit(1);
+}
+
+const reviewedManifest = manifestAtCommit(latestReview.commit_id, process.env.MANIFEST);
+if (!sameJson(reviewedManifest.impact, manifest.impact)) {
+  console.error("Impact declaration changed after the trusted CodeRabbit review");
+  process.exit(1);
+}
+for (const [checkId, status] of Object.entries(manifest.automatedChecks || {})) {
+  if (status !== "NOT_APPLICABLE") continue;
+  if (reviewedManifest.automatedChecks?.[checkId] !== "NOT_APPLICABLE") {
+    console.error(`Automated check ${checkId} became NOT_APPLICABLE after the trusted review`);
+    process.exit(1);
+  }
+  if (!sameJson(reviewedManifest.automatedCheckApplicability?.[checkId], manifest.automatedCheckApplicability?.[checkId])) {
+    console.error(`Automated check ${checkId} applicability declaration changed after the trusted review`);
+    process.exit(1);
+  }
+}
+for (const [gateId, gate] of Object.entries(manifest.gates || {})) {
+  if (gate?.status !== "NOT_APPLICABLE") continue;
+  const reviewedGate = reviewedManifest.gates?.[gateId];
+  if (reviewedGate?.status !== "NOT_APPLICABLE" || reviewedGate?.reviewer !== gate.reviewer || reviewedGate?.rationale !== gate.rationale) {
+    console.error(`Gate ${gateId} NOT_APPLICABLE declaration changed after the trusted review`);
+    process.exit(1);
+  }
 }
 
 const [owner, name] = repository.split("/");
@@ -192,5 +243,5 @@ if (unresolvedCount > 0) {
 }
 
 console.log(
-  `Trusted CodeRabbit approval: PASS — review ${latestReview.id} on ${latestReview.commit_id}; zero unresolved current CodeRabbit threads`
+  `Trusted CodeRabbit approval: PASS — review ${latestReview.id} on ${latestReview.commit_id}; applicability declarations are review-bound and unchanged; zero unresolved current CodeRabbit threads`
 );
