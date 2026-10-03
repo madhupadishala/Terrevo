@@ -1,0 +1,25 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "apps/web/src/main.tsx",
+    "apps/web/vite.config.ts"
+  ],
+  "project": [
+    "apps/web/**/*.ts",
+    "apps/web/**/*.tsx"
+  ],
+  "include": [
+    "files",
+    "dependencies",
+    "unlisted"
+  ],
+  "ignoreDependencies": [
+    "@eslint/js",
+    "eslint",
+    "typescript-eslint",
+    "dependency-cruiser",
+    "madge",
+    "knip",
+    "jscpd"
+  ]
+}

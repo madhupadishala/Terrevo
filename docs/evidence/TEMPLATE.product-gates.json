@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "changeId": "TRV-CHANGE-XXX",
+  "sprint": "Sprint XX",
+  "requirementIds": [
+    "TRV-XXX-001"
+  ],
+  "exactCommit": "REPLACE_WITH_FULL_COMMIT_SHA",
+  "owner": "REPLACE",
+  "reviewers": [],
+  "impact": {
+    "ui": false,
+    "database": false,
+    "apiContract": false,
+    "securityTenant": false,
+    "offlineSync": false,
+    "regulatoryDomain": false,
+    "architecture": false
+  },
+  "artifacts": {
+    "urs": [],
+    "frs": [],
+    "architecture": [],
+    "figma": [],
+    "userGuide": [],
+    "traceability": [],
+    "benchmark": []
+  },
+  "automatedChecks": {
+    "typecheck": "BLOCKED",
+    "lint": "BLOCKED",
+    "unit_tests": "BLOCKED",
+    "integration_tests": "BLOCKED",
+    "relevant_e2e": "BLOCKED",
+    "architecture": "BLOCKED",
+    "security": "BLOCKED",
+    "secret_scan": "BLOCKED",
+    "dependency_audit": "BLOCKED",
+    "module_regression": "BLOCKED",
+    "build": "BLOCKED",
+    "design_verification": "BLOCKED",
+    "browser_verification": "BLOCKED",
+    "evidence_verification": "BLOCKED"
+  },
+  "gates": {
+    "karpathy": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": {
+        "scope_review": [],
+        "assumptions": [],
+        "smallest_correct_change": [],
+        "verification": []
+      },
+      "rationale": ""
+    },
+    "ponytail": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": {
+        "reuse_review": [],
+        "duplication_review": [],
+        "maintainability_review": []
+      },
+      "rationale": ""
+    },
+    "product_design": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": {
+        "figma_or_no_ui_rationale": [],
+        "carbon_density_review": [],
+        "accessibility": [],
+        "responsive_states": [],
+        "browser_verification": []
+      },
+      "rationale": ""
+    },
+    "architecture": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": {
+        "boundary_review": [],
+        "dependency_direction": [],
+        "shared_services_review": [],
+        "vendor_leakage_review": []
+      },
+      "rationale": ""
+    },
+    "warpath": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": {
+        "failure_paths": [],
+        "retry_edge_cases": [],
+        "state_abuse": [],
+        "rollback": []
+      },
+      "rationale": ""
+    },
+    "coderabbit": {
+      "status": "BLOCKED",
+      "reviewer": "CodeRabbit",
+      "evidence": {
+        "review_url_or_id": [],
+        "unresolved_material_findings_zero": []
+      },
+      "rationale": ""
+    },
+    "hacker": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": {
+        "authorization_abuse": [],
+        "tenant_escape": [],
+        "replay_injection": [],
+        "tamper_workflow_bypass": []
+      },
+      "rationale": ""
+    },
+    "evidence": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": {
+        "requirements_traceability": [],
+        "tests": [],
+        "exact_commit": [],
+        "immutable_or_versioned_evidence": []
+      },
+      "rationale": ""
+    },
+    "regulatory_knowledge": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": {
+        "applicability_assessment": [],
+        "authoritative_sources_or_na_rationale": [],
+        "version_provenance": []
+      },
+      "rationale": ""
+    },
+    "modular_benchmark": {
+      "status": "BLOCKED",
+      "reviewer": "",
+      "evidence": {
+        "module_completeness": [],
+        "market_benchmark": [],
+        "no_fake_controls": [],
+        "integration_completeness": []
+      },
+      "rationale": ""
+    }
+  },
+  "rollback": {
+    "documented": false,
+    "tested": false,
+    "evidence": []
+  },
+  "finalQualification": {
+    "status": "IMPLEMENTED / NOT QUALIFIED",
+    "qualifiedBy": "",
+    "qualifiedAt": ""
+  },
+  "automatedCheckApplicability": {
+    "integration_tests": {
+      "reviewer": "",
+      "rationale": ""
+    },
+    "relevant_e2e": {
+      "reviewer": "",
+      "rationale": ""
+    },
+    "security": {
+      "reviewer": "",
+      "rationale": ""
+    },
+    "design_verification": {
+      "reviewer": "",
+      "rationale": ""
+    },
+    "browser_verification": {
+      "reviewer": "",
+      "rationale": ""
+    }
+  },
+  "impactEvidence": {
+    "database": {
+      "forward_migration": [],
+      "reverse_migration": []
+    },
+    "apiContract": {
+      "compatibility": []
+    },
+    "offlineSync": {
+      "retry": [],
+      "idempotency": []
+    }
+  },
+  "automatedCheckScopes": {
+    "lint": "",
+    "architecture": "",
+    "dead_code": "",
+    "duplication": "",
+    "module_regression": ""
+  }
+}

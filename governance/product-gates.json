@@ -1,0 +1,264 @@
+{
+  "version": 9,
+  "policyName": "Terrevo Product Development Operating System",
+  "completionRule": "A sprint or change is not COMPLETE until every mandatory gate is PASS or approved NOT_APPLICABLE and all required automated checks pass for the exact qualified commit.",
+  "statuses": [
+    "PASS",
+    "FAIL",
+    "BLOCKED",
+    "NOT_APPLICABLE"
+  ],
+  "gates": [
+    {
+      "id": "karpathy",
+      "name": "Karpathy Gate",
+      "mandatory": true,
+      "evidence": [
+        "scope_review",
+        "assumptions",
+        "smallest_correct_change",
+        "verification"
+      ]
+    },
+    {
+      "id": "ponytail",
+      "name": "Ponytail Gate",
+      "mandatory": true,
+      "evidence": [
+        "reuse_review",
+        "duplication_review",
+        "maintainability_review"
+      ]
+    },
+    {
+      "id": "product_design",
+      "name": "Product Design Guardian",
+      "mandatory": true,
+      "evidence": [
+        "figma_or_no_ui_rationale",
+        "carbon_density_review",
+        "accessibility",
+        "responsive_states",
+        "browser_verification"
+      ]
+    },
+    {
+      "id": "architecture",
+      "name": "Architecture Guardian",
+      "mandatory": true,
+      "evidence": [
+        "boundary_review",
+        "dependency_direction",
+        "shared_services_review",
+        "vendor_leakage_review"
+      ]
+    },
+    {
+      "id": "warpath",
+      "name": "Warpath Gate",
+      "mandatory": true,
+      "evidence": [
+        "failure_paths",
+        "retry_edge_cases",
+        "state_abuse",
+        "rollback"
+      ]
+    },
+    {
+      "id": "coderabbit",
+      "name": "CodeRabbit Gate",
+      "mandatory": true,
+      "evidence": [
+        "review_url_or_id",
+        "unresolved_material_findings_zero"
+      ]
+    },
+    {
+      "id": "hacker",
+      "name": "Hacker Gate",
+      "mandatory": true,
+      "evidence": [
+        "authorization_abuse",
+        "tenant_escape",
+        "replay_injection",
+        "tamper_workflow_bypass"
+      ]
+    },
+    {
+      "id": "evidence",
+      "name": "Evidence Gate",
+      "mandatory": true,
+      "evidence": [
+        "requirements_traceability",
+        "tests",
+        "exact_commit",
+        "immutable_or_versioned_evidence"
+      ]
+    },
+    {
+      "id": "regulatory_knowledge",
+      "name": "Regulatory Knowledge Gate",
+      "mandatory": true,
+      "evidence": [
+        "applicability_assessment",
+        "authoritative_sources_or_na_rationale",
+        "version_provenance"
+      ]
+    },
+    {
+      "id": "modular_benchmark",
+      "name": "Modular & Benchmark Completeness Gate",
+      "mandatory": true,
+      "evidence": [
+        "module_completeness",
+        "market_benchmark",
+        "no_fake_controls",
+        "integration_completeness"
+      ]
+    }
+  ],
+  "automatedChecks": [
+    "typecheck",
+    "lint",
+    "unit_tests",
+    "integration_tests",
+    "relevant_e2e",
+    "architecture",
+    "security",
+    "secret_scan",
+    "dependency_audit",
+    "module_regression",
+    "build",
+    "design_verification",
+    "browser_verification",
+    "evidence_verification"
+  ],
+  "completionLabels": {
+    "implementedNotQualified": "IMPLEMENTED / NOT QUALIFIED",
+    "complete": "COMPLETE",
+    "blocked": "BLOCKED",
+    "inProgress": "IN PROGRESS"
+  },
+  "exemptibleAutomatedChecks": [
+    "integration_tests",
+    "relevant_e2e",
+    "security",
+    "design_verification",
+    "browser_verification"
+  ],
+  "impactRequirements": {
+    "ui": {
+      "requiredGate": "product_design",
+      "requiredAutomatedChecks": [
+        "design_verification",
+        "browser_verification"
+      ]
+    },
+    "architecture": {
+      "requiredGate": "architecture",
+      "requiredAutomatedChecks": [
+        "architecture"
+      ]
+    },
+    "database": {
+      "requiredAutomatedChecks": [
+        "integration_tests"
+      ],
+      "requiredEvidenceKeys": [
+        "forward_migration",
+        "reverse_migration"
+      ]
+    },
+    "apiContract": {
+      "requiredAutomatedChecks": [
+        "integration_tests"
+      ],
+      "requiredEvidenceKeys": [
+        "compatibility"
+      ]
+    },
+    "securityTenant": {
+      "requiredGate": "hacker",
+      "requiredAutomatedChecks": [
+        "security"
+      ]
+    },
+    "offlineSync": {
+      "requiredGate": "warpath",
+      "requiredAutomatedChecks": [
+        "integration_tests"
+      ],
+      "requiredEvidenceKeys": [
+        "retry",
+        "idempotency"
+      ]
+    },
+    "regulatoryDomain": {
+      "requiredGate": "regulatory_knowledge"
+    }
+  },
+  "nonExemptibleGates": [
+    "coderabbit",
+    "evidence"
+  ],
+  "trustedProducers": {
+    "githubActions": {
+      "appId": 15368,
+      "slug": "github-actions",
+      "workflowPath": ".github/workflows/ci.yml",
+      "event": "push"
+    },
+    "codeRabbit": {
+      "login": "coderabbitai[bot]",
+      "id": 136622811
+    }
+  },
+  "automatedCheckBindings": {
+    "typecheck": [
+      "foundation"
+    ],
+    "lint": [
+      "quality-security"
+    ],
+    "unit_tests": [
+      "foundation"
+    ],
+    "integration_tests": [
+      "database-migrations"
+    ],
+    "relevant_e2e": [],
+    "architecture": [
+      "quality-security"
+    ],
+    "security": [
+      "quality-security"
+    ],
+    "secret_scan": [
+      "secret-scan"
+    ],
+    "dependency_audit": [
+      "quality-security"
+    ],
+    "module_regression": [
+      "foundation",
+      "mobile",
+      "database-migrations"
+    ],
+    "build": [
+      "foundation"
+    ],
+    "design_verification": [
+      "design-verification"
+    ],
+    "browser_verification": [
+      "browser-verification"
+    ],
+    "evidence_verification": [
+      "quality-security"
+    ]
+  },
+  "applicabilityApproval": {
+    "producer": "trusted CodeRabbit GitHub review",
+    "rule": "Every NOT_APPLICABLE automated-check or gate declaration must exist unchanged in the CodeRabbit-approved implementation commit; evidence-only commits may not add or modify those declarations."
+  }
+}

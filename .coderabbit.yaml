@@ -7,6 +7,9 @@ knowledge_base:
     enabled: true
     filePatterns:
       - "AGENTS.md"
+      - "README.md"
+      - "docs/governance/PRODUCT-OPERATING-SYSTEM.md"
+      - "governance/product-gates.json"
       - "skills/karpathy-guidelines/SKILL.md"
       - "skills/warpath/SKILL.md"
 reviews:
@@ -15,6 +18,7 @@ reviews:
   high_level_summary: true
   changed_files_summary: true
   review_status: true
+  review_progress: false
   commit_status: true
   fail_commit_status: true
   collapse_walkthrough: false
@@ -25,6 +29,7 @@ reviews:
     auto_incremental_review: true
     base_branches:
       - "main"
+      - "governance/product-operating-system"
       - "feature/sprint-22-offline-sync"
       - "feature/sprint-23-security-audit"
       - "feature/sprint-24-regression-uat-closure"
@@ -37,10 +42,12 @@ reviews:
   path_instructions:
     - path: "**"
       instructions: |
-        Enforce AGENTS.md, the Karpathy guidelines, and Terrevo Warpath safety concerns. Flag silent assumptions, unnecessary complexity,
-        unrelated refactors, hidden scope expansion, breaking contracts, tenant-boundary failures,
-        non-idempotent writes, missing validation, weakened tests, and UI changes unrelated to the PR.
-        Every changed line should trace to the stated requirement.
+        Enforce AGENTS.md, docs/governance/PRODUCT-OPERATING-SYSTEM.md, governance/product-gates.json,
+        the Karpathy guidelines, and Terrevo Warpath safety concerns. Treat the ten mandatory gates as qualification controls.
+        Flag silent assumptions, unnecessary complexity, unrelated refactors, hidden scope expansion, breaking contracts,
+        tenant-boundary failures, non-idempotent writes, missing validation, weakened tests, fake controls,
+        unsupported PASS claims in evidence manifests, and UI changes unrelated to the PR.
+        Every changed line should trace to the stated requirement. Any unresolved material finding blocks qualification.
     - path: "apps/mobile/**"
       instructions: |
         Focus on offline-first behavior, idempotent sync, GPS/time integrity, permissions,
@@ -58,6 +65,13 @@ reviews:
     - path: "database/**"
       instructions: |
         Require migration safety, backward compatibility, tenant isolation and rollback consideration.
-
+    - path: "docs/evidence/**"
+      instructions: |
+        Treat evidence as controlled qualification data. Flag unsupported PASS claims, missing reviewer/rationale,
+        stale or non-ancestor qualified commits, fabricated test evidence, and COMPLETE status when required gates are not proven.
+    - path: "governance/**"
+      instructions: |
+        Review governance changes fail-closed. Flag bypasses, optionalization of mandatory gates, self-attestation loopholes,
+        or mechanisms that allow implementation to be called COMPLETE without exact-commit evidence.
 chat:
   auto_reply: true

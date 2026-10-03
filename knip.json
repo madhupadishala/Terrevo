@@ -1,0 +1,28 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "apps/api/src/index.ts",
+    "apps/api/src/vercel-runtime.ts"
+  ],
+  "project": [
+    "apps/api/src/**/*.ts",
+    "modules/identity/**/*.ts",
+    "modules/tenant/**/*.ts",
+    "modules/organization/**/*.ts",
+    "modules/rbac/**/*.ts",
+    "modules/masters/**/*.ts",
+    "modules/tour-planning/**/*.ts",
+    "modules/tour-approval/**/*.ts"
+  ],
+  "include": [
+    "files",
+    "dependencies",
+    "unlisted"
+  ],
+  "ignoreDependencies": [
+    "react",
+    "react-dom",
+    "@types/react",
+    "@types/react-dom"
+  ]
+}

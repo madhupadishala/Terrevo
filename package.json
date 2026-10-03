@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "verify:foundation": "node scripts/verify-foundation.mjs",
+    "verify:product-gates": "node scripts/verify-product-gates.mjs",
     "build:api": "node -e \"require('fs').rmSync('.vercel-api',{recursive:true,force:true})\" && tsc -p tsconfig.vercel-api.json",
     "build:web": "vite build --config apps/web/vite.config.ts",
     "verify:vercel-runtime": "node scripts/verify-vercel-runtime.mjs",
@@ -13,7 +14,19 @@
     "typecheck:web": "tsc -p apps/web/tsconfig.json",
     "typecheck": "tsc -p tsconfig.json && npm run typecheck:web",
     "test": "node --experimental-strip-types --test apps/api/test/*.test.ts",
-    "verify": "npm run verify:foundation && npm run typecheck && npm test && npm run build"
+    "verify": "npm run verify:foundation && npm run typecheck && npm test && npm run build && npm run lint:core && npm run check:architecture:core && npm run check:dead-code && npm run check:duplication:core && npm run test:product-gates",
+    "lint": "npm run lint:core",
+    "check:architecture": "npm run check:architecture:core",
+    "check:dead-code": "npm run check:dead-code:core && npm run check:dead-code:web",
+    "check:duplication": "npm run check:duplication:core",
+    "check:dependency-audit": "npm audit --audit-level=high",
+    "verify:evidence-structure": "node scripts/verify-evidence-structure.mjs",
+    "lint:core": "eslint \"apps/api/src/**/*.ts\" \"apps/api/test/identity-tenant.test.ts\" \"apps/api/test/organization-rbac.test.ts\" \"apps/api/test/masters.test.ts\" \"apps/api/test/tour-planning.test.ts\" \"apps/api/test/tour-approval.test.ts\" \"modules/{identity,tenant,organization,rbac,masters,tour-planning,tour-approval}/**/*.ts\"",
+    "check:architecture:core": "depcruise --validate .dependency-cruiser.cjs apps/api/src modules/identity modules/tenant modules/organization modules/rbac modules/masters modules/tour-planning modules/tour-approval && madge --circular --extensions ts,tsx apps/api/src modules/identity modules/tenant modules/organization modules/rbac modules/masters modules/tour-planning modules/tour-approval",
+    "check:duplication:core": "jscpd --config .jscpd.json apps/api/src modules/identity modules/tenant modules/organization modules/rbac modules/masters modules/tour-planning modules/tour-approval",
+    "test:product-gates": "node scripts/test-product-gates.mjs",
+    "check:dead-code:core": "knip --config knip.json",
+    "check:dead-code:web": "knip --config knip.web.json"
   },
   "engines": {
     "node": ">=22"
@@ -27,6 +40,13 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "typescript": "5.8.3",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "@eslint/js": "^9.36.0",
+    "eslint": "^9.36.0",
+    "typescript-eslint": "^8.44.1",
+    "dependency-cruiser": "^16.10.4",
+    "madge": "^8.0.0",
+    "knip": "6.39.0",
+    "jscpd": "5.3.1"
   }
 }

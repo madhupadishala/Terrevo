@@ -1,0 +1,255 @@
+name: Product Gates
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
+    inputs:
+      manifest:
+        description: Evidence manifest path
+        required: true
+        type: string
+      pr_number:
+        description: Pull request number containing the qualified change
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: read
+  checks: read
+
+concurrency:
+  group: product-gates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22"
+
+      - name: Resolve evidence manifest
+        id: manifest
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          DISPATCH_MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            manifest="$DISPATCH_MANIFEST"
+          else
+            manifest="$(printf '%s\n' "$PR_BODY" | sed -n 's/^- Evidence manifest: `\([^`]*\)`.*/\1/p' | head -n1)"
+          fi
+          test -n "$manifest" || { echo "Evidence manifest path missing from PR body"; exit 1; }
+          test -f "$manifest" || { echo "Evidence manifest does not exist: $manifest"; exit 1; }
+
+          evidence_root="$(realpath docs/evidence)"
+          manifest_real="$(realpath "$manifest")"
+          case "$manifest_real" in
+            "$evidence_root"/*.product-gates.json) ;;
+            *)
+              echo "Evidence manifest must resolve inside docs/evidence and end in .product-gates.json"
+              exit 1
+              ;;
+          esac
+
+          workspace_real="$(realpath "$GITHUB_WORKSPACE")"
+          case "$manifest_real" in
+            "$workspace_real"/*) manifest_rel="${manifest_real#"$workspace_real"/}" ;;
+            *) echo "Evidence manifest resolved outside the checked-out workspace"; exit 1 ;;
+          esac
+          echo "path=$manifest_rel" >> "$GITHUB_OUTPUT"
+
+      - name: Verify exact qualified implementation
+        shell: bash
+        env:
+          MANIFEST: ${{ steps.manifest.outputs.path }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          manifest_sha="$(node -e 'const fs=require("fs"); console.log(JSON.parse(fs.readFileSync(process.env.MANIFEST,"utf8")).exactCommit || "")')"
+          git cat-file -e "$manifest_sha^{commit}" 2>/dev/null || {
+            echo "Evidence manifest references unknown commit: $manifest_sha"
+            exit 1
+          }
+          if [ "$manifest_sha" != "$HEAD_SHA" ]; then
+            git merge-base --is-ancestor "$manifest_sha" "$HEAD_SHA" || {
+              echo "Qualified commit $manifest_sha is not an ancestor of current head $HEAD_SHA"
+              exit 1
+            }
+            invalid=0
+            while IFS= read -r -d '' changed_path; do
+              case "$changed_path" in
+                docs/evidence/*|docs/qa/*) ;;
+                *)
+                  echo "Implementation changed after qualified commit $manifest_sha: $changed_path"
+                  invalid=1
+                  ;;
+              esac
+            done < <(git diff --no-renames --name-only -z "$manifest_sha" "$HEAD_SHA")
+            if [ "$invalid" -ne 0 ]; then
+              exit 1
+            fi
+          fi
+
+      - name: Verify trusted clean CodeRabbit review
+        env:
+          MANIFEST: ${{ steps.manifest.outputs.path }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          node scripts/verify-coderabbit-review.mjs
+          echo "CODERABBIT_REVIEW_VERIFIED=true" >> "$GITHUB_ENV"
+
+      - name: Load exact-commit automated check runs
+        shell: bash
+        env:
+          MANIFEST: ${{ steps.manifest.outputs.path }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          check_file="$RUNNER_TEMP/automated-check-runs.json"
+          CHECK_FILE="$check_file" node --input-type=module - <<'NODE'
+          import fs from "node:fs";
+
+          const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST,"utf8"));
+          const policy = JSON.parse(fs.readFileSync("governance/product-gates.json","utf8"));
+          const jobs = [...new Set(
+            Object.entries(manifest.automatedChecks || {})
+              .filter(([,status]) => status === "PASS")
+              .flatMap(([id]) => policy.automatedCheckBindings?.[id] || [])
+          )];
+
+          const allRuns = [];
+          for (const jobName of jobs) {
+            let page = 1;
+            while (true) {
+              const url = new URL(
+                `https://api.github.com/repos/${process.env.REPOSITORY}/commits/${manifest.exactCommit}/check-runs`
+              );
+              url.searchParams.set("check_name", jobName);
+              url.searchParams.set("filter", "all");
+              url.searchParams.set("per_page", "100");
+              url.searchParams.set("page", String(page));
+
+              const response = await fetch(url, {
+                headers: {
+                  Authorization: `Bearer ${process.env.GH_TOKEN}`,
+                  Accept: "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28"
+                }
+              });
+              if (!response.ok) {
+                console.error(`Failed to load check runs for ${jobName}: ${response.status}`);
+                process.exit(1);
+              }
+
+              const payload = await response.json();
+              if (!Array.isArray(payload.check_runs)) {
+                console.error(`Invalid check-run payload for ${jobName}`);
+                process.exit(1);
+              }
+              allRuns.push(...payload.check_runs);
+
+              if (payload.check_runs.length < 100) break;
+              page += 1;
+              if (page > 50) {
+                console.error(`Check-run pagination exceeded safety limit for ${jobName}`);
+                process.exit(1);
+              }
+            }
+          }
+
+          const workflowRuns = [];
+          let workflowPage = 1;
+          while (true) {
+            const url = new URL(`https://api.github.com/repos/${process.env.REPOSITORY}/actions/runs`);
+            url.searchParams.set("head_sha", manifest.exactCommit);
+            url.searchParams.set("per_page", "100");
+            url.searchParams.set("page", String(workflowPage));
+            const response = await fetch(url, {
+              headers: {
+                Authorization: `Bearer ${process.env.GH_TOKEN}`,
+                Accept: "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28"
+              }
+            });
+            if (!response.ok) {
+              console.error(`Failed to load workflow runs: ${response.status}`);
+              process.exit(1);
+            }
+            const payload = await response.json();
+            if (!Array.isArray(payload.workflow_runs)) {
+              console.error("Invalid workflow-run payload");
+              process.exit(1);
+            }
+            workflowRuns.push(...payload.workflow_runs);
+            if (payload.workflow_runs.length < 100) break;
+            workflowPage += 1;
+            if (workflowPage > 50) {
+              console.error("Workflow-run pagination exceeded safety limit");
+              process.exit(1);
+            }
+          }
+
+          fs.writeFileSync(
+            process.env.CHECK_FILE,
+            JSON.stringify({total_count: allRuns.length, check_runs: allRuns, workflow_runs: workflowRuns})
+          );
+          NODE
+          echo "AUTOMATED_CHECK_RUNS_FILE=$check_file" >> "$GITHUB_ENV"
+
+      - name: Verify evidence structure
+        env:
+          MANIFEST: ${{ steps.manifest.outputs.path }}
+        run: node scripts/verify-evidence-structure.mjs "$MANIFEST"
+
+      - name: Verify product gates
+        env:
+          MANIFEST: ${{ steps.manifest.outputs.path }}
+        run: node scripts/verify-product-gates.mjs "$MANIFEST"
+
+      - name: Verify policy fail-closed behavior
+        run: npm run test:product-gates
+
+      - name: Prevent focused tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          search_dirs=(apps modules)
+          for directory in "${search_dirs[@]}"; do
+            test -d "$directory" || {
+              echo "Focused-test search directory is missing: $directory"
+              exit 1
+            }
+          done
+          status=0
+          grep -RInE '\.(only)\s*\(' "${search_dirs[@]}" || status=$?
+          if [ "$status" -eq 0 ]; then
+            echo "Focused tests are forbidden"
+            exit 1
+          elif [ "$status" -ne 1 ]; then
+            echo "Focused-test search failed with grep status $status"
+            exit 1
+          fi
+
+      - name: Repository verification
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run verify
