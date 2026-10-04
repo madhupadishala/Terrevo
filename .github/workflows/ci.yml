@@ -100,12 +100,16 @@ jobs:
           }
           if (prs.length === 1) {
             const body = prs[0]?.body || "";
-            const match = body.match(/^- Evidence manifest: \`([^\`]+)\`\\s*$/m);
-            if (!match?.[1]) {
+            const prefix = "- Evidence manifest: `";
+            const line = body.split(/\r?\n/).find(candidate =>
+              candidate.startsWith(prefix) && candidate.endsWith("`")
+            );
+            const manifest = line?.slice(prefix.length, -1).trim();
+            if (!manifest) {
               console.error(`Open PR #${prs[0].number} for this push branch is missing the required evidence-manifest declaration`);
               process.exit(1);
             }
-            process.stdout.write(match[1]);
+            process.stdout.write(manifest);
           }
           NODE
             )"
