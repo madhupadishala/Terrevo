@@ -13,8 +13,8 @@ const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST, "utf8"));
 const policy = JSON.parse(fs.readFileSync("governance/product-gates.json", "utf8"));
 const trusted = policy.trustedProducers?.codeRabbit;
 
-if (!trusted?.login || !trusted?.id) {
-  console.error("Trusted CodeRabbit producer is not configured");
+if (!trusted?.login || !trusted?.id || !trusted?.threadLogin) {
+  console.error("Trusted CodeRabbit producer or review-thread identity is not configured");
   process.exit(1);
 }
 
@@ -227,7 +227,7 @@ for (let page = 1; page <= 50; page += 1) {
   unresolvedCount += (threads.nodes || []).filter(thread =>
     !thread.isResolved &&
     !thread.isOutdated &&
-    thread.comments?.nodes?.[0]?.author?.login === trusted.login
+    thread.comments?.nodes?.[0]?.author?.login === trusted.threadLogin
   ).length;
   if (!threads.pageInfo?.hasNextPage) break;
   cursor = threads.pageInfo.endCursor;
@@ -243,5 +243,5 @@ if (unresolvedCount > 0) {
 }
 
 console.log(
-  `Trusted CodeRabbit approval: PASS — review ${latestReview.id} on ${latestReview.commit_id}; applicability declarations are review-bound and unchanged; zero unresolved current CodeRabbit threads`
+  `Trusted CodeRabbit approval: PASS — review ${latestReview.id} on ${latestReview.commit_id}; applicability declarations are review-bound and unchanged; zero unresolved current CodeRabbit threads from ${trusted.threadLogin}`
 );
