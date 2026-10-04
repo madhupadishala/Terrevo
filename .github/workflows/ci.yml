@@ -98,9 +98,15 @@ jobs:
             console.error("Push branch maps to multiple open PRs; evidence manifest is ambiguous");
             process.exit(1);
           }
-          const body = prs[0]?.body || "";
-          const match = body.match(/^- Evidence manifest: \`([^\`]+)\`\s*$/m);
-          process.stdout.write(match?.[1] || "");
+          if (prs.length === 1) {
+            const body = prs[0]?.body || "";
+            const match = body.match(/^- Evidence manifest: \`([^\`]+)\`\\s*$/m);
+            if (!match?.[1]) {
+              console.error(`Open PR #${prs[0].number} for this push branch is missing the required evidence-manifest declaration`);
+              process.exit(1);
+            }
+            process.stdout.write(match[1]);
+          }
           NODE
             )"
 

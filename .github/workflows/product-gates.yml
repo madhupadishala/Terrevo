@@ -29,9 +29,56 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Resolve qualification target
+        id: target
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DISPATCH_PR_NUMBER: ${{ inputs.pr_number }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            head_sha="$EVENT_PR_HEAD_SHA"
+          else
+            head_sha="$(node --input-type=module - <<'NODE'
+          const raw = process.env.DISPATCH_PR_NUMBER || "";
+          if (!/^\\d+$/.test(raw) || Number(raw) < 1) {
+            console.error("workflow_dispatch pr_number must be a positive integer");
+            process.exit(1);
+          }
+          const response = await fetch(
+            `https://api.github.com/repos/${process.env.REPOSITORY}/pulls/${raw}`,
+            {
+              headers: {
+                Authorization: `Bearer ${process.env.GH_TOKEN}`,
+                Accept: "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28"
+              }
+            }
+          );
+          if (!response.ok) {
+            console.error(`Unable to resolve pull request #${raw}: ${response.status}`);
+            process.exit(1);
+          }
+          const resolvedPr = await response.json();
+          const sha = resolvedPr?.head?.sha;
+          if (!/^[0-9a-f]{40}$/.test(sha || "")) {
+            console.error(`Pull request #${raw} does not expose a valid head SHA`);
+            process.exit(1);
+          }
+          process.stdout.write(sha);
+          NODE
+            )"
+          fi
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Resolved qualification head SHA is invalid"; exit 1; }
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ steps.target.outputs.head_sha }}
           persist-credentials: false
           fetch-depth: 0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -76,7 +123,7 @@ jobs:
         shell: bash
         env:
           MANIFEST: ${{ steps.manifest.outputs.path }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          HEAD_SHA: ${{ steps.target.outputs.head_sha }}
         run: |
           set -euo pipefail
           manifest_sha="$(node -e 'const fs=require("fs"); console.log(JSON.parse(fs.readFileSync(process.env.MANIFEST,"utf8")).exactCommit || "")')"
@@ -110,7 +157,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          HEAD_SHA: ${{ steps.target.outputs.head_sha }}
         run: |
           set -euo pipefail
           node scripts/verify-coderabbit-review.mjs
