@@ -97,6 +97,6 @@ A sprint is complete only when:
 - required design/browser/security/regression evidence is attached;
 - URS/FRS/architecture/user documentation is updated when impacted;
 - rollback is documented and tested where material;
-- the evidence manifest passes `npm run verify:product-gates`.
+- the evidence manifest passes `npm run verify:product-gates -- <manifest>`.
 
 Until then, status must be **IN PROGRESS**, **BLOCKED**, or **IMPLEMENTED / NOT QUALIFIED** — never COMPLETE.
