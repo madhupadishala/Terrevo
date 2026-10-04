@@ -45,7 +45,7 @@ jobs:
           else
             head_sha="$(node --input-type=module - <<'NODE'
           const raw = process.env.DISPATCH_PR_NUMBER || "";
-          if (!/^\\d+$/.test(raw) || Number(raw) < 1) {
+          if (!/^\d+$/.test(raw) || Number(raw) < 1) {
             console.error("workflow_dispatch pr_number must be a positive integer");
             process.exit(1);
           }

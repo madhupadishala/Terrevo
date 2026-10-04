@@ -177,7 +177,6 @@ jobs:
           extra_args: --results=verified,unknown,unverified
 
   ui-applicability:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     outputs:
       design: ${{ steps.resolve.outputs.design }}
@@ -187,12 +186,112 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: Resolve UI evidence context
+        id: context
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_HEAD: ${{ github.sha }}
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          parse_manifest() {
+            printf '%s\n' "$1" | sed -n 's/^- Evidence manifest: `\([^`]*\)`.*/\1/p' | head -n1
+          }
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            manifest="$(parse_manifest "$PR_BODY")"
+            base="$PR_BASE"
+            head="$PR_HEAD"
+          else
+            head="$PUSH_HEAD"
+            base="$PUSH_BEFORE"
+            if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+              base="$(git rev-parse "$head^" 2>/dev/null || true)"
+            fi
+            test -n "$base" || { echo "Unable to resolve push comparison base"; exit 1; }
+
+            manifest="$(node --input-type=module - <<'NODE'
+          const [owner] = process.env.REPOSITORY.split("/");
+          const url = new URL(`https://api.github.com/repos/${process.env.REPOSITORY}/pulls`);
+          url.searchParams.set("state","open");
+          url.searchParams.set("head",`${owner}:${process.env.HEAD_REF}`);
+          const response = await fetch(url,{
+            headers:{
+              Authorization:`Bearer ${process.env.GH_TOKEN}`,
+              Accept:"application/vnd.github+json",
+              "X-GitHub-Api-Version":"2022-11-28"
+            }
+          });
+          if (!response.ok) {
+            console.error(`Unable to resolve push PR context: ${response.status}`);
+            process.exit(1);
+          }
+          const prs = await response.json();
+          if (!Array.isArray(prs)) {
+            console.error("Invalid pull-request payload");
+            process.exit(1);
+          }
+          if (prs.length > 1) {
+            console.error("Push branch maps to multiple open PRs; evidence manifest is ambiguous");
+            process.exit(1);
+          }
+          if (prs.length === 1) {
+            const prefix = "- Evidence manifest: `";
+            const line = (prs[0]?.body || "").split(/\r?\n/).find(candidate =>
+              candidate.startsWith(prefix) && candidate.endsWith("`")
+            );
+            const manifest = line?.slice(prefix.length, -1).trim();
+            if (!manifest) {
+              console.error(`Open PR #${prs[0].number} for this push branch is missing the required evidence-manifest declaration`);
+              process.exit(1);
+            }
+            process.stdout.write(manifest);
+          }
+          NODE
+            )"
+
+            if [ -z "$manifest" ]; then
+              mapfile -d '' changed_manifests < <(git diff --no-renames --name-only -z "$base" "$head" -- 'docs/evidence/*.product-gates.json')
+              if [ "${#changed_manifests[@]}" -ne 1 ]; then
+                echo "Push without a matching PR must change exactly one evidence manifest for UI applicability resolution"
+                exit 1
+              fi
+              manifest="${changed_manifests[0]}"
+            fi
+          fi
+
+          [[ "$base" =~ ^[0-9a-f]{40}$ ]] || { echo "Resolved UI comparison base is invalid"; exit 1; }
+          [[ "$head" =~ ^[0-9a-f]{40}$ ]] || { echo "Resolved UI comparison head is invalid"; exit 1; }
+          test -f "$manifest" || { echo "Evidence manifest does not exist: $manifest"; exit 1; }
+
+          evidence_root="$(realpath docs/evidence)"
+          manifest_real="$(realpath "$manifest")"
+          case "$manifest_real" in
+            "$evidence_root"/*.product-gates.json) ;;
+            *)
+              echo "Evidence manifest must resolve inside docs/evidence and end in .product-gates.json"
+              exit 1
+              ;;
+          esac
+
+          echo "manifest=$manifest" >> "$GITHUB_OUTPUT"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
       - name: Resolve UI verification applicability from evidence
         id: resolve
         env:
+          MANIFEST_PATH: ${{ steps.context.outputs.manifest }}
           PR_BODY: ${{ github.event.pull_request.body }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ steps.context.outputs.base }}
+          HEAD_SHA: ${{ steps.context.outputs.head }}
         run: |
           set -euo pipefail
           node scripts/resolve-check-applicability.mjs design_verification design

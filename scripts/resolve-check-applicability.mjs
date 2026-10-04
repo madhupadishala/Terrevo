@@ -23,16 +23,18 @@ const emit = required => {
 };
 
 const nonempty = value => typeof value === "string" && value.trim().length > 0;
+const explicitManifest = process.env.MANIFEST_PATH?.trim() || "";
 const prBody = process.env.PR_BODY || "";
-const match = prBody.match(/^- Evidence manifest: `([^`]+)`\s*$/m);
-if (!match) {
-  console.error("Evidence manifest path missing from PR body");
+const match = explicitManifest ? null : prBody.match(/^- Evidence manifest: `([^`]+)`\s*$/m);
+const manifestPath = explicitManifest || match?.[1] || "";
+if (!manifestPath) {
+  console.error("Evidence manifest path missing from resolved context");
   process.exit(1);
 }
 
 const repoRoot = fs.realpathSync(process.cwd());
 const evidenceRoot = fs.realpathSync(path.join(repoRoot,"docs/evidence"));
-const candidate = path.resolve(repoRoot, match[1]);
+const candidate = path.resolve(repoRoot, manifestPath);
 
 let manifestReal;
 try {
