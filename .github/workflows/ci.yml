@@ -120,8 +120,8 @@ jobs:
           fi
 
           if [ "${#manifests[@]}" -eq 0 ]; then
-            echo "No evidence manifest selected by push context; PR qualification will validate its declared manifest."
-            exit 0
+            echo "No evidence manifest selected by push context; refusing to emit evidence-verification PASS."
+            exit 1
           fi
 
           evidence_root="$(realpath docs/evidence)"
