@@ -202,5 +202,6 @@
     "dead_code": "",
     "duplication": "",
     "module_regression": ""
-  }
+  },
+  "trustedWorkflowChangeApprovals": []
 }
