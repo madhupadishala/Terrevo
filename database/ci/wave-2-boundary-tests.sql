@@ -211,6 +211,83 @@ begin
 end
 $wave2_tenant_escape$;
 
+-- Inventory issue: valid Tenant A employee cannot receive a Tenant B sample.
+do $wave2_tenant_escape$
+declare
+  v_a_balance_before integer;
+  v_a_ledger_before integer;
+  v_b_balance_before integer;
+  v_b_ledger_before integer;
+  v_a_balance_after integer;
+  v_a_ledger_after integer;
+  v_b_balance_after integer;
+  v_b_ledger_after integer;
+begin
+  select quantity into v_a_balance_before
+    from public.inventory_balances
+   where tenant_id='82000000-0000-4000-8000-000000000001'
+     and employee_id='84000000-0000-4000-8000-000000000001'
+     and sample_id='85000000-0000-4000-8000-000000000003';
+
+  select count(*) into v_a_ledger_before
+    from public.inventory_ledger
+   where tenant_id='82000000-0000-4000-8000-000000000001';
+
+  select quantity into v_b_balance_before
+    from public.inventory_balances
+   where tenant_id='82000000-0000-4000-8000-000000000002'
+     and employee_id='94000000-0000-4000-8000-000000000001'
+     and sample_id='95000000-0000-4000-8000-000000000003';
+
+  select count(*) into v_b_ledger_before
+    from public.inventory_ledger
+   where tenant_id='82000000-0000-4000-8000-000000000002';
+
+  begin
+    perform public.admin_issue_inventory(
+      '82000000-0000-4000-8000-000000000001',
+      '81000000-0000-4000-8000-000000000002',
+      '89000000-0000-4000-8000-000000000012',
+      '84000000-0000-4000-8000-000000000001',
+      'sample',
+      '95000000-0000-4000-8000-000000000003',
+      1
+    );
+    raise exception 'TRV-INV tenant escape failed: Tenant B sample accepted for Tenant A employee';
+  exception
+    when others then
+      if position('inventory item is not active in employee division' in sqlerrm)=0 then raise; end if;
+  end;
+
+  select quantity into v_a_balance_after
+    from public.inventory_balances
+   where tenant_id='82000000-0000-4000-8000-000000000001'
+     and employee_id='84000000-0000-4000-8000-000000000001'
+     and sample_id='85000000-0000-4000-8000-000000000003';
+
+  select count(*) into v_a_ledger_after
+    from public.inventory_ledger
+   where tenant_id='82000000-0000-4000-8000-000000000001';
+
+  select quantity into v_b_balance_after
+    from public.inventory_balances
+   where tenant_id='82000000-0000-4000-8000-000000000002'
+     and employee_id='94000000-0000-4000-8000-000000000001'
+     and sample_id='95000000-0000-4000-8000-000000000003';
+
+  select count(*) into v_b_ledger_after
+    from public.inventory_ledger
+   where tenant_id='82000000-0000-4000-8000-000000000002';
+
+  if v_a_balance_after is distinct from v_a_balance_before
+     or v_a_ledger_after<>v_a_ledger_before
+     or v_b_balance_after is distinct from v_b_balance_before
+     or v_b_ledger_after<>v_b_ledger_before then
+    raise exception 'TRV-INV tenant escape failed: inventory changed after rejected cross-tenant sample issue';
+  end if;
+end
+$wave2_tenant_escape$;
+
 -- GPS exception review: Tenant A manager cannot review a Tenant B visit.
 do $wave2_tenant_escape$
 declare
