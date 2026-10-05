@@ -344,7 +344,7 @@ begin
 
   begin
     perform public.admin_return_inventory(
-      '82000000-0000-4000-8000-000000000001',
+      '82000000-0000-4000-8000-000000000002',
       '81000000-0000-4000-8000-000000000001',
       '89000000-0000-4000-8000-000000000011',
       'sample',
@@ -354,7 +354,7 @@ begin
     raise exception 'TRV-INV tenant escape failed: cross-tenant return succeeded';
   exception
     when others then
-      if position('insufficient inventory balance' in sqlerrm)=0 then raise; end if;
+      if position('active employee not found' in sqlerrm)=0 then raise; end if;
   end;
 
   select quantity into v_b_balance_after
