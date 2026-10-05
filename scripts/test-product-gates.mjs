@@ -32,6 +32,7 @@ const base = {
   exactCommit: "a".repeat(40),
   owner: "test",
   reviewers: ["test"],
+  trustedWorkflowChangeApprovals: [],
   impact: {
     ui: false,
     architecture: false,
@@ -75,7 +76,24 @@ const buildRuns = sha => {
     check_suite:{id:index+1000},
     app:{id:policy.trustedProducers.githubActions.appId,slug:policy.trustedProducers.githubActions.slug}
   }));
-  return {total_count:check_runs.length,check_runs,workflow_runs:check_runs.map(run=>({id:run.id+10000,check_suite_id:run.check_suite.id,head_sha:sha,path:policy.trustedProducers.githubActions.workflowPath,event:policy.trustedProducers.githubActions.event}))};
+  return {
+    total_count:check_runs.length,
+    check_runs,
+    workflow_runs:check_runs.map(run=>({
+      id:run.id+10000,
+      check_suite_id:run.check_suite.id,
+      head_sha:sha,
+      path:policy.trustedProducers.githubActions.workflowPath,
+      event:policy.trustedProducers.githubActions.event
+    })),
+    trusted_workflow_comparison:{
+      path:policy.trustedProducers.githubActions.workflowPath,
+      base_sha:"b".repeat(40),
+      exact_sha:sha,
+      base_blob_sha:"c".repeat(40),
+      exact_blob_sha:"c".repeat(40)
+    }
+  };
 };
 
 const writeManifest = manifest => {
@@ -216,6 +234,35 @@ assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest shou
 {
   const m=structuredClone(base); const runs=buildRuns(m.exactCommit); runs.workflow_runs[0].path=".github/workflows/untrusted.yml";
   assert.notEqual(runFinal(m,{runs}).status,0,"check run from untrusted workflow must fail");
+}
+{
+  const m=structuredClone(base); const runs=buildRuns(m.exactCommit);
+  runs.workflow_runs[0].path=`${policy.trustedProducers.githubActions.workflowPath}@main`;
+  assert.equal(runFinal(m,{runs}).status,0,"trusted workflow path with GitHub ref suffix must pass");
+}
+{
+  const m=structuredClone(base); const runs=buildRuns(m.exactCommit);
+  runs.trusted_workflow_comparison.exact_blob_sha="d".repeat(40);
+  assert.notEqual(runFinal(m,{runs}).status,0,"changed trusted workflow must fail without review-bound approval");
+}
+{
+  const m=structuredClone(base); const runs=buildRuns(m.exactCommit);
+  runs.trusted_workflow_comparison.exact_blob_sha="d".repeat(40);
+  m.trustedWorkflowChangeApprovals=[{
+    path:policy.trustedProducers.githubActions.workflowPath,
+    reviewer:policy.trustedProducers.codeRabbit.login,
+    rationale:"Intentional verifier test workflow change."
+  }];
+  assert.equal(runFinal(m,{runs}).status,0,"changed trusted workflow may pass only with trusted CodeRabbit-bound approval");
+}
+{
+  const m=structuredClone(base);
+  m.trustedWorkflowChangeApprovals=[{
+    path:policy.trustedProducers.githubActions.workflowPath,
+    reviewer:"untrusted-reviewer",
+    rationale:"invalid"
+  }];
+  assert.notEqual(runStructure(m).status,0,"workflow-change approval must use trusted CodeRabbit identity");
 }
 {
   const m=structuredClone(base); const runs=buildRuns(m.exactCommit);
