@@ -13,6 +13,11 @@ const failures = [];
 const nonempty = value => typeof value === "string" && value.trim().length > 0;
 const validEvidenceList = value => Array.isArray(value) && value.length > 0 && value.every(nonempty);
 const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
+const normalizeWorkflowPath = value => {
+  if (typeof value !== "string") return "";
+  const suffix = value.lastIndexOf("@");
+  return suffix > 0 ? value.slice(0, suffix) : value;
+};
 const impactKeys = ["ui","architecture","database","apiContract","securityTenant","offlineSync","regulatoryDomain"];
 const nonExemptibleGates = new Set(policy.nonExemptibleGates || []);
 const exemptible = new Set(policy.exemptibleAutomatedChecks || []);
@@ -83,8 +88,48 @@ const automatedRuns = loadAutomatedRuns();
 const actionsProducer = policy.trustedProducers?.githubActions || {};
 const checkRuns = Array.isArray(automatedRuns?.check_runs) ? automatedRuns.check_runs : [];
 const workflowRuns = Array.isArray(automatedRuns?.workflow_runs) ? automatedRuns.workflow_runs : [];
-const trustedWorkflowPath = actionsProducer.workflowPath;
+const trustedWorkflowPath = normalizeWorkflowPath(actionsProducer.workflowPath);
 const trustedWorkflowEvent = actionsProducer.event || "push";
+const trustedWorkflowComparison = automatedRuns?.trusted_workflow_comparison;
+const requiresTrustedWorkflowEvidence = policy.automatedChecks.some(check =>
+  manifest.automatedChecks?.[check] === "PASS" &&
+  Array.isArray(policy.automatedCheckBindings?.[check]) &&
+  policy.automatedCheckBindings[check].length > 0
+);
+
+if (requiresTrustedWorkflowEvidence) {
+  if (!isRecord(trustedWorkflowComparison)) {
+    failures.push("trusted workflow comparison evidence is required for automated PASS results");
+  } else {
+    const comparisonPath = normalizeWorkflowPath(trustedWorkflowComparison.path);
+    if (comparisonPath !== trustedWorkflowPath) {
+      failures.push(`trusted workflow comparison path mismatch: ${comparisonPath || "missing"}`);
+    }
+    if (trustedWorkflowComparison.exact_sha !== manifest.exactCommit) {
+      failures.push("trusted workflow comparison exact SHA does not match manifest.exactCommit");
+    }
+    if (!/^[0-9a-f]{40}$/.test(trustedWorkflowComparison.base_sha || "")) {
+      failures.push("trusted workflow comparison base SHA is invalid");
+    }
+    if (!/^[0-9a-f]{40}$/.test(trustedWorkflowComparison.base_blob_sha || "") ||
+        !/^[0-9a-f]{40}$/.test(trustedWorkflowComparison.exact_blob_sha || "")) {
+      failures.push("trusted workflow comparison blob SHA evidence is invalid");
+    } else if (trustedWorkflowComparison.base_blob_sha !== trustedWorkflowComparison.exact_blob_sha) {
+      const approval = (manifest.trustedWorkflowChangeApprovals || []).find(item =>
+        normalizeWorkflowPath(item?.path) === trustedWorkflowPath
+      );
+      const trustedReviewer = policy.trustedProducers?.codeRabbit?.login;
+      if (
+        process.env.CODERABBIT_REVIEW_VERIFIED !== "true" ||
+        !approval ||
+        approval.reviewer !== trustedReviewer ||
+        !nonempty(approval.rationale)
+      ) {
+        failures.push(`trusted workflow ${trustedWorkflowPath} differs from the base-branch version without a review-bound CodeRabbit approval`);
+      }
+    }
+  }
+}
 
 for (const check of policy.automatedChecks) {
   const status = manifest.automatedChecks?.[check];
@@ -118,7 +163,7 @@ for (const check of policy.automatedChecks) {
       const workflow = workflowRuns.find(run =>
         run?.check_suite_id === latest?.check_suite?.id &&
         run?.head_sha === manifest.exactCommit &&
-        run?.path === trustedWorkflowPath &&
+        normalizeWorkflowPath(run?.path) === trustedWorkflowPath &&
         run?.event === trustedWorkflowEvent
       );
       if (!workflow) failures.push(`automated check ${check} latest job is not proven to come from trusted workflow ${trustedWorkflowPath} via ${trustedWorkflowEvent}: ${jobName}`);
