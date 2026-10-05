@@ -162,7 +162,7 @@ reset role;
 -- and must not mutate Tenant B state.
 
 -- Inventory issue: Tenant A manager cannot target a Tenant B employee/sample.
-do $
+do $wave2_tenant_escape$
 declare
   v_b_balance_before integer;
   v_b_ledger_before integer;
@@ -209,10 +209,10 @@ begin
     raise exception 'TRV-INV tenant escape failed: Tenant B inventory changed after rejected cross-tenant issue';
   end if;
 end
-$;
+$wave2_tenant_escape$;
 
 -- GPS exception review: Tenant A manager cannot review a Tenant B visit.
-do $
+do $wave2_tenant_escape$
 declare
   v_before text;
   v_after text;
@@ -245,10 +245,10 @@ begin
     raise exception 'TRV-VIS tenant escape failed: Tenant B visit changed after rejected cross-tenant review';
   end if;
 end
-$;
+$wave2_tenant_escape$;
 
 -- Inventory return: Tenant A MR cannot return a Tenant B sample.
-do $
+do $wave2_tenant_escape$
 declare
   v_b_balance_before integer;
   v_b_ledger_before integer;
@@ -294,7 +294,7 @@ begin
     raise exception 'TRV-INV tenant escape failed: Tenant B inventory changed after rejected cross-tenant return';
   end if;
 end
-$;
+$wave2_tenant_escape$;
 
 -- Sprint 6: second ACTIVE execution for the same employee is prohibited.
 do $$
