@@ -1,5 +1,5 @@
 {
-  "version": 10,
+  "version": 11,
   "policyName": "Terrevo Product Development Operating System",
   "completionRule": "A sprint or change is not COMPLETE until every mandatory gate is PASS or approved NOT_APPLICABLE and all required automated checks pass for the exact qualified commit.",
   "statuses": [
@@ -261,5 +261,10 @@
   "applicabilityApproval": {
     "producer": "trusted CodeRabbit GitHub review",
     "rule": "Every NOT_APPLICABLE automated-check or gate declaration must exist unchanged in the CodeRabbit-approved implementation commit; evidence-only commits may not add or modify those declarations."
+  },
+  "trustedWorkflowChangeRule": {
+    "path": ".github/workflows/ci.yml",
+    "approvalReviewer": "coderabbitai[bot]",
+    "rule": "Automated PASS evidence must use the trusted workflow path and the workflow file at exactCommit must match the pull request base version. Intentional changes require a manifest declaration present unchanged in the CodeRabbit-approved implementation commit."
   }
 }
