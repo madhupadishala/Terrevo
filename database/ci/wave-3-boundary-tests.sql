@@ -94,7 +94,7 @@ do $w3priv$
 declare t text; p text;
 begin
   foreach t in array array['tour_executions','daily_timesheets','weekly_timesheets','weekly_timesheet_days','weekly_timesheet_decisions','trade_calls','trade_call_operations','rcpa_reports','rcpa_lines','rcpa_operations'] loop
-    foreach p in array array['INSERT','UPDATE','DELETE'] loop
+    foreach p in array array['INSERT','UPDATE','DELETE','TRUNCATE'] loop
       if has_table_privilege('authenticated','public.'||t,p) then raise exception 'Wave 3 security failed: authenticated has % on %',p,t; end if;
     end loop;
   end loop;
@@ -207,6 +207,7 @@ begin
   select count(*) into o from public.weekly_timesheets where tenant_id='a2000000-0000-4000-8000-000000000001'; select count(*) into x from public.weekly_timesheets where tenant_id='a2000000-0000-4000-8000-000000000002'; if o<>1 or x<>0 then raise exception 'TRV-WTS RLS failed own=% foreign=%',o,x; end if;
   select count(*) into o from public.trade_calls where tenant_id='a2000000-0000-4000-8000-000000000001'; select count(*) into x from public.trade_calls where tenant_id='a2000000-0000-4000-8000-000000000002'; if o<>1 or x<>0 then raise exception 'TRV-TRADE RLS failed own=% foreign=%',o,x; end if;
   select count(*) into o from public.rcpa_reports where tenant_id='a2000000-0000-4000-8000-000000000001'; select count(*) into x from public.rcpa_reports where tenant_id='a2000000-0000-4000-8000-000000000002'; if o<>1 or x<>0 then raise exception 'TRV-RCPA RLS failed own=% foreign=%',o,x; end if;
+  select count(*) into o from public.rcpa_lines where tenant_id='a2000000-0000-4000-8000-000000000001'; select count(*) into x from public.rcpa_lines where tenant_id='a2000000-0000-4000-8000-000000000002'; if o<>1 or x<>0 then raise exception 'TRV-RCPA line RLS failed own=% foreign=%',o,x; end if;
 end
 $w3rls$;
 reset role;
