@@ -159,6 +159,10 @@ if (!sameJson(reviewedManifest.impact, manifest.impact)) {
   console.error("Impact declaration changed after the trusted CodeRabbit review");
   process.exit(1);
 }
+if (!sameJson(reviewedManifest.trustedWorkflowChangeApprovals || [], manifest.trustedWorkflowChangeApprovals || [])) {
+  console.error("Trusted workflow-change approval declaration changed after the trusted CodeRabbit review");
+  process.exit(1);
+}
 for (const [checkId, status] of Object.entries(manifest.automatedChecks || {})) {
   if (status !== "NOT_APPLICABLE") continue;
   if (reviewedManifest.automatedChecks?.[checkId] !== "NOT_APPLICABLE") {
