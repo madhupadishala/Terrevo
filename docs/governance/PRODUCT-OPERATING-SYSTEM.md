@@ -84,6 +84,8 @@ Requirement → URS → FRS → Architecture → Code → Test → Security → 
 
 Evidence must be versioned and tied to the exact qualified commit. Use checksums/immutable evidence where appropriate.
 
+GitHub Actions evidence is fail-closed: workflow-run paths are compared by workflow file while ignoring GitHub ref suffixes, and the trusted workflow blob at the exact qualified commit is compared with the pull request base version. An intentional trusted-workflow change is accepted only when the evidence manifest contains a specific `trustedWorkflowChangeApprovals` declaration reviewed by `coderabbitai[bot]`; that declaration must already exist unchanged in the implementation commit receiving the trusted CodeRabbit APPROVED review.
+
 ## Controlled documentation
 Treat URS, FRS, user guide, architecture, traceability, design system, validation evidence and benchmark documents as controlled artifacts when applicable.
 
