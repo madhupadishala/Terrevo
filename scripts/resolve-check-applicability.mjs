@@ -44,7 +44,13 @@ try {
   process.exit(1);
 }
 
-if (!manifestReal.startsWith(evidenceRoot + path.sep) || !manifestReal.endsWith(".product-gates.json")) {
+const manifestRelative = path.relative(evidenceRoot, manifestReal);
+const outsideEvidenceRoot =
+  manifestRelative === ".." ||
+  manifestRelative.startsWith(`..${path.sep}`) ||
+  path.isAbsolute(manifestRelative);
+
+if (outsideEvidenceRoot || !manifestReal.endsWith(".product-gates.json")) {
   console.error("Evidence manifest must resolve inside docs/evidence and end in .product-gates.json");
   process.exit(1);
 }
