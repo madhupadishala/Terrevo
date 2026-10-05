@@ -24,6 +24,8 @@ const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 const policy = JSON.parse(fs.readFileSync(policyPath, "utf8"));
 const exemptible = new Set(policy.exemptibleAutomatedChecks || []);
 const nonExemptibleGates = new Set(policy.nonExemptibleGates || []);
+const trustedWorkflowPath = policy.trustedProducers?.githubActions?.workflowPath;
+const trustedWorkflowReviewer = policy.trustedProducers?.codeRabbit?.login;
 
 if (manifest.schemaVersion !== 1) failures.push("schemaVersion must be 1");
 if (!nonempty(manifest.changeId)) failures.push("changeId is required");
@@ -99,6 +101,23 @@ if (!isRecord(manifest.artifacts)) {
       }
       if (!fs.existsSync(resolved)) failures.push(`referenced artifact does not exist: ${item}`);
     }
+  }
+}
+
+if (!Array.isArray(manifest.trustedWorkflowChangeApprovals)) {
+  failures.push("trustedWorkflowChangeApprovals must be an array");
+} else {
+  const seenWorkflowApprovals = new Set();
+  for (const approval of manifest.trustedWorkflowChangeApprovals) {
+    if (!isRecord(approval)) {
+      failures.push("trustedWorkflowChangeApprovals entries must be objects");
+      continue;
+    }
+    if (approval.path !== trustedWorkflowPath) failures.push(`untrusted workflow-change approval path: ${approval.path || "missing"}`);
+    if (approval.reviewer !== trustedWorkflowReviewer) failures.push(`workflow-change approval reviewer must be ${trustedWorkflowReviewer}`);
+    if (!nonempty(approval.rationale)) failures.push("workflow-change approval requires rationale");
+    if (seenWorkflowApprovals.has(approval.path)) failures.push(`duplicate workflow-change approval: ${approval.path}`);
+    seenWorkflowApprovals.add(approval.path);
   }
 }
 
