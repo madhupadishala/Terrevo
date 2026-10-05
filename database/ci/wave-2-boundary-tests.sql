@@ -158,6 +158,144 @@ end
 $$;
 reset role;
 
+-- Cross-tenant write abuse: service-role entrypoints must reject mixed tenant identifiers
+-- and must not mutate Tenant B state.
+
+-- Inventory issue: Tenant A manager cannot target a Tenant B employee/sample.
+do $
+declare
+  v_b_balance_before integer;
+  v_b_ledger_before integer;
+  v_b_balance_after integer;
+  v_b_ledger_after integer;
+begin
+  select quantity into v_b_balance_before
+    from public.inventory_balances
+   where tenant_id='82000000-0000-4000-8000-000000000002'
+     and employee_id='94000000-0000-4000-8000-000000000001'
+     and sample_id='95000000-0000-4000-8000-000000000003';
+
+  select count(*) into v_b_ledger_before
+    from public.inventory_ledger
+   where tenant_id='82000000-0000-4000-8000-000000000002';
+
+  begin
+    perform public.admin_issue_inventory(
+      '82000000-0000-4000-8000-000000000001',
+      '81000000-0000-4000-8000-000000000002',
+      '89000000-0000-4000-8000-000000000010',
+      '94000000-0000-4000-8000-000000000001',
+      'sample',
+      '95000000-0000-4000-8000-000000000003',
+      1
+    );
+    raise exception 'TRV-INV tenant escape failed: cross-tenant issue succeeded';
+  exception
+    when others then
+      if position('active employee not found' in sqlerrm)=0 then raise; end if;
+  end;
+
+  select quantity into v_b_balance_after
+    from public.inventory_balances
+   where tenant_id='82000000-0000-4000-8000-000000000002'
+     and employee_id='94000000-0000-4000-8000-000000000001'
+     and sample_id='95000000-0000-4000-8000-000000000003';
+
+  select count(*) into v_b_ledger_after
+    from public.inventory_ledger
+   where tenant_id='82000000-0000-4000-8000-000000000002';
+
+  if v_b_balance_after is distinct from v_b_balance_before or v_b_ledger_after<>v_b_ledger_before then
+    raise exception 'TRV-INV tenant escape failed: Tenant B inventory changed after rejected cross-tenant issue';
+  end if;
+end
+$;
+
+-- GPS exception review: Tenant A manager cannot review a Tenant B visit.
+do $
+declare
+  v_before text;
+  v_after text;
+begin
+  select exception_status into v_before
+    from public.field_visits
+   where tenant_id='82000000-0000-4000-8000-000000000002'
+     and id='98000000-0000-4000-8000-000000000001';
+
+  begin
+    perform public.admin_review_visit_exception(
+      '82000000-0000-4000-8000-000000000001',
+      '81000000-0000-4000-8000-000000000002',
+      '98000000-0000-4000-8000-000000000001',
+      'APPROVE',
+      null
+    );
+    raise exception 'TRV-VIS tenant escape failed: cross-tenant review succeeded';
+  exception
+    when others then
+      if position('pending GPS exception not found' in sqlerrm)=0 then raise; end if;
+  end;
+
+  select exception_status into v_after
+    from public.field_visits
+   where tenant_id='82000000-0000-4000-8000-000000000002'
+     and id='98000000-0000-4000-8000-000000000001';
+
+  if v_after is distinct from v_before or v_after is distinct from 'PENDING' then
+    raise exception 'TRV-VIS tenant escape failed: Tenant B visit changed after rejected cross-tenant review';
+  end if;
+end
+$;
+
+-- Inventory return: Tenant A MR cannot return a Tenant B sample.
+do $
+declare
+  v_b_balance_before integer;
+  v_b_ledger_before integer;
+  v_b_balance_after integer;
+  v_b_ledger_after integer;
+begin
+  select quantity into v_b_balance_before
+    from public.inventory_balances
+   where tenant_id='82000000-0000-4000-8000-000000000002'
+     and employee_id='94000000-0000-4000-8000-000000000001'
+     and sample_id='95000000-0000-4000-8000-000000000003';
+
+  select count(*) into v_b_ledger_before
+    from public.inventory_ledger
+   where tenant_id='82000000-0000-4000-8000-000000000002';
+
+  begin
+    perform public.admin_return_inventory(
+      '82000000-0000-4000-8000-000000000001',
+      '81000000-0000-4000-8000-000000000001',
+      '89000000-0000-4000-8000-000000000011',
+      'sample',
+      '95000000-0000-4000-8000-000000000003',
+      1
+    );
+    raise exception 'TRV-INV tenant escape failed: cross-tenant return succeeded';
+  exception
+    when others then
+      if position('insufficient inventory balance' in sqlerrm)=0 then raise; end if;
+  end;
+
+  select quantity into v_b_balance_after
+    from public.inventory_balances
+   where tenant_id='82000000-0000-4000-8000-000000000002'
+     and employee_id='94000000-0000-4000-8000-000000000001'
+     and sample_id='95000000-0000-4000-8000-000000000003';
+
+  select count(*) into v_b_ledger_after
+    from public.inventory_ledger
+   where tenant_id='82000000-0000-4000-8000-000000000002';
+
+  if v_b_balance_after is distinct from v_b_balance_before or v_b_ledger_after<>v_b_ledger_before then
+    raise exception 'TRV-INV tenant escape failed: Tenant B inventory changed after rejected cross-tenant return';
+  end if;
+end
+$;
+
 -- Sprint 6: second ACTIVE execution for the same employee is prohibited.
 do $$
 begin

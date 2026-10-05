@@ -222,5 +222,11 @@
     "duplication": "Core qualification duplication threshold.",
     "module_regression": "Foundation, mobile and database-migrations jobs cover the qualified Wave 2 scope."
   },
-  "trustedWorkflowChangeApprovals": []
+  "trustedWorkflowChangeApprovals": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "reviewer": "coderabbitai[bot]",
+      "rationale": "Wave 2 intentionally adds its database qualification script to the trusted CI workflow. This declaration must remain unchanged through the CodeRabbit-reviewed implementation commit."
+    }
+  ]
 }
