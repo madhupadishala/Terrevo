@@ -2,24 +2,361 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: ['**']
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   foundation:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "22"
-      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run verify:foundation
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
       - run: git diff --check
+
+
+  quality-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22"
+      - name: Install quality tooling
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: ESLint core qualification scope
+        run: npm run lint:core
+      - name: Architecture and circular dependency checks
+        run: npm run check:architecture:core
+      - name: Dead code and dependency hygiene (core + web)
+        run: npm run check:dead-code
+      - name: Duplication threshold
+        run: npm run check:duplication:core
+      - name: Dependency vulnerability audit
+        run: npm run check:dependency-audit
+      - name: Product-gate verifier negative tests
+        run: npm run test:product-gates
+      - name: Resolve and validate governance evidence structure
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          declare -a manifests=()
+
+          parse_manifest() {
+            printf '%s\n' "$1" | sed -n 's/^- Evidence manifest: `\([^`]*\)`.*/\1/p' | head -n1
+          }
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            selected="$(parse_manifest "$PR_BODY")"
+            test -n "$selected" || { echo "Evidence manifest path missing from PR body"; exit 1; }
+            manifests+=("$selected")
+          else
+            selected="$(node --input-type=module - <<'NODE'
+          const [owner] = process.env.REPOSITORY.split("/");
+          const url = new URL(`https://api.github.com/repos/${process.env.REPOSITORY}/pulls`);
+          url.searchParams.set("state","open");
+          url.searchParams.set("head",`${owner}:${process.env.HEAD_REF}`);
+          const response = await fetch(url,{
+            headers:{
+              Authorization:`Bearer ${process.env.GH_TOKEN}`,
+              Accept:"application/vnd.github+json",
+              "X-GitHub-Api-Version":"2022-11-28"
+            }
+          });
+          if (!response.ok) {
+            console.error(`Unable to resolve push PR context: ${response.status}`);
+            process.exit(1);
+          }
+          const prs = await response.json();
+          if (!Array.isArray(prs)) {
+            console.error("Invalid pull-request payload");
+            process.exit(1);
+          }
+          if (prs.length > 1) {
+            console.error("Push branch maps to multiple open PRs; evidence manifest is ambiguous");
+            process.exit(1);
+          }
+          if (prs.length === 1) {
+            const body = prs[0]?.body || "";
+            const prefix = "- Evidence manifest: `";
+            const line = body.split(/\r?\n/).find(candidate =>
+              candidate.startsWith(prefix) && candidate.endsWith("`")
+            );
+            const manifest = line?.slice(prefix.length, -1).trim();
+            if (!manifest) {
+              console.error(`Open PR #${prs[0].number} for this push branch is missing the required evidence-manifest declaration`);
+              process.exit(1);
+            }
+            process.stdout.write(manifest);
+          }
+          NODE
+            )"
+
+            if [ -n "$selected" ]; then
+              manifests+=("$selected")
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+                base="$(git rev-parse "$HEAD_SHA^" 2>/dev/null || true)"
+              fi
+              if [ -n "$base" ]; then
+                while IFS= read -r -d '' manifest; do
+                  manifests+=("$manifest")
+                done < <(git diff --no-renames --name-only -z "$base" "$HEAD_SHA" -- 'docs/evidence/*.product-gates.json')
+              fi
+            fi
+          fi
+
+          if [ "${#manifests[@]}" -eq 0 ]; then
+            echo "No evidence manifest selected by push context; refusing to emit evidence-verification PASS."
+            exit 1
+          fi
+
+          evidence_root="$(realpath docs/evidence)"
+          for manifest in "${manifests[@]}"; do
+            test -f "$manifest" || { echo "Evidence manifest does not exist: $manifest"; exit 1; }
+            manifest_real="$(realpath "$manifest")"
+            case "$manifest_real" in
+              "$evidence_root"/*.product-gates.json) ;;
+              *)
+                echo "Evidence manifest must resolve inside docs/evidence and end in .product-gates.json"
+                exit 1
+                ;;
+            esac
+            npm run verify:evidence-structure -- "$manifest"
+          done
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Resolve safe secret-scan base
+        id: secret-base
+        shell: bash
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          candidate="${PR_BASE:-${PUSH_BEFORE:-}}"
+          if [ -z "$candidate" ] || [[ "$candidate" =~ ^0+$ ]] || ! git cat-file -e "$candidate^{commit}" 2>/dev/null; then
+            candidate=""
+          fi
+          echo "base=$candidate" >> "$GITHUB_OUTPUT"
+      - name: Scan exact change range for secrets
+        uses: trufflesecurity/trufflehog@6f3c981e7b77f235fd2702dd74af25fc4b72bf11 # v3.96.0
+        with:
+          base: ${{ steps.secret-base.outputs.base }}
+          head: ${{ github.event.pull_request.head.sha || github.sha }}
+          version: "3.96.0"
+          extra_args: --results=verified,unknown,unverified
+
+  ui-applicability:
+    runs-on: ubuntu-latest
+    outputs:
+      design: ${{ steps.resolve.outputs.design }}
+      browser: ${{ steps.resolve.outputs.browser }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Resolve UI evidence context
+        id: context
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_HEAD: ${{ github.sha }}
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          parse_manifest() {
+            printf '%s\n' "$1" | sed -n 's/^- Evidence manifest: `\([^`]*\)`.*/\1/p' | head -n1
+          }
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            manifest="$(parse_manifest "$PR_BODY")"
+            base="$PR_BASE"
+            head="$PR_HEAD"
+          else
+            head="$PUSH_HEAD"
+
+            pr_context="$(node --input-type=module - <<'NODE'
+          const [owner] = process.env.REPOSITORY.split("/");
+          const url = new URL(`https://api.github.com/repos/${process.env.REPOSITORY}/pulls`);
+          url.searchParams.set("state","open");
+          url.searchParams.set("head",`${owner}:${process.env.HEAD_REF}`);
+          const response = await fetch(url,{
+            headers:{
+              Authorization:`Bearer ${process.env.GH_TOKEN}`,
+              Accept:"application/vnd.github+json",
+              "X-GitHub-Api-Version":"2022-11-28"
+            }
+          });
+          if (!response.ok) {
+            console.error(`Unable to resolve push PR context: ${response.status}`);
+            process.exit(1);
+          }
+          const prs = await response.json();
+          if (!Array.isArray(prs)) {
+            console.error("Invalid pull-request payload");
+            process.exit(1);
+          }
+          if (prs.length > 1) {
+            console.error("Push branch maps to multiple open PRs; UI applicability context is ambiguous");
+            process.exit(1);
+          }
+          if (prs.length === 0) {
+            process.stdout.write(JSON.stringify({found:false}));
+            process.exit(0);
+          }
+
+          const pr = prs[0];
+          const prefix = "- Evidence manifest: `";
+          const line = (pr?.body || "").split(/\r?\n/).find(candidate =>
+            candidate.startsWith(prefix) && candidate.endsWith("`")
+          );
+          const manifest = line?.slice(prefix.length, -1).trim();
+          const baseSha = pr?.base?.sha;
+
+          if (!manifest) {
+            console.error(`Open PR #${pr.number} for this push branch is missing the required evidence-manifest declaration`);
+            process.exit(1);
+          }
+          if (!/^[0-9a-f]{40}$/.test(baseSha || "")) {
+            console.error(`Open PR #${pr.number} does not expose a valid base SHA`);
+            process.exit(1);
+          }
+
+          process.stdout.write(JSON.stringify({found:true,manifest,baseSha}));
+          NODE
+            )"
+
+            context_found="$(PR_CONTEXT="$pr_context" node -e 'const c=JSON.parse(process.env.PR_CONTEXT); process.stdout.write(c.found ? "true" : "false")')"
+
+            if [ "$context_found" = "true" ]; then
+              manifest="$(PR_CONTEXT="$pr_context" node -e 'const c=JSON.parse(process.env.PR_CONTEXT); process.stdout.write(c.manifest)')"
+              base="$(PR_CONTEXT="$pr_context" node -e 'const c=JSON.parse(process.env.PR_CONTEXT); process.stdout.write(c.baseSha)')"
+              git cat-file -e "$base^{commit}" 2>/dev/null || {
+                echo "Matching PR base commit is unavailable in checkout: $base"
+                exit 1
+              }
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+                base="$(git rev-parse "$head^" 2>/dev/null || true)"
+              fi
+              test -n "$base" || { echo "Unable to resolve push comparison base"; exit 1; }
+
+              mapfile -d '' changed_manifests < <(git diff --no-renames --name-only -z "$base" "$head" -- 'docs/evidence/*.product-gates.json')
+              if [ "${#changed_manifests[@]}" -ne 1 ]; then
+                echo "Push without a matching PR must change exactly one evidence manifest for UI applicability resolution"
+                exit 1
+              fi
+              manifest="${changed_manifests[0]}"
+            fi
+          fi
+
+          [[ "$base" =~ ^[0-9a-f]{40}$ ]] || { echo "Resolved UI comparison base is invalid"; exit 1; }
+          [[ "$head" =~ ^[0-9a-f]{40}$ ]] || { echo "Resolved UI comparison head is invalid"; exit 1; }
+          test -f "$manifest" || { echo "Evidence manifest does not exist: $manifest"; exit 1; }
+
+          evidence_root="$(realpath docs/evidence)"
+          manifest_real="$(realpath "$manifest")"
+          case "$manifest_real" in
+            "$evidence_root"/*.product-gates.json) ;;
+            *)
+              echo "Evidence manifest must resolve inside docs/evidence and end in .product-gates.json"
+              exit 1
+              ;;
+          esac
+
+          echo "manifest=$manifest" >> "$GITHUB_OUTPUT"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+      - name: Resolve UI verification applicability from evidence
+        id: resolve
+        env:
+          MANIFEST_PATH: ${{ steps.context.outputs.manifest }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ steps.context.outputs.base }}
+          HEAD_SHA: ${{ steps.context.outputs.head }}
+        run: |
+          set -euo pipefail
+          node scripts/resolve-check-applicability.mjs design_verification design
+          node scripts/resolve-check-applicability.mjs browser_verification browser
+
+  design-verification:
+    needs: ui-applicability
+    if: needs.ui-applicability.outputs.design == 'run'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22"
+      - name: Verify UI design evidence
+        run: |
+          if [ ! -f scripts/verify-ui-design.mjs ]; then
+            echo "UI changes require a real design verification script."
+            exit 1
+          fi
+          node scripts/verify-ui-design.mjs
+
+  browser-verification:
+    needs: ui-applicability
+    if: needs.ui-applicability.outputs.browser == 'run'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22"
+      - name: Verify UI in a real browser
+        run: |
+          if [ ! -f scripts/verify-ui-browser.mjs ]; then
+            echo "UI changes require a real browser verification script."
+            exit 1
+          fi
+          node scripts/verify-ui-browser.mjs
 
   mobile:
     runs-on: ubuntu-latest
@@ -27,8 +364,10 @@ jobs:
       run:
         working-directory: apps/mobile
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "22"
       - run: npm install --ignore-scripts --no-audit --no-fund
@@ -58,7 +397,9 @@ jobs:
       PGUSER: postgres
       PGDATABASE: terrevo_ci
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Install PostgreSQL client
         run: |
           if ! command -v psql >/dev/null 2>&1; then
