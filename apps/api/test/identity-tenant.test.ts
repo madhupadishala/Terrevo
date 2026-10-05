@@ -179,3 +179,50 @@ test("TRV-TENANT-002 resolves tenant context only after membership verification"
   assert.match(calls[1].url, /\/rest\/v1\/tenants\?/);
   assert.match(calls[1].url, /status=eq\.active/);
 });
+
+test("TRV-ID-004 initiates password reset through provider with normalized email", async () => {
+  const { fetcher, calls } = sequenceFetch([{ body: {} }]);
+  const handle = createHandler(env, { fetcher });
+
+  const response = await handle(new Request("https://api.terrevo.test/v1/auth/password-reset", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: " MR@Example.COM " }),
+  }));
+
+  assert.equal(response.status, 202);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/auth\/v1\/recover$/);
+  assert.equal(calls[0].init?.method, "POST");
+  assert.equal(String(calls[0].init?.body), JSON.stringify({ email: "mr@example.com" }));
+});
+
+test("TRV-ID-003 logs out through provider using the caller bearer token", async () => {
+  const { fetcher, calls } = sequenceFetch([{ body: {} }]);
+  const handle = createHandler(env, { fetcher });
+
+  const response = await handle(new Request("https://api.terrevo.test/v1/auth/logout", {
+    method: "POST",
+    headers: { authorization: "Bearer access-token" },
+  }));
+
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/auth\/v1\/logout$/);
+  assert.equal((calls[0].init?.headers as Record<string, string>).authorization, "Bearer access-token");
+});
+
+test("TRV-ID-002 rejects malformed bearer authorization before provider access", async () => {
+  const { fetcher, calls } = sequenceFetch([]);
+  const handle = createHandler(env, { fetcher });
+
+  const response = await handle(new Request("https://api.terrevo.test/v1/me", {
+    headers: { authorization: "Basic not-allowed" },
+  }));
+
+  assert.equal(response.status, 401);
+  assert.equal(calls.length, 0);
+});
+
