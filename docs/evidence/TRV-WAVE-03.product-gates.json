@@ -182,16 +182,16 @@
   },
   "automatedCheckApplicability": {
     "integration_tests": {
-      "reviewer": "",
-      "rationale": ""
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "Wave 3 integration behavior is exercised by database/ci/wave-3-boundary-tests.sql in the trusted database-migrations CI job. Exact-head CI run evidence is recorded only after this implementation state is reviewed and frozen."
     },
     "relevant_e2e": {
       "reviewer": "OpenAI GPT-5.6 Sol",
       "rationale": "The qualification delta adds boundary evidence without changing an end-user workflow; existing API workflow regression remains in the repository suite."
     },
     "security": {
-      "reviewer": "",
-      "rationale": ""
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "securityTenant impact is true. database/ci/wave-3-boundary-tests.sql covers authenticated write/TRUNCATE denial, service-RPC denial, cross-tenant mutation rejection, and RLS isolation. Exact-head CI run evidence is recorded only after this implementation state is reviewed and frozen."
     },
     "design_verification": {
       "reviewer": "OpenAI GPT-5.6 Sol",
