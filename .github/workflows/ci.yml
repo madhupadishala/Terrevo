@@ -212,13 +212,8 @@ jobs:
             head="$PR_HEAD"
           else
             head="$PUSH_HEAD"
-            base="$PUSH_BEFORE"
-            if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
-              base="$(git rev-parse "$head^" 2>/dev/null || true)"
-            fi
-            test -n "$base" || { echo "Unable to resolve push comparison base"; exit 1; }
 
-            manifest="$(node --input-type=module - <<'NODE'
+            pr_context="$(node --input-type=module - <<'NODE'
           const [owner] = process.env.REPOSITORY.split("/");
           const url = new URL(`https://api.github.com/repos/${process.env.REPOSITORY}/pulls`);
           url.searchParams.set("state","open");
@@ -240,25 +235,51 @@ jobs:
             process.exit(1);
           }
           if (prs.length > 1) {
-            console.error("Push branch maps to multiple open PRs; evidence manifest is ambiguous");
+            console.error("Push branch maps to multiple open PRs; UI applicability context is ambiguous");
             process.exit(1);
           }
-          if (prs.length === 1) {
-            const prefix = "- Evidence manifest: `";
-            const line = (prs[0]?.body || "").split(/\r?\n/).find(candidate =>
-              candidate.startsWith(prefix) && candidate.endsWith("`")
-            );
-            const manifest = line?.slice(prefix.length, -1).trim();
-            if (!manifest) {
-              console.error(`Open PR #${prs[0].number} for this push branch is missing the required evidence-manifest declaration`);
-              process.exit(1);
-            }
-            process.stdout.write(manifest);
+          if (prs.length === 0) {
+            process.stdout.write(JSON.stringify({found:false}));
+            process.exit(0);
           }
+
+          const pr = prs[0];
+          const prefix = "- Evidence manifest: `";
+          const line = (pr?.body || "").split(/\r?\n/).find(candidate =>
+            candidate.startsWith(prefix) && candidate.endsWith("`")
+          );
+          const manifest = line?.slice(prefix.length, -1).trim();
+          const baseSha = pr?.base?.sha;
+
+          if (!manifest) {
+            console.error(`Open PR #${pr.number} for this push branch is missing the required evidence-manifest declaration`);
+            process.exit(1);
+          }
+          if (!/^[0-9a-f]{40}$/.test(baseSha || "")) {
+            console.error(`Open PR #${pr.number} does not expose a valid base SHA`);
+            process.exit(1);
+          }
+
+          process.stdout.write(JSON.stringify({found:true,manifest,baseSha}));
           NODE
             )"
 
-            if [ -z "$manifest" ]; then
+            context_found="$(PR_CONTEXT="$pr_context" node -e 'const c=JSON.parse(process.env.PR_CONTEXT); process.stdout.write(c.found ? "true" : "false")')"
+
+            if [ "$context_found" = "true" ]; then
+              manifest="$(PR_CONTEXT="$pr_context" node -e 'const c=JSON.parse(process.env.PR_CONTEXT); process.stdout.write(c.manifest)')"
+              base="$(PR_CONTEXT="$pr_context" node -e 'const c=JSON.parse(process.env.PR_CONTEXT); process.stdout.write(c.baseSha)')"
+              git cat-file -e "$base^{commit}" 2>/dev/null || {
+                echo "Matching PR base commit is unavailable in checkout: $base"
+                exit 1
+              }
+            else
+              base="$PUSH_BEFORE"
+              if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+                base="$(git rev-parse "$head^" 2>/dev/null || true)"
+              fi
+              test -n "$base" || { echo "Unable to resolve push comparison base"; exit 1; }
+
               mapfile -d '' changed_manifests < <(git diff --no-renames --name-only -z "$base" "$head" -- 'docs/evidence/*.product-gates.json')
               if [ "${#changed_manifests[@]}" -ne 1 ]; then
                 echo "Push without a matching PR must change exactly one evidence manifest for UI applicability resolution"
