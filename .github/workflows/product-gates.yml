@@ -35,6 +35,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           EVENT_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           DISPATCH_PR_NUMBER: ${{ inputs.pr_number }}
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -42,8 +43,9 @@ jobs:
           set -euo pipefail
           if [ "$EVENT_NAME" = "pull_request" ]; then
             head_sha="$EVENT_PR_HEAD_SHA"
+            base_sha="$EVENT_PR_BASE_SHA"
           else
-            head_sha="$(node --input-type=module - <<'NODE'
+            read -r head_sha base_sha < <(node --input-type=module - <<'NODE'
           const raw = process.env.DISPATCH_PR_NUMBER || "";
           if (!/^\d+$/.test(raw) || Number(raw) < 1) {
             console.error("workflow_dispatch pr_number must be a positive integer");
@@ -65,16 +67,19 @@ jobs:
           }
           const resolvedPr = await response.json();
           const sha = resolvedPr?.head?.sha;
-          if (!/^[0-9a-f]{40}$/.test(sha || "")) {
-            console.error(`Pull request #${raw} does not expose a valid head SHA`);
+          const base = resolvedPr?.base?.sha;
+          if (!/^[0-9a-f]{40}$/.test(sha || "") || !/^[0-9a-f]{40}$/.test(base || "")) {
+            console.error(`Pull request #${raw} does not expose valid head/base SHAs`);
             process.exit(1);
           }
-          process.stdout.write(sha);
+          process.stdout.write(`${sha} ${base}`);
           NODE
-            )"
+            )
           fi
           [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Resolved qualification head SHA is invalid"; exit 1; }
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Resolved qualification base SHA is invalid"; exit 1; }
           echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -169,11 +174,13 @@ jobs:
           MANIFEST: ${{ steps.manifest.outputs.path }}
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
+          TRUSTED_BASE_SHA: ${{ steps.target.outputs.base_sha }}
         run: |
           set -euo pipefail
           check_file="$RUNNER_TEMP/automated-check-runs.json"
           CHECK_FILE="$check_file" node --input-type=module - <<'NODE'
           import fs from "node:fs";
+          import { execFileSync } from "node:child_process";
 
           const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST,"utf8"));
           const policy = JSON.parse(fs.readFileSync("governance/product-gates.json","utf8"));
@@ -255,9 +262,38 @@ jobs:
             }
           }
 
+          const trustedWorkflowPath = policy.trustedProducers?.githubActions?.workflowPath;
+          const trustedBaseSha = process.env.TRUSTED_BASE_SHA || "";
+          if (!trustedWorkflowPath || !/^[0-9a-f]{40}$/.test(trustedBaseSha)) {
+            console.error("Trusted workflow path/base SHA is missing or invalid");
+            process.exit(1);
+          }
+
+          const blobSha = (commit, workflowPath) => {
+            try {
+              return execFileSync("git", ["rev-parse", `${commit}:${workflowPath}`], {encoding:"utf8"}).trim();
+            } catch {
+              console.error(`Unable to resolve trusted workflow blob ${workflowPath} at ${commit}`);
+              process.exit(1);
+            }
+          };
+
+          const trustedWorkflowComparison = {
+            path: trustedWorkflowPath,
+            base_sha: trustedBaseSha,
+            exact_sha: manifest.exactCommit,
+            base_blob_sha: blobSha(trustedBaseSha, trustedWorkflowPath),
+            exact_blob_sha: blobSha(manifest.exactCommit, trustedWorkflowPath)
+          };
+
           fs.writeFileSync(
             process.env.CHECK_FILE,
-            JSON.stringify({total_count: allRuns.length, check_runs: allRuns, workflow_runs: workflowRuns})
+            JSON.stringify({
+              total_count: allRuns.length,
+              check_runs: allRuns,
+              workflow_runs: workflowRuns,
+              trusted_workflow_comparison: trustedWorkflowComparison
+            })
           );
           NODE
           echo "AUTOMATED_CHECK_RUNS_FILE=$check_file" >> "$GITHUB_ENV"
