@@ -213,5 +213,12 @@
     "dead_code": "Knip runs separate core and apps/web analyses.",
     "duplication": "Core qualification scope only: apps/api/src plus identity/tenant/organization/rbac/masters/tour-planning/tour-approval modules. Excludes apps/web and non-core modules.",
     "module_regression": "Foundation, mobile, and database-migrations jobs together provide regression coverage for the currently qualified scope."
-  }
+  },
+  "trustedWorkflowChangeApprovals": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "reviewer": "coderabbitai[bot]",
+      "rationale": "TRV-GOV-001 intentionally hardens the trusted CI workflow. This declaration must exist unchanged in the implementation commit and is accepted only after a trusted CodeRabbit APPROVED review of that implementation."
+    }
+  ]
 }
