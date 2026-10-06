@@ -1,31 +1,23 @@
 # Wave 2 Requalification — Sprints 6–10
 
-Status: **COMPLETE CANDIDATE — PRODUCT GATES VERIFICATION**
+Status: **BOUND QUALIFICATION CANDIDATE — CODERABBIT REVIEW PENDING**
 
-Qualified implementation commit: `19d00fb40bc40e80d9f669fc19bc387144de007d`
+Frozen implementation commit: `5c4031b78380f2c19455a678e945754eb27a3652`
 
-Wave 2 requalifies the existing production runtime for Start My Tour, Show My Tour, GPS Check-in/Check-out, Doctor Call + Automatic DCR, and Samples + Gifts.
+Wave 2 requalifies Start My Tour, Show My Tour, GPS Check-in/Check-out, Doctor Call + Automatic DCR, and Samples + Gifts.
 
 ## Exact-head automated evidence
+- Push CI `37520353398`: **SUCCESS**
+- PR CI `37520360731`: **SUCCESS**
+- foundation `112463870336`: **SUCCESS**
+- quality-security `112463870569`: **SUCCESS**
+- database-migrations `112463869842`: **SUCCESS**
+- mobile `112463870399`: **SUCCESS**
+- secret-scan `112463870795`: **SUCCESS**
+- ui-applicability `112463870335`: **SUCCESS**
 
-- Push CI run `37519015608`: **SUCCESS**
-- PR CI run `37519021485`: **SUCCESS**
-- foundation job `112459238263`: **SUCCESS**
-- quality-security job `112459238423`: **SUCCESS**
-- database-migrations job `112459238322`: **SUCCESS**
-- mobile job `112459238116`: **SUCCESS**
-- secret-scan job `112459238223`: **SUCCESS**
-- ui-applicability job `112459238095`: **SUCCESS**
-- design/browser verification: reviewed **NOT_APPLICABLE** because Wave 2 requalification changes no UI.
+## Governance hardening in this exact head
+- Product Gates regression tests isolate synthetic fixtures from live `AUTOMATED_CHECK_RUNS_FILE` state.
+- `requalify/wave-2-sprints-06-10` is an allowed CodeRabbit base branch so downstream Wave 3 review can run.
 
-## Independent review
-
-- CodeRabbit review `5416565054` on `19d00fb40bc40e80d9f669fc19bc387144de007d`: **APPROVED**
-- Current non-outdated unresolved CodeRabbit threads: **0**
-- CodeRabbit commit status: **SUCCESS — Review completed**
-
-## Qualification coverage
-
-Two-tenant database qualification verifies own-row visibility, cross-tenant execution/visit/inventory isolation, authenticated mutation denial, service-only RPC denial, one-active-tour enforcement, GPS self-review prevention, inventory idempotency, payload mismatch rejection, over-return rejection and non-negative balances.
-
-Wave 2 is formally COMPLETE only if Product Gates accepts the evidence-only closure commit.
+The CodeRabbit gate remains BLOCKED until a trusted exact-head review approves this candidate. Wave 2 remains IMPLEMENTED / NOT QUALIFIED until that review and Product Gates pass.

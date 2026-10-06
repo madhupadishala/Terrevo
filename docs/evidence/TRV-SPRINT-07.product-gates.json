@@ -10,11 +10,11 @@
     "TRV-PROG-005",
     "TRV-PROG-006"
   ],
-  "exactCommit": "19d00fb40bc40e80d9f669fc19bc387144de007d",
+  "exactCommit": "5c4031b78380f2c19455a678e945754eb27a3652",
   "owner": "madhupadishala",
   "reviewers": [
     "OpenAI GPT-5.6 Sol",
-    "CodeRabbit — APPROVED review 5416565054"
+    "CodeRabbit pending exact-head review"
   ],
   "impact": {
     "ui": false,
@@ -72,8 +72,8 @@
           "Qualification-only evidence."
         ],
         "verification": [
-          "CI push 37519015608",
-          "CI PR 37519021485"
+          "CI push 37520353398",
+          "CI PR 37520360731"
         ]
       },
       "rationale": "Scope verified."
@@ -140,23 +140,19 @@
           "Invalid-state and self-review paths rejected."
         ],
         "rollback": [
-          "database-migrations job 112459238322: success"
+          "database-migrations job 112463869842: success"
         ]
       },
       "rationale": "Failure paths qualified."
     },
     "coderabbit": {
-      "status": "PASS",
+      "status": "BLOCKED",
       "reviewer": "CodeRabbit",
       "evidence": {
-        "review_url_or_id": [
-          "CodeRabbit APPROVED review 5416565054"
-        ],
-        "unresolved_material_findings_zero": [
-          "PR #47 unresolved current CodeRabbit threads: 0"
-        ]
+        "review_url_or_id": [],
+        "unresolved_material_findings_zero": []
       },
-      "rationale": "Trusted approval on exactCommit."
+      "rationale": "Awaiting trusted CodeRabbit approval of the bound exact-head qualification candidate."
     },
     "hacker": {
       "status": "PASS",
@@ -189,7 +185,7 @@
           "apps/api/test/tour-progress.test.ts"
         ],
         "exact_commit": [
-          "19d00fb40bc40e80d9f669fc19bc387144de007d"
+          "5c4031b78380f2c19455a678e945754eb27a3652"
         ],
         "immutable_or_versioned_evidence": [
           "docs/evidence/TRV-SPRINT-07.product-gates.json",
@@ -223,7 +219,7 @@
           "Real DB/RLS/RPC controls exercised."
         ],
         "integration_completeness": [
-          "CI push 37519015608"
+          "CI push 37520353398"
         ]
       },
       "rationale": "Module qualification complete."
@@ -234,18 +230,18 @@
     "tested": false,
     "evidence": [
       "Evidence-only closure can be reverted.",
-      "database-migrations job 112459238322: success"
+      "database-migrations job 112463869842: success"
     ]
   },
   "finalQualification": {
-    "status": "COMPLETE",
-    "qualifiedBy": "OpenAI GPT-5.6 Sol + CodeRabbit review 5416565054 + Product Gates",
-    "qualifiedAt": "2026-10-07"
+    "status": "IMPLEMENTED / NOT QUALIFIED",
+    "qualifiedBy": "",
+    "qualifiedAt": ""
   },
   "automatedCheckApplicability": {
     "integration_tests": {
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "rationale": "PASS via database-migrations job 112459238322."
+      "rationale": "PASS via database-migrations job 112463869842."
     },
     "relevant_e2e": {
       "reviewer": "OpenAI GPT-5.6 Sol",
@@ -253,7 +249,7 @@
     },
     "security": {
       "reviewer": "OpenAI GPT-5.6 Sol",
-      "rationale": "PASS via quality-security job 112459238423 and Wave 2 boundary SQL."
+      "rationale": "PASS via quality-security job 112463870569 and Wave 2 boundary SQL."
     },
     "design_verification": {
       "reviewer": "OpenAI GPT-5.6 Sol",
