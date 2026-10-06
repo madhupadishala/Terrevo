@@ -113,7 +113,11 @@ const runFinal = (
     {
       encoding:"utf8",
       env:{
-        ...process.env,
+        ...Object.fromEntries(
+          Object.entries(process.env).filter(([key]) =>
+            !["AUTOMATED_CHECK_RUNS_FILE","AUTOMATED_CHECK_RUNS_JSON"].includes(key)
+          )
+        ),
         CODERABBIT_REVIEW_VERIFIED: coderabbitVerified ? "true" : "false",
         AUTOMATED_CHECK_RUNS_JSON: JSON.stringify(runs)
       }
