@@ -1,0 +1,308 @@
+{
+  "schemaVersion": 1,
+  "changeId": "TRV-SPRINT-11",
+  "sprint": "Sprint 11 — Submit Tour",
+  "requirementIds": [
+    "TRV-SUBMIT-001",
+    "TRV-SUBMIT-002",
+    "TRV-SUBMIT-003",
+    "TRV-SUBMIT-004",
+    "TRV-SUBMIT-005",
+    "TRV-SUBMIT-006",
+    "TRV-SUBMIT-007",
+    "TRV-SUBMIT-008"
+  ],
+  "exactCommit": "1151548e46e9b819a8cced740ffabf06be451193",
+  "owner": "madhupadishala",
+  "reviewers": [
+    "OpenAI GPT-5.6 Sol",
+    "CodeRabbit clean commit-status review on frozen Wave 3 implementation"
+  ],
+  "impact": {
+    "ui": false,
+    "database": false,
+    "apiContract": false,
+    "securityTenant": true,
+    "offlineSync": false,
+    "regulatoryDomain": false,
+    "architecture": false
+  },
+  "artifacts": {
+    "urs": [],
+    "frs": [],
+    "architecture": [
+      "docs/qa/WAVE-3-REQUALIFICATION.md"
+    ],
+    "figma": [],
+    "userGuide": [],
+    "traceability": [
+      "docs/requirements/sprint-11-submit-tour.md"
+    ],
+    "benchmark": [
+      "docs/qa/WAVE-3-REQUALIFICATION.md"
+    ]
+  },
+  "automatedChecks": {
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "unit_tests": "PASS",
+    "integration_tests": "PASS",
+    "relevant_e2e": "NOT_APPLICABLE",
+    "architecture": "PASS",
+    "security": "PASS",
+    "secret_scan": "PASS",
+    "dependency_audit": "PASS",
+    "module_regression": "PASS",
+    "build": "PASS",
+    "design_verification": "NOT_APPLICABLE",
+    "browser_verification": "NOT_APPLICABLE",
+    "evidence_verification": "PASS"
+  },
+  "gates": {
+    "karpathy": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "scope_review": [
+          "docs/qa/WAVE-3-REQUALIFICATION.md",
+          "docs/requirements/sprint-11-submit-tour.md"
+        ],
+        "assumptions": [
+          "Existing Sprints 11–15 runtime behavior is retained; this qualification delta introduces no production runtime rewrite."
+        ],
+        "smallest_correct_change": [
+          "Wave 3 qualification is limited to CI wiring, boundary tests, Sprint 15 traceability and controlled evidence."
+        ],
+        "verification": [
+          "GitHub Actions push CI run 37361521478 on 1151548e46e9b819a8cced740ffabf06be451193",
+          "GitHub Actions PR CI run 37361530263 on 1151548e46e9b819a8cced740ffabf06be451193"
+        ]
+      },
+      "rationale": "Wave 3 scope was reviewed against the smallest qualification-only change needed."
+    },
+    "ponytail": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "reuse_review": [
+          "Existing Submit Tour, timesheet, trade-call and RCPA modules/migrations were reused rather than duplicated."
+        ],
+        "duplication_review": [
+          "No duplicate runtime implementation was added by Wave 3 requalification."
+        ],
+        "maintainability_review": [
+          "Qualification logic is centralized in database/ci/wave-3-boundary-tests.sql and sprint-specific regression suites."
+        ]
+      },
+      "rationale": "Existing product architecture and runtime modules were preserved."
+    },
+    "product_design": {
+      "status": "NOT_APPLICABLE",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "figma_or_no_ui_rationale": [],
+        "carbon_density_review": [],
+        "accessibility": [],
+        "responsive_states": [],
+        "browser_verification": []
+      },
+      "rationale": "Wave 3 requalification changes no product UI or interaction surface."
+    },
+    "architecture": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "boundary_review": [
+          "docs/qa/WAVE-3-REQUALIFICATION.md",
+          "database/ci/wave-3-boundary-tests.sql"
+        ],
+        "dependency_direction": [
+          "No new runtime dependency direction introduced by the Wave 3 qualification delta."
+        ],
+        "shared_services_review": [
+          "Existing shared tenant/RBAC/service entrypoints are exercised rather than bypassed."
+        ],
+        "vendor_leakage_review": [
+          "No new vendor-specific runtime coupling or dependency introduced."
+        ]
+      },
+      "rationale": "Qualification preserves existing module and service boundaries."
+    },
+    "warpath": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "failure_paths": [
+          "database/ci/wave-3-boundary-tests.sql",
+          "Submit Tour: open-visit blocking, short-day reason, submission replay/idempotency and tenant boundary."
+        ],
+        "retry_edge_cases": [
+          "Payload-aware idempotency/replay assertions in database/ci/wave-3-boundary-tests.sql",
+          "apps/api/test/tour-submit.test.ts"
+        ],
+        "state_abuse": [
+          "Open-visit submission block, weekly self-approval prevention, foreign visit/product rejection and cross-tenant denial are exercised."
+        ],
+        "rollback": [
+          "Evidence-only qualification commit can be reverted without production schema/data migration.",
+          "database-migrations job 111937026478: success"
+        ]
+      },
+      "rationale": "Wave 3 failure, replay, authorization and invalid-state paths are exercised by trusted CI."
+    },
+    "coderabbit": {
+      "status": "PASS",
+      "reviewer": "CodeRabbit",
+      "evidence": {
+        "review_url_or_id": [
+          "CodeRabbit commit status on 1151548e46e9b819a8cced740ffabf06be451193: success — Review completed at 2026-10-05T19:22:40Z"
+        ],
+        "unresolved_material_findings_zero": [
+          "PR #48 current non-outdated unresolved CodeRabbit review threads: 0"
+        ]
+      },
+      "rationale": "Candidate PASS is based on the clean CodeRabbit exact-head commit status and zero unresolved current threads; Product Gates remains authoritative for whether the repository's formal APPROVED-review-object rule accepts this signal."
+    },
+    "hacker": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "authorization_abuse": [
+          "database/ci/wave-3-boundary-tests.sql — authenticated direct-write/TRUNCATE and service-RPC denial",
+          "quality-security job 111937026291: success"
+        ],
+        "tenant_escape": [
+          "database/ci/wave-3-boundary-tests.sql — two-tenant RLS isolation including RCPA reports and lines",
+          "database-migrations job 111937026478: success"
+        ],
+        "replay_injection": [
+          "database/ci/wave-3-boundary-tests.sql — submit/trade/RCPA payload replay and idempotency assertions",
+          "apps/api/test/tour-submit.test.ts"
+        ],
+        "tamper_workflow_bypass": [
+          "Open visit, self-approval, manager-scope, foreign visit/product and call-before-checkout controls are tested."
+        ]
+      },
+      "rationale": "Security/tenant impact is covered by the exact-head Wave 3 boundary qualification and regression suite."
+    },
+    "evidence": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "requirements_traceability": [
+          "docs/requirements/sprint-11-submit-tour.md"
+        ],
+        "tests": [
+          "database/ci/wave-3-boundary-tests.sql",
+          "apps/api/test/tour-submit.test.ts",
+          "GitHub Actions push CI run 37361521478 on 1151548e46e9b819a8cced740ffabf06be451193"
+        ],
+        "exact_commit": [
+          "1151548e46e9b819a8cced740ffabf06be451193"
+        ],
+        "immutable_or_versioned_evidence": [
+          "docs/evidence/TRV-SPRINT-11.product-gates.json",
+          "docs/qa/WAVE-3-REQUALIFICATION.md",
+          "GitHub Actions PR CI run 37361530263 on 1151548e46e9b819a8cced740ffabf06be451193"
+        ]
+      },
+      "rationale": "Evidence is bound to the frozen implementation SHA and recorded in version-controlled manifests."
+    },
+    "regulatory_knowledge": {
+      "status": "NOT_APPLICABLE",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "applicability_assessment": [],
+        "authoritative_sources_or_na_rationale": [],
+        "version_provenance": []
+      },
+      "rationale": "Wave 3 field-force workflow qualification does not introduce a pharmacovigilance regulatory decision."
+    },
+    "modular_benchmark": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "module_completeness": [
+          "docs/requirements/sprint-11-submit-tour.md",
+          "apps/api/test/tour-submit.test.ts"
+        ],
+        "market_benchmark": [
+          "docs/qa/WAVE-3-REQUALIFICATION.md — field-force workflow qualification baseline retained."
+        ],
+        "no_fake_controls": [
+          "database/ci/wave-3-boundary-tests.sql exercises real database/RLS/RPC failure paths rather than UI-only controls."
+        ],
+        "integration_completeness": [
+          "GitHub Actions push CI run 37361521478 on 1151548e46e9b819a8cced740ffabf06be451193",
+          "foundation job 111937026728: success",
+          "mobile job 111937026027: success",
+          "database-migrations job 111937026478: success"
+        ]
+      },
+      "rationale": "Each Wave 3 module is requirement-mapped, regression-tested and included in exact-head integration qualification."
+    }
+  },
+  "rollback": {
+    "documented": true,
+    "tested": false,
+    "evidence": [
+      "Revert this evidence-only qualification commit to restore the prior qualification record.",
+      "Wave 3 qualification introduces no production schema migration; forward/reverse migration suite passed in exact-head CI.",
+      "database-migrations job 111937026478: success"
+    ]
+  },
+  "finalQualification": {
+    "status": "COMPLETE",
+    "qualifiedBy": "Product Gates qualification candidate prepared by OpenAI GPT-5.6 Sol; acceptance is determined by automated Product Gates",
+    "qualifiedAt": "2026-10-07"
+  },
+  "automatedCheckApplicability": {
+    "integration_tests": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "PASS via database-migrations job 111937026478: success in GitHub Actions push CI run 37361521478 on 1151548e46e9b819a8cced740ffabf06be451193."
+    },
+    "relevant_e2e": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "The qualification delta adds boundary evidence without changing an end-user workflow; existing API workflow regression remains in the repository suite."
+    },
+    "security": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "PASS via quality-security job 111937026291: success plus database/ci/wave-3-boundary-tests.sql in database-migrations job 111937026478: success."
+    },
+    "design_verification": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "No UI/design change in Wave 3 requalification."
+    },
+    "browser_verification": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "No browser-visible product change in Wave 3 requalification."
+    }
+  },
+  "impactEvidence": {
+    "database": {
+      "forward_migration": [],
+      "reverse_migration": []
+    },
+    "apiContract": {
+      "compatibility": []
+    },
+    "offlineSync": {
+      "retry": [],
+      "idempotency": []
+    }
+  },
+  "automatedCheckScopes": {
+    "lint": "Repository core qualification scope.",
+    "architecture": "Repository core qualification scope.",
+    "dead_code": "Core and web dead-code analyses.",
+    "duplication": "Core qualification duplication threshold.",
+    "module_regression": "Foundation, mobile and database-migrations jobs cover the qualified Wave 3 scope."
+  },
+  "trustedWorkflowChangeApprovals": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "reviewer": "coderabbitai[bot]",
+      "rationale": "Wave 3 intentionally adds its Sprint 11-15 database qualification script to the trusted CI workflow. This declaration must remain unchanged through the CodeRabbit-reviewed implementation commit."
+    }
+  ]
+}
