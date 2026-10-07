@@ -113,7 +113,11 @@ const runFinal = (
     {
       encoding:"utf8",
       env:{
-        ...process.env,
+        ...Object.fromEntries(
+          Object.entries(process.env).filter(([key]) =>
+            !["AUTOMATED_CHECK_RUNS_FILE","AUTOMATED_CHECK_RUNS_JSON"].includes(key)
+          )
+        ),
         CODERABBIT_REVIEW_VERIFIED: coderabbitVerified ? "true" : "false",
         AUTOMATED_CHECK_RUNS_JSON: JSON.stringify(runs)
       }
@@ -242,6 +246,41 @@ assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest shou
 }
 {
   const m=structuredClone(base); const runs=buildRuns(m.exactCommit);
+  const original=runs.check_runs.find(r=>r.name==="foundation");
+  runs.check_runs.push({
+    ...structuredClone(original),
+    id:9998,
+    status:"completed",
+    conclusion:"success",
+    check_suite:{id:9998}
+  });
+  runs.workflow_runs.push({
+    id:19998,
+    check_suite_id:9998,
+    head_sha:m.exactCommit,
+    path:policy.trustedProducers.githubActions.workflowPath,
+    event:"pull_request"
+  });
+  assert.equal(
+    runFinal(m,{runs}).status,
+    0,
+    "newer PR job must not override the latest trusted push job"
+  );
+}
+{
+  const m=structuredClone(base); const runs=buildRuns(m.exactCommit);
+  const foundation=runs.check_runs.find(r=>r.name==="foundation");
+  foundation.check_suite={id:null};
+  const trustedPush=runs.workflow_runs.find(r=>r.check_suite_id===1000);
+  trustedPush.check_suite_id=null;
+  assert.notEqual(
+    runFinal(m,{runs}).status,
+    0,
+    "missing check-suite IDs must not establish trusted workflow provenance"
+  );
+}
+{
+  const m=structuredClone(base); const runs=buildRuns(m.exactCommit);
   runs.trusted_workflow_comparison.exact_blob_sha="d".repeat(40);
   assert.notEqual(runFinal(m,{runs}).status,0,"changed trusted workflow must fail without review-bound approval");
 }
@@ -267,7 +306,14 @@ assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest shou
 {
   const m=structuredClone(base); const runs=buildRuns(m.exactCommit);
   runs.check_runs.push({...structuredClone(runs.check_runs[0]),id:9999,status:"in_progress",conclusion:null,completed_at:null,check_suite:{id:9999}});
-  assert.notEqual(runFinal(m,{runs}).status,0,"newer in-progress re-run must block PASS");
+  runs.workflow_runs.push({
+    id:19999,
+    check_suite_id:9999,
+    head_sha:m.exactCommit,
+    path:policy.trustedProducers.githubActions.workflowPath,
+    event:policy.trustedProducers.githubActions.event
+  });
+  assert.notEqual(runFinal(m,{runs}).status,0,"newer in-progress trusted push re-run must block PASS");
 }
 {
   const m=structuredClone(base); m.impact.architecture=true; m.gates.architecture.status="NOT_APPLICABLE"; m.gates.architecture.rationale="incorrect exemption";

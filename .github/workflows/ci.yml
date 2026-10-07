@@ -415,6 +415,9 @@ jobs:
             echo "Applying $file"
             psql -v ON_ERROR_STOP=1 -f "$file"
           done
+      - name: Run Wave 2 Sprint 6-10 tenant/security qualification
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/wave-2-boundary-tests.sql
+
       - name: Apply all rollback migrations in reverse
         run: |
           set -euo pipefail

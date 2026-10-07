@@ -1,0 +1,293 @@
+{
+  "schemaVersion": 1,
+  "changeId": "TRV-SPRINT-08",
+  "sprint": "Sprint 8 — GPS Check-in / Check-out",
+  "requirementIds": [
+    "TRV-VIS-001",
+    "TRV-VIS-002",
+    "TRV-VIS-003",
+    "TRV-VIS-004",
+    "TRV-VIS-005",
+    "TRV-VIS-006",
+    "TRV-VIS-007",
+    "TRV-VIS-008",
+    "TRV-VIS-009"
+  ],
+  "exactCommit": "5c4031b78380f2c19455a678e945754eb27a3652",
+  "owner": "madhupadishala",
+  "reviewers": [
+    "OpenAI GPT-5.6 Sol",
+    "CodeRabbit pending exact-head review"
+  ],
+  "impact": {
+    "ui": false,
+    "database": false,
+    "apiContract": false,
+    "securityTenant": true,
+    "offlineSync": false,
+    "regulatoryDomain": false,
+    "architecture": false
+  },
+  "artifacts": {
+    "urs": [],
+    "frs": [],
+    "architecture": [
+      "docs/qa/WAVE-2-REQUALIFICATION.md"
+    ],
+    "figma": [],
+    "userGuide": [],
+    "traceability": [
+      "docs/requirements/sprint-08-gps-visits.md"
+    ],
+    "benchmark": [
+      "docs/qa/WAVE-2-REQUALIFICATION.md"
+    ]
+  },
+  "automatedChecks": {
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "unit_tests": "PASS",
+    "integration_tests": "PASS",
+    "relevant_e2e": "NOT_APPLICABLE",
+    "architecture": "PASS",
+    "security": "PASS",
+    "secret_scan": "PASS",
+    "dependency_audit": "PASS",
+    "module_regression": "PASS",
+    "build": "PASS",
+    "design_verification": "NOT_APPLICABLE",
+    "browser_verification": "NOT_APPLICABLE",
+    "evidence_verification": "PASS"
+  },
+  "gates": {
+    "karpathy": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "scope_review": [
+          "docs/qa/WAVE-2-REQUALIFICATION.md",
+          "docs/requirements/sprint-08-gps-visits.md"
+        ],
+        "assumptions": [
+          "Existing runtime retained."
+        ],
+        "smallest_correct_change": [
+          "Qualification-only evidence."
+        ],
+        "verification": [
+          "CI push 37520353398",
+          "CI PR 37520360731"
+        ]
+      },
+      "rationale": "Scope verified."
+    },
+    "ponytail": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "reuse_review": [
+          "Existing module reused."
+        ],
+        "duplication_review": [
+          "No duplicate runtime path."
+        ],
+        "maintainability_review": [
+          "Wave 2 boundary test + sprint regression retained."
+        ]
+      },
+      "rationale": "Reuse preserved."
+    },
+    "product_design": {
+      "status": "NOT_APPLICABLE",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "figma_or_no_ui_rationale": [],
+        "carbon_density_review": [],
+        "accessibility": [],
+        "responsive_states": [],
+        "browser_verification": []
+      },
+      "rationale": "This requalification branch changes no product UI or interaction surface."
+    },
+    "architecture": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "boundary_review": [
+          "database/ci/wave-2-boundary-tests.sql"
+        ],
+        "dependency_direction": [
+          "No new runtime dependency direction."
+        ],
+        "shared_services_review": [
+          "Existing tenant/RBAC services exercised."
+        ],
+        "vendor_leakage_review": [
+          "No new vendor coupling."
+        ]
+      },
+      "rationale": "Architecture preserved."
+    },
+    "warpath": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "failure_paths": [
+          "database/ci/wave-2-boundary-tests.sql",
+          "apps/api/test/visit-execution.test.ts"
+        ],
+        "retry_edge_cases": [
+          "Replay/idempotency coverage."
+        ],
+        "state_abuse": [
+          "Invalid-state and self-review paths rejected."
+        ],
+        "rollback": [
+          "database-migrations job 112463869842: success"
+        ]
+      },
+      "rationale": "Failure paths qualified."
+    },
+    "coderabbit": {
+      "status": "BLOCKED",
+      "reviewer": "CodeRabbit",
+      "evidence": {
+        "review_url_or_id": [],
+        "unresolved_material_findings_zero": []
+      },
+      "rationale": "Awaiting trusted CodeRabbit approval of the bound exact-head qualification candidate."
+    },
+    "hacker": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "authorization_abuse": [
+          "Authenticated mutation and service-RPC denial."
+        ],
+        "tenant_escape": [
+          "Two-tenant execution/visit/inventory isolation."
+        ],
+        "replay_injection": [
+          "Replay/payload mismatch tests."
+        ],
+        "tamper_workflow_bypass": [
+          "Self-review and invalid state transitions rejected."
+        ]
+      },
+      "rationale": "Security boundary qualified."
+    },
+    "evidence": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "requirements_traceability": [
+          "docs/requirements/sprint-08-gps-visits.md"
+        ],
+        "tests": [
+          "database/ci/wave-2-boundary-tests.sql",
+          "apps/api/test/visit-execution.test.ts"
+        ],
+        "exact_commit": [
+          "5c4031b78380f2c19455a678e945754eb27a3652"
+        ],
+        "immutable_or_versioned_evidence": [
+          "docs/evidence/TRV-SPRINT-08.product-gates.json",
+          "docs/qa/WAVE-2-REQUALIFICATION.md"
+        ]
+      },
+      "rationale": "Evidence bound to exact commit."
+    },
+    "regulatory_knowledge": {
+      "status": "NOT_APPLICABLE",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "applicability_assessment": [],
+        "authoritative_sources_or_na_rationale": [],
+        "version_provenance": []
+      },
+      "rationale": "This field-force requalification does not introduce or change a regulated pharmacovigilance decision."
+    },
+    "modular_benchmark": {
+      "status": "PASS",
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "evidence": {
+        "module_completeness": [
+          "docs/requirements/sprint-08-gps-visits.md",
+          "apps/api/test/visit-execution.test.ts"
+        ],
+        "market_benchmark": [
+          "docs/qa/WAVE-2-REQUALIFICATION.md"
+        ],
+        "no_fake_controls": [
+          "Real DB/RLS/RPC controls exercised."
+        ],
+        "integration_completeness": [
+          "CI push 37520353398"
+        ]
+      },
+      "rationale": "Module qualification complete."
+    }
+  },
+  "rollback": {
+    "documented": true,
+    "tested": false,
+    "evidence": [
+      "Evidence-only closure can be reverted.",
+      "database-migrations job 112463869842: success"
+    ]
+  },
+  "finalQualification": {
+    "status": "IMPLEMENTED / NOT QUALIFIED",
+    "qualifiedBy": "",
+    "qualifiedAt": ""
+  },
+  "automatedCheckApplicability": {
+    "integration_tests": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "PASS via database-migrations job 112463869842."
+    },
+    "relevant_e2e": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "The requalification delta adds evidence and boundary tests without changing an end-user workflow; existing workflow regression remains in the repository test suite."
+    },
+    "security": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "PASS via quality-security job 112463870569 and Wave 2 boundary SQL."
+    },
+    "design_verification": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "No UI/design change in this Wave 2 requalification."
+    },
+    "browser_verification": {
+      "reviewer": "OpenAI GPT-5.6 Sol",
+      "rationale": "No browser-visible product change in this Wave 2 requalification."
+    }
+  },
+  "impactEvidence": {
+    "database": {
+      "forward_migration": [],
+      "reverse_migration": []
+    },
+    "apiContract": {
+      "compatibility": []
+    },
+    "offlineSync": {
+      "retry": [],
+      "idempotency": []
+    }
+  },
+  "automatedCheckScopes": {
+    "lint": "Repository core qualification scope.",
+    "architecture": "Repository core qualification scope.",
+    "dead_code": "Core and web dead-code analyses.",
+    "duplication": "Core qualification duplication threshold.",
+    "module_regression": "Foundation, mobile and database-migrations jobs cover the qualified Wave 2 scope."
+  },
+  "trustedWorkflowChangeApprovals": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "reviewer": "coderabbitai[bot]",
+      "rationale": "Wave 2 intentionally adds its database qualification script to the trusted CI workflow. This declaration must remain unchanged through the CodeRabbit-reviewed implementation commit."
+    }
+  ]
+}
