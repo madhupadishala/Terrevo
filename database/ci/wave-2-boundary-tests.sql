@@ -453,7 +453,9 @@ end
 $$;
 
 -- Returning more than available balance must fail and balance remains non-negative.
-do $$
+do $
+declare
+  v_balance integer;
 begin
   begin
     perform public.admin_return_inventory(
@@ -465,8 +467,25 @@ begin
     when others then
       if position('insufficient inventory balance' in sqlerrm)=0 then raise; end if;
   end;
+
+  select quantity into v_balance
+    from public.inventory_balances
+   where tenant_id='82000000-0000-4000-8000-000000000001'
+     and employee_id='84000000-0000-4000-8000-000000000001'
+     and sample_id='85000000-0000-4000-8000-000000000003';
+  if v_balance is distinct from 10 then
+    raise exception 'TRV-INV-008 failed: balance changed after rejected over-return, got %',v_balance;
+  end if;
+
+  if exists(
+    select 1 from public.inventory_operations
+     where tenant_id='82000000-0000-4000-8000-000000000001'
+       and operation_id='89000000-0000-4000-8000-000000000002'
+  ) then
+    raise exception 'TRV-INV-008 failed: rejected over-return recorded an operation';
+  end if;
 end
-$$;
+$;
 
 do $$
 begin

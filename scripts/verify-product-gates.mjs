@@ -146,27 +146,25 @@ for (const check of policy.automatedChecks) {
     }
 
     for (const jobName of bindings) {
-      const latest = checkRuns
+      const trustedCandidates = checkRuns
         .filter(run =>
           run?.name === jobName &&
           run?.head_sha === manifest.exactCommit &&
           run?.app?.id === actionsProducer.appId &&
-          run?.app?.slug === actionsProducer.slug
+          run?.app?.slug === actionsProducer.slug &&
+          workflowRuns.some(workflow =>
+            workflow?.check_suite_id === run?.check_suite?.id &&
+            workflow?.head_sha === manifest.exactCommit &&
+            normalizeWorkflowPath(workflow?.path) === trustedWorkflowPath &&
+            workflow?.event === trustedWorkflowEvent
+          )
         )
-        .sort((a, b) => (a?.id || 0) - (b?.id || 0))
-        .at(-1);
+        .sort((a, b) => (a?.id || 0) - (b?.id || 0));
 
+      const latest = trustedCandidates.at(-1);
       if (!latest || latest.status !== "completed" || latest.conclusion !== "success") {
-        failures.push(`automated check ${check} lacks trusted successful latest exact-commit job: ${jobName}`);
-        continue;
+        failures.push(`automated check ${check} lacks trusted successful latest exact-commit job from ${trustedWorkflowPath} via ${trustedWorkflowEvent}: ${jobName}`);
       }
-      const workflow = workflowRuns.find(run =>
-        run?.check_suite_id === latest?.check_suite?.id &&
-        run?.head_sha === manifest.exactCommit &&
-        normalizeWorkflowPath(run?.path) === trustedWorkflowPath &&
-        run?.event === trustedWorkflowEvent
-      );
-      if (!workflow) failures.push(`automated check ${check} latest job is not proven to come from trusted workflow ${trustedWorkflowPath} via ${trustedWorkflowEvent}: ${jobName}`);
     }
     continue;
   }
