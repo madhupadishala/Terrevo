@@ -487,12 +487,12 @@ begin
 end
 $wave2$;
 
-do $
+do $negative$
 begin
   if exists(select 1 from public.inventory_balances where quantity<0) then
     raise exception 'TRV-INV-001/008 failed: negative balance exists';
   end if;
 end
-$$;
+$negative$;
 
 rollback;
