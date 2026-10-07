@@ -153,7 +153,9 @@ for (const check of policy.automatedChecks) {
           run?.app?.id === actionsProducer.appId &&
           run?.app?.slug === actionsProducer.slug &&
           workflowRuns.some(workflow =>
-            workflow?.check_suite_id === run?.check_suite?.id &&
+            workflow?.check_suite_id != null &&
+            run?.check_suite?.id != null &&
+            workflow.check_suite_id === run.check_suite.id &&
             workflow?.head_sha === manifest.exactCommit &&
             normalizeWorkflowPath(workflow?.path) === trustedWorkflowPath &&
             workflow?.event === trustedWorkflowEvent

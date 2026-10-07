@@ -269,6 +269,18 @@ assert.equal(runStructure(structuredClone(base)).status, 0, "valid manifest shou
 }
 {
   const m=structuredClone(base); const runs=buildRuns(m.exactCommit);
+  const foundation=runs.check_runs.find(r=>r.name==="foundation");
+  foundation.check_suite={id:null};
+  const trustedPush=runs.workflow_runs.find(r=>r.check_suite_id===1000);
+  trustedPush.check_suite_id=null;
+  assert.notEqual(
+    runFinal(m,{runs}).status,
+    0,
+    "missing check-suite IDs must not establish trusted workflow provenance"
+  );
+}
+{
+  const m=structuredClone(base); const runs=buildRuns(m.exactCommit);
   runs.trusted_workflow_comparison.exact_blob_sha="d".repeat(40);
   assert.notEqual(runFinal(m,{runs}).status,0,"changed trusted workflow must fail without review-bound approval");
 }
