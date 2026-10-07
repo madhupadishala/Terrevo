@@ -453,7 +453,7 @@ end
 $$;
 
 -- Returning more than available balance must fail and balance remains non-negative.
-do $
+do $wave2$
 declare
   v_balance integer;
 begin
@@ -485,9 +485,9 @@ begin
     raise exception 'TRV-INV-008 failed: rejected over-return recorded an operation';
   end if;
 end
-$;
+$wave2$;
 
-do $$
+do $
 begin
   if exists(select 1 from public.inventory_balances where quantity<0) then
     raise exception 'TRV-INV-001/008 failed: negative balance exists';
