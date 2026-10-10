@@ -69,7 +69,7 @@ export function createNcaService(repo:NcaRepository,rbac:RbacService) {
         categoryCode:short(raw.categoryCode,"categoryCode",40),
         townId:raw.townId==null||raw.townId===""?null:uuid(raw.townId,"townId"),
         reason:short(raw.reason,"reason",500),
-        remarks:short(raw.remarks,"remarks",2000,false),
+        remarks:short(raw.remarks,"remarks",2000,phase==="REPORT"),
         durationMinutes:Number(raw.durationMinutes),
       };
       if(!Number.isInteger(command.durationMinutes)||command.durationMinutes<1||command.durationMinutes>1440)throw new NcaInputError("durationMinutes must be 1 to 1440");
