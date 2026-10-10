@@ -12,7 +12,7 @@ import { localDate } from "./plan-calendar";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
-  type Session, type StartOption, type Tenant,
+  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord,
 } from "./terrevo-api";
 
 type Area = "overview" | "today" | "customers" | "activities" | "edetailing" | "field" | "plans" | "manager" | "admin" | "platform" | BusinessArea;
@@ -99,6 +99,12 @@ export default function App() {
   const [assignmentRole, setAssignmentRole] = useState<"TENANT_ADMIN" | "MANAGER" | "MR">("MR");
   const [assignmentScope, setAssignmentScope] = useState("");
   const [focusedCustomer, setFocusedCustomer] = useState<{kind:"doctor"|"chemist"|"stockist";id:string;territoryId:string;name:string}|null>(null);
+  const [ncaOptions,setNcaOptions] = useState<NcaOptions>({categories:[],towns:[]});
+  const [ncaRecords,setNcaRecords] = useState<NcaRecord[]>([]);
+  const [ncaCategoryCode,setNcaCategoryCode] = useState("");
+  const [ncaCategoryLabel,setNcaCategoryLabel] = useState("");
+  const [ncaTownName,setNcaTownName] = useState("");
+  const [ncaTownTerritory,setNcaTownTerritory] = useState("");
 
   function resetTenantState() {
     setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
@@ -106,7 +112,7 @@ export default function App() {
     setSelectedOption(""); setStopId(""); setGpsReason(""); setCallOutcome("");
     setCallRemarks(""); setShortDayReason("");
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
-    setFocusedCustomer(null);
+    setFocusedCustomer(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
   }
 
   const connected = Boolean(session && tenantId && access);
@@ -128,6 +134,7 @@ export default function App() {
       const base = await Promise.allSettled([
         api.progress(), api.startOptions(), api.openVisit(), api.plans(), api.orgUnits(),
         ...MASTER_KINDS.map(k=>api.masters(k)),
+        api.ncaOptions(),api.ownNcaRecords(),
       ]);
       if (generation !== tenantGeneration.current) return;
       setProgress(base[0].status==="fulfilled"?base[0].value:null);
@@ -141,6 +148,9 @@ export default function App() {
         next[kind]=result.status==="fulfilled"?result.value as Master[]:[];
       });
       setMasters(next);
+      const ncaOptionsResult=base[5+MASTER_KINDS.length],ncaRowsResult=base[6+MASTER_KINDS.length];
+      setNcaOptions(ncaOptionsResult.status==="fulfilled"?ncaOptionsResult.value as NcaOptions:{categories:[],towns:[]});
+      setNcaRecords(ncaRowsResult.status==="fulfilled"?ncaRowsResult.value as NcaRecord[]:[]);
       const failures=base.filter(result=>result.status==="rejected").length;
       if (failures) setNotice({kind:"info",title:"Partial data access",
         message:String(failures)+" API requests were denied or unavailable; previous tenant records have been cleared."});
@@ -364,7 +374,27 @@ export default function App() {
           plannedCalls={progress?.stops.map(stop=>({
             planStopId:stop.planStopId, label:stop.targetName, territoryId:progress.territoryId, workDate:progress.workDate,
           }))??[]}
-          ncaSubtypes={[]} towns={[]} loading={loading} />}
+          ncaSubtypes={ncaOptions.categories.map(x=>({code:x.code,label:x.label}))}
+          towns={ncaOptions.towns.map(x=>({id:x.id,name:x.name}))}
+          onSaveDraft={async draft=>{
+            if(!connected||draft.tenantId!==tenantId)throw new Error("The organization changed; start a new authorized draft.");
+            if(draft.kind!=="NON_CALL_ACTIVITY")throw new Error("Planned and unplanned calls must use their approved tour workflows; the separate backend contract is not yet available.");
+            if(draft.evidence)throw new Error("NCA evidence uploads are not supported. Remove the unverified reference before saving.");
+            await api.saveNcaDraft({phase:draft.ncaPhase==="PLAN"?"PLAN":"REPORT",
+              workDate:draft.workDate,territoryId:draft.territoryId,categoryCode:draft.ncaSubtype??"",
+              townId:draft.townId??null,reason:draft.reason,remarks:draft.remarks,durationMinutes:draft.durationMinutes});
+            await refresh(access);
+          }}
+          loading={loading} />}
+        {view==="activities"&&connected&&<Panel eyebrow="SERVER RECORDS" title="My NCA drafts and reports">
+          {ncaRecords.length?ncaRecords.map(record=><div className="tr-history-row" key={record.id}>
+            <div><strong>{record.workDate} · {record.phase} · {record.categoryCode}</strong>
+              <p>{record.reason} · {record.durationMinutes} minutes</p></div>
+            <Status value={record.status}/>
+            {record.status==="DRAFT"&&<Button size="sm" disabled={busy||loading}
+              onClick={()=>guarded(()=>api.submitNca(record.id),"NCA report submitted")}>Submit NCA</Button>}
+          </div>):<p className="tr-detail">No NCA records returned by the tenant API. Create an authorized draft above.</p>}
+        </Panel>}
 
         {view==="edetailing" && <EDetailingView
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
@@ -428,6 +458,28 @@ export default function App() {
               <Button disabled={busy||!assignmentUser||(!assignmentScope&&assignmentRole!=="TENANT_ADMIN")} onClick={()=>guarded(()=>api.assignRole(assignmentUser,assignmentRole,assignmentRole==="TENANT_ADMIN"?null:assignmentScope),"Role assignment saved")}>Assign role</Button></div>
           </Panel>
         </div>:<Panel eyebrow="ADMIN PERMISSIONS" title="Tenant administration requires authorization"><p className="tr-detail">This area uses existing real organization and role APIs. It does not grant elevated access to a regular field user.</p></Panel>)}
+
+        {view==="admin"&&admin&&<Panel eyebrow="CONTROLLED NCA MASTER" title="Manage NCA categories and towns">
+          <p className="tr-detail">NCA types and towns are client-controlled records; Terrevo does not invent categories or towns.</p>
+          <div className="tr-form">
+            <TextInput id="nca-master-code" labelText="Category code (UPPERCASE_UNDERSCORES)" maxLength={40}
+              value={ncaCategoryCode} onChange={e=>setNcaCategoryCode(e.target.value)}/>
+            <TextInput id="nca-master-label" labelText="NCA category label" maxLength={120}
+              value={ncaCategoryLabel} onChange={e=>setNcaCategoryLabel(e.target.value)}/>
+            <Button size="sm" disabled={!connected||busy||!ncaCategoryCode||!ncaCategoryLabel}
+              onClick={()=>guarded(()=>api.configureNcaCategory(ncaCategoryCode,ncaCategoryLabel),"NCA category configured")}>Save category</Button>
+            <label className="tr-select-label" htmlFor="nca-town-territory">Town territory</label>
+            <select id="nca-town-territory" className="tr-select" value={ncaTownTerritory} onChange={e=>setNcaTownTerritory(e.target.value)}>
+              <option value="">Select authorized territory</option>
+              {units.filter(x=>x.type==="territory"&&x.status==="active").map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+            <TextInput id="nca-town-name" labelText="Actual town name" maxLength={120} value={ncaTownName}
+              onChange={e=>setNcaTownName(e.target.value)}/>
+            <Button size="sm" disabled={!connected||busy||!ncaTownTerritory||!ncaTownName}
+              onClick={()=>guarded(()=>api.configureNcaTown(ncaTownTerritory,ncaTownName),"NCA town configured")}>Save town</Button>
+          </div>
+          <p className="tr-detail">{ncaOptions.categories.length} approved NCA categories · {ncaOptions.towns.length} authorized towns</p>
+        </Panel>}
 
         {view==="platform"&&<PlatformConsole api={api} authenticated={Boolean(session)}
           isSuperAdmin={isPlatformAdmin} busy={busy} perform={(fn,title)=>action(fn,title,false)}/>}
