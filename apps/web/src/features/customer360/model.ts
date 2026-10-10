@@ -24,5 +24,5 @@ export function visibleRelationships(tenant:string,selected:Customer,authorized:
  .map(x=>({...x,target:authorized.find(y=>y.kind===x.targetKind&&y.record.id===x.targetId)!}));
 }
 export function visibleHistory(tenant:string,selected:Customer,events:CustomerActivity[]){
- return events.filter(x=>x.tenantId===tenant&&x.customerId===selected.record.id&&x.customerKind===selected.kind).sort((a,b)=>b.occurredAt.localeCompare(a.occurredAt));
+ return events.filter(x=>x.tenantId===tenant&&x.customerId===selected.record.id&&x.customerKind===selected.kind).sort((a,b)=>new Date(b.occurredAt).getTime()-new Date(a.occurredAt).getTime());
 }
