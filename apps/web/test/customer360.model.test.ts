@@ -21,3 +21,11 @@ test("history includes only matching tenant, customer and kind",()=>{
  ];
  assert.deepEqual(visibleHistory("t",rows[0],events).map(x=>x.id),["match"]);
 });
+
+test("history sorts by absolute timestamps across UTC offsets",()=>{
+ const events=[
+  {tenantId:"t",customerKind:"doctor" as const,customerId:"d",id:"later",occurredAt:"2026-10-10T23:30:00-02:00",activityType:"CALL",summary:"later"},
+  {tenantId:"t",customerKind:"doctor" as const,customerId:"d",id:"earlier",occurredAt:"2026-10-11T00:30:00Z",activityType:"CALL",summary:"earlier"},
+ ];
+ assert.deepEqual(visibleHistory("t",rows[0],events).map(x=>x.id),["later","earlier"]);
+});
