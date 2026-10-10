@@ -9,7 +9,7 @@ export type PlannedCallOption = {planStopId:string;label:string;territoryId:stri
 export type NcaSubtype = {code:string;label:string};
 export type ActivitiesViewProps = {tenantId:string;authorizedForTenantId:string;contextKey:string;territories:TerritoryOption[];
  customers?:{doctors?:Master[];chemists?:Master[];stockists?:Master[]};plannedCalls?:PlannedCallOption[];
- ncaSubtypes?:NcaSubtype[];towns?:TerritoryOption[];onSaveDraft?:(draft:ActivityDraft)=>void|Promise<void>;loading?:boolean};
+ ncaSubtypes?:NcaSubtype[];towns?:TerritoryOption[];onSaveDraft?:(draft:ActivityDraft)=>void|Promise<void>;saveMode?:"SERVER_NCA"|"HANDOFF";loading?:boolean};
 export type ActivityValidationContext = {territories:TerritoryOption[];customers:NonNullable<ActivitiesViewProps["customers"]>;plannedCalls:PlannedCallOption[];ncaSubtypes:NcaSubtype[];towns?:TerritoryOption[]};
 export function validateActivityDraft(d:ActivityDraft,ctx:ActivityValidationContext):string[]{
  const e:string[]=[];
