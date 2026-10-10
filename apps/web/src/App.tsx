@@ -3,6 +3,7 @@ import { Button, InlineNotification, Tag, TextArea, TextInput, Tile } from "@car
 import { BusinessWorkspace, type BusinessArea } from "./BusinessWorkspace";
 import { PlatformConsole } from "./PlatformConsole";
 import { MasterEditor } from "./MasterEditor";
+import { MonthlyPlanner } from "./MonthlyPlanner";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
@@ -29,14 +30,6 @@ const roles: Record<string, string> = {
 };
 const MASTER_KINDS = ["employees", "doctors", "chemists", "stockists", "products", "samples", "gifts"];
 const dateTime = (value: string | null | undefined) => value ? new Date(value).toLocaleString() : "—";
-const localDate = (d: Date) => [
-  d.getFullYear(), String(d.getMonth()+1).padStart(2,"0"), String(d.getDate()).padStart(2,"0"),
-].join("-");
-const monday = () => {
-  const d = new Date(); const day = d.getDay(); d.setDate(d.getDate() - ((day + 6) % 7));
-  return localDate(d);
-};
-const toDay = (s: string) => new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10);
 const errText = (error: unknown) => error instanceof Error ? error.message : "The operation could not be completed.";
 const fmt = (v: number | string | null | undefined) => v == null ? "—" : String(v);
 const UI_TAG: Record<string, "gray" | "green" | "blue" | "red" | "purple"> = {
@@ -87,11 +80,6 @@ export default function App() {
   const [callOutcome, setCallOutcome] = useState("");
   const [callRemarks, setCallRemarks] = useState("");
   const [shortDayReason, setShortDayReason] = useState("");
-  const [planWeek, setPlanWeek] = useState(monday());
-  const [planDay, setPlanDay] = useState(localDate(new Date()));
-  const [territoryId, setTerritoryId] = useState("");
-  const [stopType, setStopType] = useState<"doctor" | "chemist" | "stockist">("doctor");
-  const [targetId, setTargetId] = useState("");
   const [reviewComment, setReviewComment] = useState("");
   const [unitType, setUnitType] = useState("company");
   const [unitCode, setUnitCode] = useState("");
@@ -106,17 +94,14 @@ export default function App() {
     setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
     setCommand(null); setAnalytics(null); setUnits([]); setMasters({});
     setSelectedOption(""); setStopId(""); setGpsReason(""); setCallOutcome("");
-    setCallRemarks(""); setShortDayReason(""); setTerritoryId(""); setTargetId("");
+    setCallRemarks(""); setShortDayReason("");
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
-    setPlanWeek(monday()); setPlanDay(localDate(new Date()));
   }
 
   const connected = Boolean(session && tenantId && access);
   const admin = access?.roles.some(r => r.roleKey === "TENANT_ADMIN") ?? false;
   const manager = admin || (access?.roles.some(r => r.roleKey === "MANAGER") ?? false);
-  const territoryUnits = units.filter(u => u.type === "territory" && u.status === "active");
   const activeStop = progress?.stops.find(s => s.planStopId === visit?.planStopId);
-  const availableTargets = masters[stopType === "doctor" ? "doctors" : stopType === "chemist" ? "chemists" : "stockists"] ?? [];
 
   const refresh = useCallback(async (rights: AccessContext | null) => {
     if (!api.connected) return;
@@ -220,7 +205,6 @@ export default function App() {
   function requireLocation(): Promise<{latitude: number; longitude:number; accuracyMeters:number}> {
     return freshPosition();
   }
-  const selectedTerritory = territoryUnits.find(u => u.id === territoryId);
   const viewName = NAV.find(n => n.id === view)!;
   const selectedTenantName = tenants.find(t => t.id === tenantId)?.name ?? null;
   return <div className="tr-app">
@@ -328,29 +312,8 @@ export default function App() {
           </Panel>
         </div>}
 
-        {view==="plans"&&<div className="tr-grid-wide">
-          <Panel eyebrow="WEEKLY FIELD PLAN" title="Create a real plan">
-            <p className="tr-detail">Choose a territory and account from existing master records. The plan is persisted by Terrevo's server; a manager must approve it before tour execution.</p>
-            <div className="tr-form">
-              <label className="tr-select-label" htmlFor="plan-week">Week starting (Monday)</label><input className="tr-select" id="plan-week" type="date" value={planWeek} onChange={e=>setPlanWeek(e.target.value)}/>
-              <label className="tr-select-label" htmlFor="plan-date">Work date</label><input className="tr-select" id="plan-date" type="date" value={planDay} onChange={e=>setPlanDay(e.target.value)}/>
-              <label className="tr-select-label" htmlFor="plan-territory">Territory</label>
-              <select className="tr-select" id="plan-territory" value={territoryId} onChange={e=>setTerritoryId(e.target.value)} disabled={!connected}><option value="">Select territory</option>
-                {territoryUnits.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select>
-              <label className="tr-select-label" htmlFor="plan-type">Visit type</label>
-              <select className="tr-select" id="plan-type" value={stopType} onChange={e=>{setStopType(e.target.value as typeof stopType);setTargetId("");}}><option value="doctor">Doctor</option><option value="chemist">Chemist</option><option value="stockist">Stockist</option></select>
-              <label className="tr-select-label" htmlFor="plan-target">Account</label>
-              <select className="tr-select" id="plan-target" value={targetId} onChange={e=>setTargetId(e.target.value)} disabled={!connected}><option value="">Select account</option>
-                {availableTargets.filter(m=>m.status==="active"&&(!selectedTerritory||m.territoryId===selectedTerritory.id)).map(m=><option value={m.id} key={m.id}>{m.name}</option>)}</select>
-              <Button disabled={!connected||busy||!territoryId||!targetId} onClick={()=>guarded(()=>api.savePlan(planWeek,[{date:toDay(planDay),territoryId,remarks:null,stops:[{sequence:1,type:stopType,targetId,remarks:null}]}]),"Weekly plan saved")}>Save plan</Button>
-            </div>
-          </Panel>
-          <Panel eyebrow="SAVED PLANS" title="Your weekly plans">
-            {plans.length?plans.map(p=><div className="tr-history-row" key={p.id}><div><strong>Week of {p.weekStart}</strong><p>{p.status} · {p.id.slice(0,8)}</p>
-              {["DRAFT","RETURNED"].includes(p.status)&&<Button kind="ghost" size="sm" disabled={!connected||busy} onClick={()=>guarded(()=>api.submitPlan(p.id),"Plan submitted for approval")}>Submit for approval ↗</Button>}</div><Status value={p.status}/></div>):
-              <Empty title="No plans returned" detail="Your saved plans will appear here as soon as they exist on the server."/>}
-          </Panel>
-        </div>}
+        {view==="plans" && <MonthlyPlanner key={tenantId || "unconnected"} api={api} connected={connected}
+          busy={busy} plans={plans} units={units} masters={masters} perform={(fn,title)=>action(fn,title)} />}
 
         {(["trade","inventory","workforce","approvals","reports"] as Area[]).includes(view) &&
           <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} busy={busy}
