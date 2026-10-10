@@ -109,17 +109,16 @@ export class TerrevoWebApi {
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     if (response.status === 401 && retry && this.session?.refreshToken) {
-      try {
-        // Another request may already have rotated the refresh token.
-        if (headers.authorization !== "Bearer " + this.session.accessToken) {
-          return this.raw(path, method, body, tenantScoped, false);
+      // A parallel request may already have rotated the token.
+      if (headers.authorization === "Bearer " + this.session.accessToken) {
+        try { await this.refreshOnce(); }
+        catch {
+          this.reset();
+          throw new ApiFailure(401, "Session expired. Reconnect your account.");
         }
-        await this.refreshOnce();
-        return this.raw(path, method, body, tenantScoped, false);
-      } catch {
-        this.reset();
-        throw new ApiFailure(401, "Session expired. Reconnect your account.");
       }
+      // Errors from the retried business operation must not invalidate a valid session.
+      return this.raw(path, method, body, tenantScoped, false);
     }
     if (!response.ok) {
       const value: unknown = await response.json().catch(() => null);
