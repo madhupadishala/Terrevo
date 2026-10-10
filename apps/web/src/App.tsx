@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Button, InlineNotification, Tag, TextArea, TextInput, Tile } from "@carbon/react";
 import { BusinessWorkspace, type BusinessArea } from "./BusinessWorkspace";
 import { PlatformConsole } from "./PlatformConsole";
@@ -29,9 +29,12 @@ const roles: Record<string, string> = {
 };
 const MASTER_KINDS = ["employees", "doctors", "chemists", "stockists", "products", "samples", "gifts"];
 const dateTime = (value: string | null | undefined) => value ? new Date(value).toLocaleString() : "—";
+const localDate = (d: Date) => [
+  d.getFullYear(), String(d.getMonth()+1).padStart(2,"0"), String(d.getDate()).padStart(2,"0"),
+].join("-");
 const monday = () => {
-  const d = new Date(); const day = d.getUTCDay(); d.setUTCDate(d.getUTCDate() - ((day + 6) % 7));
-  return d.toISOString().slice(0, 10);
+  const d = new Date(); const day = d.getDay(); d.setDate(d.getDate() - ((day + 6) % 7));
+  return localDate(d);
 };
 const toDay = (s: string) => new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10);
 const errText = (error: unknown) => error instanceof Error ? error.message : "The operation could not be completed.";
@@ -62,6 +65,7 @@ export default function App() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [tenantId, setTenantId] = useState("");
   const [access, setAccess] = useState<AccessContext | null>(null);
+  const tenantGeneration = useRef(0);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -84,7 +88,7 @@ export default function App() {
   const [callRemarks, setCallRemarks] = useState("");
   const [shortDayReason, setShortDayReason] = useState("");
   const [planWeek, setPlanWeek] = useState(monday());
-  const [planDay, setPlanDay] = useState(new Date().toISOString().slice(0, 10));
+  const [planDay, setPlanDay] = useState(localDate(new Date()));
   const [territoryId, setTerritoryId] = useState("");
   const [stopType, setStopType] = useState<"doctor" | "chemist" | "stockist">("doctor");
   const [targetId, setTargetId] = useState("");
@@ -98,6 +102,15 @@ export default function App() {
   const [assignmentRole, setAssignmentRole] = useState<"TENANT_ADMIN" | "MANAGER" | "MR">("MR");
   const [assignmentScope, setAssignmentScope] = useState("");
 
+  function resetTenantState() {
+    setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
+    setCommand(null); setAnalytics(null); setUnits([]); setMasters({});
+    setSelectedOption(""); setStopId(""); setGpsReason(""); setCallOutcome("");
+    setCallRemarks(""); setShortDayReason(""); setTerritoryId(""); setTargetId("");
+    setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
+    setPlanWeek(monday()); setPlanDay(localDate(new Date()));
+  }
+
   const connected = Boolean(session && tenantId && access);
   const admin = access?.roles.some(r => r.roleKey === "TENANT_ADMIN") ?? false;
   const manager = admin || (access?.roles.some(r => r.roleKey === "MANAGER") ?? false);
@@ -107,28 +120,41 @@ export default function App() {
 
   const refresh = useCallback(async (rights: AccessContext | null) => {
     if (!api.connected) return;
+    const generation = tenantGeneration.current;
     setLoading(true);
     try {
-      const base = await Promise.allSettled([api.progress(), api.startOptions(), api.openVisit(), api.plans(), api.orgUnits(),
-        ...MASTER_KINDS.map(k => api.masters(k))]);
-      if (base[0].status === "fulfilled") setProgress(base[0].value);
-      if (base[1].status === "fulfilled") setOptions(base[1].value);
-      if (base[2].status === "fulfilled") setVisit(base[2].value);
-      if (base[3].status === "fulfilled") setPlans(base[3].value);
-      if (base[4].status === "fulfilled") setUnits(base[4].value);
-      const next: Record<string, Master[]> = {};
-      MASTER_KINDS.forEach((kind,i) => { const res = base[5+i]; if (res.status === "fulfilled") next[kind] = res.value as Master[]; });
+      const base = await Promise.allSettled([
+        api.progress(), api.startOptions(), api.openVisit(), api.plans(), api.orgUnits(),
+        ...MASTER_KINDS.map(k=>api.masters(k)),
+      ]);
+      if (generation !== tenantGeneration.current) return;
+      setProgress(base[0].status==="fulfilled"?base[0].value:null);
+      setOptions(base[1].status==="fulfilled"?base[1].value:[]);
+      setVisit(base[2].status==="fulfilled"?base[2].value:null);
+      setPlans(base[3].status==="fulfilled"?base[3].value:[]);
+      setUnits(base[4].status==="fulfilled"?base[4].value:[]);
+      const next:Record<string,Master[]>={};
+      MASTER_KINDS.forEach((kind,i)=>{
+        const result=base[5+i];
+        next[kind]=result.status==="fulfilled"?result.value as Master[]:[];
+      });
       setMasters(next);
-      const failures = base.filter(result => result.status === "rejected");
-      if (failures.length) setNotice({ kind: "info", title: "Partial data access", message: `${failures.length} data requests were not available for this account. Unavailable views show no invented data.` });
-      if (rights?.roles.some(r => ["TENANT_ADMIN", "MANAGER"].includes(r.roleKey))) {
-        const extra = await Promise.allSettled([api.manager(), api.pendingPlans(), api.analytics()]);
-        if (extra[0].status === "fulfilled") setCommand(extra[0].value);
-        if (extra[1].status === "fulfilled") setPending(extra[1].value);
-        if (extra[2].status === "fulfilled") setAnalytics(extra[2].value);
+      const failures=base.filter(result=>result.status==="rejected").length;
+      if (failures) setNotice({kind:"info",title:"Partial data access",
+        message:String(failures)+" API requests were denied or unavailable; previous tenant records have been cleared."});
+      if (rights?.roles.some(r=>r.roleKey==="TENANT_ADMIN"||r.roleKey==="MANAGER")) {
+        const extra=await Promise.allSettled([api.manager(),api.pendingPlans(),api.analytics()]);
+        if (generation !== tenantGeneration.current) return;
+        setCommand(extra[0].status==="fulfilled"?extra[0].value:null);
+        setPending(extra[1].status==="fulfilled"?extra[1].value:[]);
+        setAnalytics(extra[2].status==="fulfilled"?extra[2].value:null);
+      } else {
+        setCommand(null);setPending([]);setAnalytics(null);
       }
-    } finally { setLoading(false); }
-  }, [api]);
+    } finally {
+      if (generation === tenantGeneration.current) setLoading(false);
+    }
+  },[api]);
 
   async function action(fn: () => Promise<unknown>, title: string, shouldRefresh = true) {
     setBusy(true); setNotice(null);
@@ -141,10 +167,13 @@ export default function App() {
     } finally { setBusy(false); }
   }
   async function chooseTenant(id: string) {
+    const generation = ++tenantGeneration.current;
+    resetTenantState(); setLoading(false);
     setTenantId(""); setAccess(null); api.setTenant(id);
     setBusy(true); setNotice(null);
     try {
       const rights = await api.access();
+      if (generation !== tenantGeneration.current) return;
       setTenantId(id); setAccess(rights);
       await refresh(rights);
       setNotice({ kind: "success", title: "Workspace connected", message: "Real business data is loaded under your authorized organization." });
@@ -173,6 +202,8 @@ export default function App() {
     } finally { setBusy(false); }
   }
   async function disconnect() {
+    ++tenantGeneration.current;
+    resetTenantState(); setTenantId(""); setAccess(null);
     setBusy(true);
     try { await api.logout(); }
     catch (error) { setNotice({ kind: "error", title: "Logout encountered a problem", message: errText(error) }); }
@@ -322,7 +353,7 @@ export default function App() {
         </div>}
 
         {(["trade","inventory","workforce","approvals","reports"] as Area[]).includes(view) &&
-          <BusinessWorkspace mode={view as BusinessArea} api={api} connected={connected} manager={manager} busy={busy}
+          <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} busy={busy}
             visit={visit} progress={progress} masters={masters} perform={(fn,title)=>action(fn,title)} />}
 
         {view==="manager"&&(manager?
@@ -363,7 +394,7 @@ export default function App() {
             <label className="tr-select-label" htmlFor="masters-kind">Master type</label><select id="masters-kind" className="tr-select" value={masterKind} onChange={e=>setMasterKind(e.target.value)}>
               {MASTER_KINDS.map(kind=><option value={kind} key={kind}>{kind}</option>)}</select>
             <div className="tr-list-sm">{(masters[masterKind]??[]).map(m=><div className="tr-history-row" key={m.id}><div><strong>{m.name}</strong><p>{m.code}</p></div><Status value={m.status.toUpperCase()}/></div>)}</div>
-            <MasterEditor kind={masterKind} units={units} products={masters.products??[]} disabled={!connected||busy}
+            <MasterEditor key={tenantId} kind={masterKind} units={units} products={masters.products??[]} disabled={!connected||busy}
               perform={input=>action(()=>api.createMaster(masterKind,input),"Master record created")}/>
             <h3>Assign an existing user</h3><div className="tr-form"><TextInput id="assign-user" labelText="Existing user UUID" value={assignmentUser} onChange={e=>setAssignmentUser(e.target.value)}/>
               <label className="tr-select-label" htmlFor="assign-role">Role</label><select className="tr-select" id="assign-role" value={assignmentRole} onChange={e=>setAssignmentRole(e.target.value as typeof assignmentRole)}>
@@ -380,7 +411,7 @@ export default function App() {
 
         {connected&&<div className="tr-footer-actions"><div><strong>{selectedTenantName}</strong>
           <p>{access?.roles.map(r=>roles[r.roleKey]??r.roleKey).join(" · ")||"No assigned roles"}</p></div>
-          {tenants.length>1&&<select className="tr-select" aria-label="Switch organization" value={tenantId} onChange={e=>void chooseTenant(e.target.value)}>{tenants.map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select>}
+          {tenants.length>1&&<select className="tr-select" aria-label="Switch organization" value={tenantId} disabled={busy||loading} onChange={e=>void chooseTenant(e.target.value)}>{tenants.map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select>}
           <Button kind="ghost" onClick={()=>void disconnect()} disabled={busy}>Disconnect</Button></div>}
         <footer className="tr-footer"><span>TERREVO / PHARMA FIELD INTELLIGENCE</span><span>Server-backed business workflows · platform administration separately authorized</span></footer>
       </main>
