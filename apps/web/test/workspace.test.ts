@@ -98,3 +98,25 @@ test("invalid refresh responses do not restore a broken session",async()=>{
     assert.equal(api.connected,false);
   }finally{globalThis.fetch=old;}
 });
+
+
+test("successful token refresh followed by business 404 preserves the active session", async () => {
+  const prior=globalThis.fetch;
+  let calls=0;
+  globalThis.fetch=(async (input:RequestInfo|URL,init?:RequestInit)=>{
+    const path=String(input),bearer=new Headers(init?.headers).get("authorization");
+    if(path==="/api/v1/auth/refresh")return Response.json({accessToken:"rotated",refreshToken:"rotated-refresh",expiresIn:3600,user:{id:"u",email:null}});
+    calls++;
+    if(bearer==="Bearer old")return Response.json({error:"expired"},{status:401});
+    return Response.json({error:"No report has been recorded"},{status:404});
+  }) as typeof fetch;
+  try {
+    const api=new TerrevoWebApi();
+    api.setSession({accessToken:"old",refreshToken:"old-refresh",expiresIn:3600,user:{id:"u",email:null}});
+    api.setTenant(TENANT);
+    // A missing RCPA report is a normal empty result, not a reason to sign a user out.
+    assert.equal(await api.rcpa("44444444-4444-4444-8444-444444444444"),null);
+    assert.equal(api.connected,true);
+    assert.equal(calls,2);
+  } finally { globalThis.fetch=prior; }
+});
