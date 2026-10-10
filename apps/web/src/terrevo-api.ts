@@ -171,6 +171,12 @@ export class TerrevoWebApi {
     return this.raw("/v1/tour-executions/submit", "POST", { operationId: crypto.randomUUID(), shortDayReason });
   }
   async plans(): Promise<Plan[]> { return (await this.raw("/v1/tour-plans") as { plans: Plan[] }).plans; }
+  async getPlan(planId: string): Promise<Plan> {
+    return (await this.raw("/v1/tour-plans/" + encodeURIComponent(planId)) as { plan: Plan }).plan;
+  }
+  async updatePlan(planId: string, weekStart: string, days: PlanDay[]): Promise<Plan> {
+    return (await this.raw("/v1/tour-plans/" + encodeURIComponent(planId),"PUT",{ weekStart, days }) as { plan: Plan }).plan;
+  }
   async savePlan(weekStart: string, days: PlanDay[]): Promise<Plan> {
     return (await this.raw("/v1/tour-plans", "POST", { weekStart, days }) as { plan: Plan }).plan;
   }
