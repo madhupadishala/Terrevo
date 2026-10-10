@@ -4,15 +4,14 @@ import {emptyActivityDraft,validateActivityDraft,type ActivitiesViewProps,type A
 export type {ActivitiesViewProps,ActivityDraft,ActivityEvidence,NcaSubtype,PlannedCallOption} from "./model";
 export {validateActivityDraft,emptyActivityDraft} from "./model";
 export function ActivitiesView({tenantId,authorizedForTenantId,contextKey,territories,customers={},plannedCalls=[],ncaSubtypes=[],towns=[],onSaveDraft,loading=false}:ActivitiesViewProps){
- const scope=tenantId+":"+contextKey;
- const [state,setState]=useState<{scope:string;draft:ActivityDraft}>({scope,draft:emptyActivityDraft(tenantId,"")});
+ const [state,setState]=useState<{tenantId:string;contextKey:string;draft:ActivityDraft}>({tenantId,contextKey,draft:emptyActivityDraft(tenantId,"")});
  const [review,setReview]=useState(false),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
- useEffect(()=>{setState({scope,draft:emptyActivityDraft(tenantId,"")});setReview(false);setMessage("");},[scope,tenantId]);
+ useEffect(()=>{setState({tenantId,contextKey,draft:emptyActivityDraft(tenantId,"")});setReview(false);setMessage("");},[tenantId,contextKey]);
  const authorized=Boolean(tenantId&&contextKey&&authorizedForTenantId===tenantId);
- const draft=state.scope===scope?state.draft:emptyActivityDraft(tenantId,"");
+ const draft=state.tenantId===tenantId&&state.contextKey===contextKey?state.draft:emptyActivityDraft(tenantId,"");
  const context=useMemo(()=>({territories,customers,plannedCalls,ncaSubtypes,towns}),[territories,customers,plannedCalls,ncaSubtypes,towns]);
  const errors=validateActivityDraft(draft,context);
- function patch(changes:Partial<ActivityDraft>){setState({scope,draft:{...draft,...changes}});setReview(false);setMessage("");}
+ function patch(changes:Partial<ActivityDraft>){setState({tenantId,contextKey,draft:{...draft,...changes}});setReview(false);setMessage("");}
  function setKind(kind:ActivityKind){patch({kind,plannedStopId:undefined,customerType:undefined,customerId:undefined,ncaSubtype:undefined,ncaPhase:kind==="NON_CALL_ACTIVITY"?"REPORT":undefined,townId:undefined});}
  function setCustomerKind(kind:ActivityCustomerKind){patch({customerType:kind,customerId:undefined});}
  const group=draft.customerType==="doctor"?"doctors":draft.customerType==="chemist"?"chemists":"stockists";
