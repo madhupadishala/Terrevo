@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Button, InlineNotification, Tag, TextArea, TextInput, Tile } from "@carbon/react";
 import { BusinessWorkspace, type BusinessArea } from "./BusinessWorkspace";
 import { PlatformConsole } from "./PlatformConsole";
+import { MasterEditor } from "./MasterEditor";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
@@ -362,6 +363,8 @@ export default function App() {
             <label className="tr-select-label" htmlFor="masters-kind">Master type</label><select id="masters-kind" className="tr-select" value={masterKind} onChange={e=>setMasterKind(e.target.value)}>
               {MASTER_KINDS.map(kind=><option value={kind} key={kind}>{kind}</option>)}</select>
             <div className="tr-list-sm">{(masters[masterKind]??[]).map(m=><div className="tr-history-row" key={m.id}><div><strong>{m.name}</strong><p>{m.code}</p></div><Status value={m.status.toUpperCase()}/></div>)}</div>
+            <MasterEditor kind={masterKind} units={units} products={masters.products??[]} disabled={!connected||busy}
+              perform={input=>action(()=>api.createMaster(masterKind,input),"Master record created")}/>
             <h3>Assign an existing user</h3><div className="tr-form"><TextInput id="assign-user" labelText="Existing user UUID" value={assignmentUser} onChange={e=>setAssignmentUser(e.target.value)}/>
               <label className="tr-select-label" htmlFor="assign-role">Role</label><select className="tr-select" id="assign-role" value={assignmentRole} onChange={e=>setAssignmentRole(e.target.value as typeof assignmentRole)}>
                 <option value="MR">Field user</option><option value="MANAGER">Manager</option><option value="TENANT_ADMIN">Organization administrator</option></select>
