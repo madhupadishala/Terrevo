@@ -82,6 +82,13 @@ test("platform role authorizes only authenticated actor and audited RPCs",async(
   assert.equal(fixture.getPrivilegedCalls(),4);
 });
 
+test("platform mutations reject invalid bearer before privileged operations",async()=>{
+  const fixture=createFixture(true);
+  assert.equal((await fixture.send("/v1/platform/tenants","POST",{name:"Example Pharma",slug:"example-pharma"},"invalid")).status,401);
+  assert.equal((await fixture.send("/v1/platform/tenants/"+TENANT+"/status","PATCH",{status:"inactive"},"invalid")).status,401);
+  assert.equal(fixture.getPrivilegedCalls(),0);
+});
+
 test("platform mutation validation denies malformed input before RPC",async()=>{
   const fixture=createFixture(true);
   assert.equal((await fixture.send("/v1/platform/tenants","POST",{name:"X",slug:"INVALID SLUG"})).status,400);
