@@ -14,7 +14,7 @@ export type ActivityValidationContext = {territories:TerritoryOption[];customers
 export function validateActivityDraft(d:ActivityDraft,ctx:ActivityValidationContext):string[]{
  const e:string[]=[];
  if(!d.tenantId)e.push("An authorized tenant is required.");
- if(!/^\d{4}-\d{2}-\d{2}$/.test(d.workDate)||Number.isNaN(Date.parse(d.workDate+"T00:00:00"))||new Date(d.workDate+"T00:00:00").toISOString().slice(0,10)!==d.workDate)e.push("A valid activity date is required.");
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(d.workDate)||Number.isNaN(Date.parse(d.workDate+"T00:00:00"))||new Date(d.workDate+"T00:00:00Z").toISOString().slice(0,10)!==d.workDate)e.push("A valid activity date is required.");
  if(!ctx.territories.some(t=>t.id===d.territoryId))e.push("Select an authorized territory.");
  if(!Number.isInteger(d.durationMinutes)||d.durationMinutes<1||d.durationMinutes>1440)e.push("Duration must be 1–1440 minutes.");
  if(!d.reason.trim()||d.reason.trim().length>500)e.push("Reason is required (max 500 characters).");
