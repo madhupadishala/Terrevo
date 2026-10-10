@@ -1,229 +1,379 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { Button, InlineNotification, Tag, TextArea, TextInput, Tile } from "@carbon/react";
 import {
-  Button, InlineNotification, Tag, TextArea, TextInput, Tile,
-} from "@carbon/react";
-import {
-  activeTour, checkIn, checkOut, emptyWorkspace, openVisit, readWorkspace, saveNotes,
-  startTour, STORAGE_KEY, submitTour, type VisitType, type Workspace,
-} from "./workspace";
+  TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
+  type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
+  type Session, type StartOption, type Tenant,
+} from "./terrevo-api";
 
-type View = "overview" | "tours" | "visits" | "insights" | "integration";
-type Health = {
-  status: "ok" | "degraded";
-  apiAdapter: string;
-  provider: { identity: string; serverMutations: string };
-};
-
-const NAV: Array<{ id: View; label: string; short: string }> = [
-  { id: "overview", label: "Command overview", short: "Overview" },
-  { id: "tours", label: "My tours", short: "Tours" },
-  { id: "visits", label: "Field visits", short: "Visits" },
-  { id: "insights", label: "Activity intelligence", short: "Insights" },
-  { id: "integration", label: "Connections & safety", short: "Connections" },
+type Area = "overview" | "field" | "plans" | "manager" | "admin" | "platform";
+type Notice = { kind: "success" | "error" | "info"; title: string; message: string };
+const NAV: Array<{ id: Area; title: string; icon: string; subtitle: string }> = [
+  { id: "overview", title: "Command overview", icon: "▦", subtitle: "Your real operational activity" },
+  { id: "field", title: "Field execution", icon: "⌖", subtitle: "Tour · visits · calls · DCR" },
+  { id: "plans", title: "Tour planning", icon: "▤", subtitle: "Weekly plans and approvals" },
+  { id: "manager", title: "Manager command", icon: "◫", subtitle: "Team activity and decisions" },
+  { id: "admin", title: "Organization admin", icon: "⚙", subtitle: "Organization · masters · roles" },
+  { id: "platform", title: "Platform Super Admin", icon: "◇", subtitle: "Platform control plane" },
 ];
-
-const LABEL: Record<VisitType, string> = {
-  DOCTOR: "Doctor", CHEMIST: "Chemist", STOCKIST: "Stockist",
+const roles: Record<string, string> = {
+  TENANT_ADMIN: "Organization administrator", MANAGER: "Field manager", MR: "Field representative",
 };
-
-function formatTime(iso: string | null): string {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString(undefined, {
-    dateStyle: "medium", timeStyle: "short",
-  });
+const MASTER_KINDS = ["employees", "doctors", "chemists", "stockists", "products", "samples", "gifts"];
+const dateTime = (value: string | null | undefined) => value ? new Date(value).toLocaleString() : "—";
+const monday = () => {
+  const d = new Date(); const day = d.getUTCDay(); d.setUTCDate(d.getUTCDate() - ((day + 6) % 7));
+  return d.toISOString().slice(0, 10);
+};
+const toDay = (s: string) => new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10);
+const errText = (error: unknown) => error instanceof Error ? error.message : "The operation could not be completed.";
+const fmt = (v: number | string | null | undefined) => v == null ? "—" : String(v);
+const UI_TAG: Record<string, "gray" | "green" | "blue" | "red" | "purple"> = {
+  ACTIVE: "green", PENDING: "blue", SUBMITTED: "blue", APPROVED: "green", CHECKED_IN: "blue",
+  COMPLETED: "green", CHECKED_OUT: "green", RETURNED: "purple", REJECTED: "red",
+};
+function Status({ value }: { value: string }) {
+  return <Tag type={UI_TAG[value] ?? "gray"}>{value.replace(/_/g, " ")}</Tag>;
 }
-
-function useWorkspace() {
-  const [workspace, setWorkspace] = useState<Workspace>(() => {
-    try { return readWorkspace(window.localStorage); }
-    catch { return emptyWorkspace(); }
-  });
-  const [storageWarning, setStorageWarning] = useState(false);
-  useEffect(() => {
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace)); }
-    catch { setStorageWarning(true); }
-  }, [workspace]);
-  return { workspace, setWorkspace, storageWarning };
+function FieldMetric({ label, value, context }: { label: string; value: string | number | null | undefined; context: string }) {
+  return <Tile className="tr-metric"><p className="tr-metric-label">{label}</p>
+    <strong className="tr-metric-number">{fmt(value)}</strong><p className="tr-muted">{context}</p></Tile>;
 }
-
-function Metric({ label, value, context }: { label: string; value: string | number; context: string }) {
-  return <Tile className="tr-metric">
-    <p className="tr-metric-label">{label}</p>
-    <strong className="tr-metric-number">{value}</strong>
-    <p className="tr-muted">{context}</p>
-  </Tile>;
+function Panel({ eyebrow, title, children }: { eyebrow: string; title?: string; children: React.ReactNode }) {
+  return <section className="tr-panel"><span className="tr-section-kicker">{eyebrow}</span>
+    {title && <h2>{title}</h2>}{children}</section>;
+}
+function Empty({ title, detail }: { title: string; detail: string }) {
+  return <div className="tr-empty"><div className="tr-empty-icon" aria-hidden="true">⌖</div><strong>{title}</strong><p>{detail}</p></div>;
 }
 
 export default function App() {
-  const [view, setView] = useState<View>("overview");
-  const { workspace, setWorkspace, storageWarning } = useWorkspace();
-  const [health, setHealth] = useState<Health | null>(null);
-  const [apiUnavailable, setApiUnavailable] = useState(false);
-  const [territory, setTerritory] = useState("");
-  const [account, setAccount] = useState("");
-  const [visitType, setVisitType] = useState<VisitType>("DOCTOR");
-  const [notes, setNotes] = useState("");
-  const [notice, setNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
+  const [view, setView] = useState<Area>("overview");
+  const [session, setSession] = useState<Session | null>(null);
+  const api = useMemo(() => new TerrevoWebApi(setSession), []);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [tenantId, setTenantId] = useState("");
+  const [access, setAccess] = useState<AccessContext | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const [options, setOptions] = useState<StartOption[]>([]);
+  const [visit, setVisit] = useState<FieldVisit | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [pending, setPending] = useState<Plan[]>([]);
+  const [command, setCommand] = useState<ManagerCommand | null>(null);
+  const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
+  const [units, setUnits] = useState<OrgUnit[]>([]);
+  const [masters, setMasters] = useState<Record<string, Master[]>>({});
+  const [selectedOption, setSelectedOption] = useState("");
+  const [stopId, setStopId] = useState("");
+  const [gpsReason, setGpsReason] = useState("");
+  const [callOutcome, setCallOutcome] = useState("");
+  const [callRemarks, setCallRemarks] = useState("");
+  const [shortDayReason, setShortDayReason] = useState("");
+  const [planWeek, setPlanWeek] = useState(monday());
+  const [planDay, setPlanDay] = useState(new Date().toISOString().slice(0, 10));
+  const [territoryId, setTerritoryId] = useState("");
+  const [stopType, setStopType] = useState<"doctor" | "chemist" | "stockist">("doctor");
+  const [targetId, setTargetId] = useState("");
+  const [reviewComment, setReviewComment] = useState("");
+  const [unitType, setUnitType] = useState("company");
+  const [unitCode, setUnitCode] = useState("");
+  const [unitName, setUnitName] = useState("");
+  const [unitParent, setUnitParent] = useState("");
+  const [masterKind, setMasterKind] = useState("doctors");
+  const [assignmentUser, setAssignmentUser] = useState("");
+  const [assignmentRole, setAssignmentRole] = useState<"TENANT_ADMIN" | "MANAGER" | "MR">("MR");
+  const [assignmentScope, setAssignmentScope] = useState("");
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/health", { signal: controller.signal, headers: { accept: "application/json" } })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("API health check failed");
-        return response.json() as Promise<Health>;
-      })
-      .then(setHealth)
-      .catch(() => { if (!controller.signal.aborted) setApiUnavailable(true); });
-    return () => controller.abort();
-  }, []);
+  const connected = Boolean(session && tenantId && access);
+  const admin = access?.roles.some(r => r.roleKey === "TENANT_ADMIN") ?? false;
+  const manager = admin || (access?.roles.some(r => r.roleKey === "MANAGER") ?? false);
+  const territoryUnits = units.filter(u => u.type === "territory" && u.status === "active");
+  const activeStop = progress?.stops.find(s => s.planStopId === visit?.planStopId);
+  const availableTargets = masters[stopType === "doctor" ? "doctors" : stopType === "chemist" ? "chemists" : "stockists"] ?? [];
 
-  const active = activeTour(workspace);
-  const currentVisit = openVisit(workspace);
-  useEffect(() => { setNotes(currentVisit?.notes ?? ""); }, [currentVisit?.id]);
-  const activeVisits = active ? workspace.visits.filter((visit) => visit.tourId === active.id) : [];
-  const completedVisits = workspace.visits.filter((visit) => visit.status === "CHECKED_OUT");
-  const submittedTours = workspace.tours.filter((tour) => tour.status === "SUBMITTED");
-  const recentVisits = workspace.visits.slice(0, 6);
-  const names = useMemo(
-    () => new Set(workspace.visits.map((visit) => visit.account.toLocaleLowerCase())).size,
-    [workspace.visits],
-  );
-
-  function apply(change: () => Workspace, message: string) {
+  const refresh = useCallback(async (rights: AccessContext | null) => {
+    if (!api.connected) return;
+    setLoading(true);
     try {
-      setWorkspace(change());
-      setNotice({ kind: "success", message });
+      const base = await Promise.allSettled([api.progress(), api.startOptions(), api.openVisit(), api.plans(), api.orgUnits(),
+        ...MASTER_KINDS.map(k => api.masters(k))]);
+      if (base[0].status === "fulfilled") setProgress(base[0].value);
+      if (base[1].status === "fulfilled") setOptions(base[1].value);
+      if (base[2].status === "fulfilled") setVisit(base[2].value);
+      if (base[3].status === "fulfilled") setPlans(base[3].value);
+      if (base[4].status === "fulfilled") setUnits(base[4].value);
+      const next: Record<string, Master[]> = {};
+      MASTER_KINDS.forEach((kind,i) => { const res = base[5+i]; if (res.status === "fulfilled") next[kind] = res.value as Master[]; });
+      setMasters(next);
+      const failures = base.filter(result => result.status === "rejected");
+      if (failures.length) setNotice({ kind: "info", title: "Partial data access", message: `${failures.length} data requests were not available for this account. Unavailable views show no invented data.` });
+      if (rights?.roles.some(r => ["TENANT_ADMIN", "MANAGER"].includes(r.roleKey))) {
+        const extra = await Promise.allSettled([api.manager(), api.pendingPlans(), api.analytics()]);
+        if (extra[0].status === "fulfilled") setCommand(extra[0].value);
+        if (extra[1].status === "fulfilled") setPending(extra[1].value);
+        if (extra[2].status === "fulfilled") setAnalytics(extra[2].value);
+      }
+    } finally { setLoading(false); }
+  }, [api]);
+
+  async function action(fn: () => Promise<unknown>, title: string, shouldRefresh = true) {
+    setBusy(true); setNotice(null);
+    try {
+      await fn();
+      setNotice({ kind: "success", title, message: "The operation was accepted by the Terrevo API." });
+      if (shouldRefresh) await refresh(access);
     } catch (error) {
-      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Action could not be completed." });
+      setNotice({ kind: "error", title: "Action could not be completed", message: errText(error) });
+    } finally { setBusy(false); }
+  }
+  async function chooseTenant(id: string) {
+    setTenantId(""); setAccess(null); api.setTenant(id);
+    setBusy(true); setNotice(null);
+    try {
+      const rights = await api.access();
+      setTenantId(id); setAccess(rights);
+      await refresh(rights);
+      setNotice({ kind: "success", title: "Workspace connected", message: "Real business data is loaded under your authorized organization." });
+    } catch (error) {
+      api.setTenant(null);
+      setNotice({ kind: "error", title: "Cannot open organization", message: errText(error) });
+    } finally { setBusy(false); }
+  }
+  async function connect() {
+    setBusy(true); setNotice(null);
+    try {
+      await api.login(email, password);
+      setPassword(""); setEmail("");
+      const available = await api.tenants();
+      setTenants(available.filter(t=>t.status === "active"));
+      if (available.filter(t=>t.status === "active").length === 1) await chooseTenant(available.find(t=>t.status === "active")!.id);
+      else if (!available.length) setNotice({ kind: "info", title: "No accessible organization", message: "Your account has no active tenant memberships." });
+    } catch (error) {
+      api.reset(); setTenants([]);
+      setNotice({ kind: "error", title: "Connection failed", message: errText(error) });
+    } finally { setBusy(false); }
+  }
+  async function disconnect() {
+    setBusy(true);
+    try { await api.logout(); }
+    catch (error) { setNotice({ kind: "error", title: "Logout encountered a problem", message: errText(error) }); }
+    finally {
+      setTenantId(""); setAccess(null); setTenants([]); setProgress(null); setVisit(null);
+      setOptions([]); setPlans([]); setPending([]); setCommand(null); setAnalytics(null);
+      setUnits([]); setMasters({}); setBusy(false);
     }
   }
-  function handleStart() {
-    apply(() => startTour(workspace, territory, crypto.randomUUID(), new Date().toISOString()), "Tour started in this local workspace.");
-    if (!active && territory.trim().length >= 2) setTerritory("");
+  function guarded(actionFn: () => Promise<unknown>, title: string) {
+    if (!connected || busy) return;
+    void action(actionFn, title);
   }
-  function handleCheckIn() {
-    apply(() => checkIn(workspace, account, visitType, crypto.randomUUID(), new Date().toISOString()), "Visit check-in recorded locally.");
-    if (active && !currentVisit && account.trim().length >= 2) { setAccount(""); setNotes(""); }
+  function requireLocation(): Promise<{latitude: number; longitude:number; accuracyMeters:number}> {
+    return freshPosition();
   }
-  function handleCheckOut() {
-    if (!currentVisit) return;
-    apply(() => checkOut(workspace, currentVisit.id, new Date().toISOString()), "Visit check-out recorded locally.");
-    setNotes("");
-  }
-  const countByType = (type: VisitType) => workspace.visits.filter(v => v.type === type).length;
-
-  return (
-    <div className="tr-app">
-      <aside className="tr-sidebar" aria-label="Application navigation">
-        <div className="tr-brand"><div className="tr-mark">T<span>.</span></div><div><strong>terrevo</strong><small>FIELD INTELLIGENCE</small></div></div>
-        <div className="tr-workspace"><span className="tr-workspace-dot" /> LOCAL WORKSPACE <span className="tr-chevron">⌄</span></div>
-        <p className="tr-nav-label">OPERATIONS</p>
-        <nav className="tr-nav" aria-label="Primary">
-          {NAV.map((item, i) => <button key={item.id} type="button" className={view === item.id ? "tr-nav-item selected" : "tr-nav-item"} aria-current={view === item.id ? "page" : undefined} onClick={() => { setView(item.id); setNotice(null); }}>
-            <span className="tr-nav-glyph" aria-hidden="true">{["▦", "▤", "⌖", "◫", "⚙"][i]}</span>{item.label}
-          </button>)}
-        </nav>
-        <div className="tr-sidebar-foot">
-          <div className="tr-foot-pill"><span className="tr-foot-dot" /> Browser-only mode</div>
-          <p>Operational web workspace<br/>Wave 1 · No sign-in</p>
+  const selectedTerritory = territoryUnits.find(u => u.id === territoryId);
+  const viewName = NAV.find(n => n.id === view)!;
+  const selectedTenantName = tenants.find(t => t.id === tenantId)?.name ?? null;
+  return <div className="tr-app">
+    <aside className="tr-sidebar" aria-label="Terrevo navigation">
+      <div className="tr-brand"><div className="tr-mark">T<span>.</span></div><div><strong>terrevo</strong><small>FIELD INTELLIGENCE</small></div></div>
+      <div className="tr-workspace"><span className="tr-workspace-dot" /> {selectedTenantName ?? "PRODUCT WORKSPACE"} </div>
+      <p className="tr-nav-label">WORKSPACES</p>
+      <nav className="tr-nav" aria-label="Primary">{NAV.map(n=>
+        <button key={n.id} type="button" className={view===n.id?"tr-nav-item selected":"tr-nav-item"} aria-current={view===n.id?"page":undefined} onClick={()=>{setView(n.id); setNotice(null);}}>
+          <span className="tr-nav-glyph" aria-hidden="true">{n.icon}</span>{n.title}</button>)}</nav>
+      <div className="tr-sidebar-foot"><div className="tr-foot-pill"><span className="tr-foot-dot" /> {connected?"Server-connected":"No organization connected"}</div><p>Web · Carbon enterprise UI<br/>Live records only</p></div>
+    </aside>
+    <div className="tr-main">
+      <header className="tr-topbar"><div className="tr-breadcrumb">TERREVO <span>/</span> OPERATIONS <span>/</span> <b>{viewName.title}</b></div>
+        <div className="tr-header-right">
+          {connected && <Button size="sm" kind="ghost" disabled={busy||loading} onClick={()=>void refresh(access)}>Refresh data</Button>}
+          <span className="tr-live"><span />{connected?"LIVE API":"SECURE CONNECTION"}</span>
+          <span className="tr-avatar" aria-hidden="true">TR</span>
+        </div></header>
+      <main className="tr-content" id="main-content">
+        <div className="tr-page-heading"><div><p className="tr-eyebrow">TERREVO / PHARMA FIELD OPERATIONS</p>
+          <h1>{view==="overview"?"Operations, connected.":viewName.title}</h1><p className="tr-intro">{viewName.subtitle}. No simulated company, employee or transaction data.</p></div>
+          <Tag type={connected?"green":"blue"}>{connected?"AUTHORIZED WORKSPACE":"UI / API INTEGRATION"}</Tag>
         </div>
-      </aside>
+        {notice && <div className="tr-notice" role="status"><InlineNotification lowContrast hideCloseButton kind={notice.kind} title={notice.title} subtitle={notice.message}/></div>}
+        {loading && <p className="tr-loading" role="status">Loading authorized Terrevo records…</p>}
 
-      <div className="tr-main">
-        <header className="tr-topbar">
-          <div className="tr-breadcrumb">TERREVO <span>/</span> FIELD OPERATIONS <span>/</span> <b>{NAV.find(n => n.id === view)?.short}</b></div>
-          <div className="tr-header-right"><span className="tr-live"><span /> LOCAL MODE</span><span className="tr-avatar" aria-hidden="true">TR</span></div>
-        </header>
+        {!connected && <div className="tr-connect-grid">
+          <Panel eyebrow="ACCOUNT CONNECTION" title={session?"Choose your organization":"Connect an existing Terrevo account"}>
+            <p className="tr-detail">You can explore every workspace without credentials. Live company data and mutations remain protected by the existing identity, RBAC and tenant services. No Super Admin email is required to develop the UI.</p>
+            {!session ? <form className="tr-form" onSubmit={e=>{e.preventDefault();void connect();}}>
+              <TextInput id="account-email" type="email" labelText="Existing account email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username"/>
+              <TextInput id="account-password" type="password" labelText="Password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password"/>
+              <Button type="submit" disabled={busy||!email||!password}>Connect to live workflows</Button>
+            </form> : <div className="tr-form"><label className="tr-select-label" htmlFor="org-select">Active organization</label>
+              <select className="tr-select" id="org-select" value={tenantId} onChange={e=>void chooseTenant(e.target.value)} disabled={busy}>
+                <option value="">Select organization</option>{tenants.map(t=><option value={t.id} key={t.id}>{t.name}</option>)}
+              </select>
+              <Button kind="ghost" onClick={()=>void disconnect()}>Disconnect session</Button></div>}
+          </Panel>
+          <Panel eyebrow="SECURITY STATUS" title="Real operations, not a local simulation">
+            <div className="tr-check-row"><span>Server data source</span><Tag type="blue">Supabase API</Tag></div>
+            <div className="tr-check-row"><span>Access requirements</span><Tag type="green">Enforced</Tag></div>
+            <div className="tr-check-row"><span>Organization boundaries</span><Tag type="green">Existing RLS</Tag></div>
+            <div className="tr-check-row"><span>Super Admin role</span><Tag type="gray">Backend pending</Tag></div>
+            <p className="tr-detail">This application never exposes a service-role token or impersonates an end user.</p>
+          </Panel>
+        </div>}
 
-        <main className="tr-content" id="main-content">
-          <div className="tr-page-heading">
-            <div><p className="tr-eyebrow">FIELD EXECUTION PLATFORM / WAVE 01</p>
-              <h1>{view === "overview" ? "Your field, in focus." : NAV.find(n => n.id === view)?.label}</h1>
-              <p className="tr-intro">{view === "overview" ? "A single command space for tour activity, visits and operational momentum." :
-                view === "tours" ? "Plan your day, start a tour and record its completion." :
-                view === "visits" ? "Capture field interactions and keep each visit accounted for." :
-                view === "insights" ? "Live totals computed from your browser-local workspace." :
-                "Understand which services are configured and what this environment can safely do."}</p>
-            </div>
-            <Tag type="blue">WAVE 1 · WORKSPACE</Tag>
+        {view==="overview" && <>
+          <div className="tr-metrics">
+            <FieldMetric label="Active tour" value={!connected?null:progress?"1":"0"} context="From server"/>
+            <FieldMetric label="Visits completed" value={progress?.completedCount??null} context="Current tour"/>
+            <FieldMetric label="Planned stops" value={progress?.plannedCount??null} context="Approved work"/>
+            <FieldMetric label="Pending approvals" value={manager?command?.pending.tourApprovals:null} context="Manager queue"/>
           </div>
+          <div className="tr-grid-wide">
+            <Panel eyebrow="FIELD CONTROL" title={progress?"Today's tour is in progress":"Your next field assignment"}>
+              {progress?<><p className="tr-detail">Started {dateTime(progress.startedAt)} · {progress.workDate}</p>
+                <p className="tr-detail">{progress.completedCount} of {progress.plannedCount} stops completed · {progress.remainingMinutes} minutes remaining at last refresh.</p>
+                <Button onClick={()=>setView("field")}>Continue field execution ↗</Button></>:
+                <><p className="tr-detail">{connected?"No active tour was returned for this account. Start from an approved tour day.":"Connect an authorized account to retrieve approved tour assignments."}</p><Button kind="primary" onClick={()=>setView("field")}>Open field execution ↗</Button></>}
+            </Panel>
+            <Panel eyebrow="ROLE-AWARE OPERATIONS" title="Workspace access">
+              <div className="tr-check-row"><span>Field execution</span><Tag type={connected?"green":"blue"}>{connected?"Available":"Connect first"}</Tag></div>
+              <div className="tr-check-row"><span>Manager command</span><Tag type={manager?"green":"gray"}>{manager?"Authorized":"Permission-gated"}</Tag></div>
+              <div className="tr-check-row"><span>Organization administration</span><Tag type={admin?"green":"gray"}>{admin?"Authorized":"Permission-gated"}</Tag></div>
+              <div className="tr-check-row"><span>Platform Super Admin</span><Tag type="gray">Separate authorization required</Tag></div>
+            </Panel>
+          </div>
+        </>}
 
-          <InlineNotification kind="info" lowContrast hideCloseButton
-            title="Protected development boundary"
-            subtitle="No login screen. Tour and visit actions are saved on this browser only, not to Supabase. Do not enter personal or customer data. API write operations remain protected." />
-          {storageWarning && <InlineNotification kind="error" lowContrast hideCloseButton title="Local storage unavailable" subtitle="Changes may disappear when this page reloads." />}
-          {notice && <div className="tr-notice" role="status"><InlineNotification kind={notice.kind} lowContrast hideCloseButton title={notice.kind === "success" ? "Recorded" : "Action blocked"} subtitle={notice.message} /></div>}
+        {view==="field" && <div className="tr-grid-wide">
+          <Panel eyebrow="FIELD EXECUTION / REAL API" title={progress?"Tour in progress":"Start My Tour"}>
+            {progress?<><div className="tr-section-line"><p>{progress.workDate} · {dateTime(progress.startedAt)}</p><Tag type="green">ACTIVE</Tag></div>
+              <div className="tr-tour-stats"><div><span>COMPLETED</span><strong>{progress.completedCount}/{progress.plannedCount}</strong></div><div><span>REMAINING</span><strong>{progress.remainingMinutes} minutes</strong></div></div>
+              {visit?<><h3>On-site visit</h3><p className="tr-detail">{activeStop?.targetName??visit.planStopId} · {visit.verification}</p>
+                <Status value={visit.exceptionStatus}/>
+                <div className="tr-form"><TextInput id="call-outcome" labelText="Call outcome" value={callOutcome} onChange={e=>setCallOutcome(e.target.value)} maxLength={120}/>
+                  <TextArea id="call-remarks" labelText="Remarks" value={callRemarks} onChange={e=>setCallRemarks(e.target.value)} maxLength={2000}/>
+                  <Button kind="secondary" disabled={!connected||busy||!callOutcome.trim()||!activeStop} onClick={()=>guarded(()=>activeStop?.type==="doctor"?api.doctorCall(visit.id,callOutcome,callRemarks||null):api.tradeCall(visit.id,callOutcome,callRemarks||null),"Call outcome saved")}>Save call outcome</Button>
+                  <Button disabled={!connected||busy} onClick={()=>guarded(async()=>api.checkOut(visit.id,await requireLocation()),"Checked out of field visit")}>Check out with location</Button></div>
+              </>:<><p className="tr-detail">Select an approved stop; check-in captures a fresh device location.</p>
+                <div className="tr-form"><label className="tr-select-label" htmlFor="stop-select">Next stop</label>
+                  <select className="tr-select" id="stop-select" value={stopId} onChange={e=>setStopId(e.target.value)}>
+                    <option value="">Select pending stop</option>{progress.stops.filter(s=>s.status!=="COMPLETED").map(s=><option key={s.planStopId} value={s.planStopId}>{s.sequence}. {s.targetName} ({s.type})</option>)}
+                  </select>
+                  <TextInput id="gps-reason" labelText="GPS exception reason (only if applicable)" value={gpsReason} onChange={e=>setGpsReason(e.target.value)} maxLength={1000}/>
+                  <Button disabled={!connected||busy||!stopId} onClick={()=>guarded(async()=>api.checkIn(stopId,await requireLocation(),gpsReason||null),"Field check-in saved")}>Check in using device GPS</Button></div></>}
+              <div className="tr-form"><TextInput id="short-reason" labelText="Short-day explanation (if required)" value={shortDayReason} onChange={e=>setShortDayReason(e.target.value)} maxLength={1000}/>
+                <Button kind="tertiary" disabled={!connected||busy||Boolean(visit)} onClick={()=>guarded(()=>api.submitTour(shortDayReason||null),"Tour submitted")}>Submit My Tour</Button></div>
+            </>:<><p className="tr-detail">{connected?"Only approved, assigned tour days can be started.":"Connect an account to retrieve approved tour days."}</p>
+              <div className="tr-form"><label className="tr-select-label" htmlFor="approved-day">Approved work date</label>
+                <select className="tr-select" id="approved-day" value={selectedOption} onChange={e=>setSelectedOption(e.target.value)} disabled={!connected}>
+                  <option value="">Select approved tour day</option>{options.map(o=><option value={o.planDayId} key={o.planDayId}>{o.workDate} · {units.find(u=>u.id===o.territoryId)?.name??o.territoryId}</option>)}
+                </select>
+                <Button disabled={!connected||busy||!selectedOption} onClick={()=>guarded(async()=>api.startTour(selectedOption,await requireLocation()),"Tour started")}>Start My Tour (GPS)</Button></div>
+              {connected&&options.length===0&&<Empty title="No approved tour day" detail="Create a weekly tour plan and have an authorized manager approve it first."/>}
+            </>}
+          </Panel>
+          <Panel eyebrow="TOUR WORKLIST" title="Visit execution queue">
+            {progress?.stops.length? <div className="tr-visit-list">{progress.stops.map(s=><div className="tr-visit-row" key={s.planStopId}>
+              <span className="tr-row-icon">{s.sequence}</span><div><strong>{s.targetName}</strong><p>{s.type}</p></div><Status value={s.status}/></div>)}</div>:
+              <Empty title="No active route" detail="The visit worklist is populated from the authorized tour-progress API."/>}
+          </Panel>
+        </div>}
 
-          {view === "overview" && <>
-            <section className="tr-metrics" aria-label="Local activity overview">
-              <Metric label="Active tour" value={active ? "01" : "00"} context={active ? active.territory : "Ready when you are"} />
-              <Metric label="Visits recorded" value={workspace.visits.length.toString().padStart(2, "0")} context={completedVisits.length + " checked out"} />
-              <Metric label="Accounts covered" value={names.toString().padStart(2, "0")} context="Unique visit accounts" />
-              <Metric label="Tours submitted" value={submittedTours.length.toString().padStart(2, "0")} context="Recorded locally" />
-            </section>
-            <div className="tr-grid-wide">
-              <section className="tr-panel tr-mission">
-                <div className="tr-section-line"><span className="tr-section-kicker">TODAY'S MISSION</span><Tag type={active ? "green" : "gray"}>{active ? "In progress" : "Not started"}</Tag></div>
-                <h2>{active ? active.territory : "Ready to take the field?"}</h2>
-                <p>{active ? "Your tour is active. Every recorded visit builds your field activity timeline." : "Start a tour to activate visit recording and create your first operational timeline."}</p>
-                {active ? <div className="tr-tour-stats"><div><span>STARTED</span><strong>{formatTime(active.startAt)}</strong></div><div><span>VISITS</span><strong>{activeVisits.length}</strong></div></div> : <div className="tr-empty-lines"><span /><span /><span /></div>}
-                <Button onClick={() => setView(active ? "visits" : "tours")} className="tr-action">{active ? "Record a field visit" : "Start your first tour"} <span aria-hidden="true">↗</span></Button>
-              </section>
-              <section className="tr-panel tr-secondary-panel">
-                <span className="tr-section-kicker">WORKSPACE STATUS</span>
-                <h3>Operational foundations</h3>
-                <div className="tr-check-row"><span className="tr-tick">✓</span> Local lifecycle engine <Tag type="green">Available</Tag></div>
-                <div className="tr-check-row"><span className="tr-tick">✓</span> Persistent browser records <Tag type="green">Available</Tag></div>
-                <div className="tr-check-row"><span className="tr-tick">○</span> Supabase business writes <Tag type="gray">Protected</Tag></div>
-                <div className="tr-check-row"><span className="tr-tick">○</span> Identity / RBAC UI <Tag type="gray">Deferred</Tag></div>
-                <Button kind="ghost" size="sm" onClick={() => setView("integration")}>View connection details ↗</Button>
-              </section>
+        {view==="plans"&&<div className="tr-grid-wide">
+          <Panel eyebrow="WEEKLY FIELD PLAN" title="Create a real plan">
+            <p className="tr-detail">Choose a territory and account from existing master records. The plan is persisted by Terrevo's server; a manager must approve it before tour execution.</p>
+            <div className="tr-form">
+              <label className="tr-select-label" htmlFor="plan-week">Week starting (Monday)</label><input className="tr-select" id="plan-week" type="date" value={planWeek} onChange={e=>setPlanWeek(e.target.value)}/>
+              <label className="tr-select-label" htmlFor="plan-date">Work date</label><input className="tr-select" id="plan-date" type="date" value={planDay} onChange={e=>setPlanDay(e.target.value)}/>
+              <label className="tr-select-label" htmlFor="plan-territory">Territory</label>
+              <select className="tr-select" id="plan-territory" value={territoryId} onChange={e=>setTerritoryId(e.target.value)} disabled={!connected}><option value="">Select territory</option>
+                {territoryUnits.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select>
+              <label className="tr-select-label" htmlFor="plan-type">Visit type</label>
+              <select className="tr-select" id="plan-type" value={stopType} onChange={e=>{setStopType(e.target.value as typeof stopType);setTargetId("");}}><option value="doctor">Doctor</option><option value="chemist">Chemist</option><option value="stockist">Stockist</option></select>
+              <label className="tr-select-label" htmlFor="plan-target">Account</label>
+              <select className="tr-select" id="plan-target" value={targetId} onChange={e=>setTargetId(e.target.value)} disabled={!connected}><option value="">Select account</option>
+                {availableTargets.filter(m=>m.status==="active"&&(!selectedTerritory||m.territoryId===selectedTerritory.id)).map(m=><option value={m.id} key={m.id}>{m.name}</option>)}</select>
+              <Button disabled={!connected||busy||!territoryId||!targetId} onClick={()=>guarded(()=>api.savePlan(planWeek,[{date:toDay(planDay),territoryId,remarks:null,stops:[{sequence:1,type:stopType,targetId,remarks:null}]}]),"Weekly plan saved")}>Save plan</Button>
             </div>
-            <section className="tr-panel tr-activity"><div className="tr-section-line"><div><span className="tr-section-kicker">ACTIVITY STREAM</span><h3>Recent field interactions</h3></div><Button kind="ghost" size="sm" onClick={() => setView("visits")}>View all ↗</Button></div>
-              {recentVisits.length === 0 ? <div className="tr-empty"><div className="tr-empty-icon">⌖</div><strong>No activity recorded yet</strong><p>Field visits will appear here as you check in to accounts.</p></div> :
-                <div className="tr-visit-list">{recentVisits.map(visit => <div className="tr-visit-row" key={visit.id}><span className="tr-row-icon">{LABEL[visit.type].charAt(0)}</span><div><strong>{visit.account}</strong><p>{LABEL[visit.type]} · {formatTime(visit.checkinAt)}</p></div><Tag type={visit.status === "CHECKED_OUT" ? "green" : "blue"}>{visit.status === "CHECKED_OUT" ? "Completed" : "On site"}</Tag></div>)}</div>}
-            </section>
-          </>}
+          </Panel>
+          <Panel eyebrow="SAVED PLANS" title="Your weekly plans">
+            {plans.length?plans.map(p=><div className="tr-history-row" key={p.id}><div><strong>Week of {p.weekStart}</strong><p>{p.status} · {p.id.slice(0,8)}</p>
+              {["DRAFT","RETURNED"].includes(p.status)&&<Button kind="ghost" size="sm" disabled={!connected||busy} onClick={()=>guarded(()=>api.submitPlan(p.id),"Plan submitted for approval")}>Submit for approval ↗</Button>}</div><Status value={p.status}/></div>):
+              <Empty title="No plans returned" detail="Your saved plans will appear here as soon as they exist on the server."/>}
+          </Panel>
+        </div>}
 
-          {view === "tours" && <div className="tr-grid-wide">
-            <section className="tr-panel">
-              <span className="tr-section-kicker">TOUR CONTROL</span>
-              {active ? <><h2>{active.territory}</h2><Tag type="green">Active field tour</Tag><p className="tr-detail">Started {formatTime(active.startAt)}</p><p className="tr-detail">{activeVisits.length} field visits · {activeVisits.filter(v => v.status === "CHECKED_OUT").length} completed</p>
-                <Button kind="primary" disabled={Boolean(currentVisit)} onClick={() => apply(() => submitTour(workspace, new Date().toISOString()), "Tour submitted to local activity history.")}>Submit tour</Button>
-                {currentVisit && <p className="tr-hint">Check out from the open visit before submitting.</p>}
-              </> : <><h2>Start My Tour</h2><p className="tr-detail">Begin a new field day. Only one tour can be active at once.</p><div className="tr-form"><TextInput id="tour-territory" labelText="Territory or working area" placeholder="e.g. Central Zone" value={territory} onChange={e => setTerritory(e.target.value)} maxLength={100}/><Button onClick={handleStart}>Start tour ↗</Button></div></>}
-            </section>
-            <section className="tr-panel"><span className="tr-section-kicker">TOUR HISTORY</span><h3>Previous tours</h3>
-              {workspace.tours.length === 0 ? <p className="tr-detail">Your first completed tour will appear here.</p> : workspace.tours.map(tour => <div className="tr-history-row" key={tour.id}><div><strong>{tour.territory}</strong><p>{formatTime(tour.startAt)}</p></div><Tag type={tour.status === "ACTIVE" ? "blue" : "green"}>{tour.status === "ACTIVE" ? "Active" : "Submitted"}</Tag></div>)}
-            </section>
-          </div>}
+        {view==="manager"&&(manager?
+          <><div className="tr-metrics">
+            <FieldMetric label="Field team members" value={command?.teamMembers} context="Authorized team"/>
+            <FieldMetric label="Active tours" value={command?.activeTours} context="Currently executing"/>
+            <FieldMetric label="Today's submissions" value={command?.submittedToursToday} context="Server-reported"/>
+            <FieldMetric label="Pending approvals" value={command?.pending.tourApprovals} context="Tour decisions"/>
+          </div><div className="tr-grid-wide">
+            <Panel eyebrow="DECISION QUEUE" title="Tour approvals">
+              {pending.length?pending.map(p=><div className="tr-history-row" key={p.id}><div><strong>Week of {p.weekStart}</strong><p>Plan {p.id.slice(0,8)}</p>
+                <div className="tr-button-row"><Button size="sm" disabled={busy} onClick={()=>guarded(()=>api.decidePlan(p.id,"APPROVE",null),"Tour plan approved")}>Approve</Button>
+                  <Button size="sm" kind="secondary" disabled={busy||!reviewComment.trim()} onClick={()=>guarded(()=>api.decidePlan(p.id,"RETURN",reviewComment),"Plan returned")}>Return</Button></div>
+              </div><Status value={p.status}/></div>):<Empty title="No pending plans" detail="Only plans awaiting your permitted review appear here."/>}
+              <TextArea id="approval-comment" labelText="Return / rejection comment" value={reviewComment} onChange={e=>setReviewComment(e.target.value)} maxLength={1000}/>
+            </Panel>
+            <Panel eyebrow="MANAGER ANALYTICS" title="Rolling 7-day operations"><div className="tr-check-row"><span>Submitted tours</span><strong>{fmt(analytics?.tours.submitted)}</strong></div>
+              <div className="tr-check-row"><span>Planned stops</span><strong>{fmt(analytics?.coverage.plannedStops)}</strong></div>
+              <div className="tr-check-row"><span>Completed visits</span><strong>{fmt(analytics?.coverage.completedVisits)}</strong></div>
+              <div className="tr-check-row"><span>Doctor calls</span><strong>{fmt(analytics?.coverage.doctorCalls)}</strong></div>
+              <div className="tr-check-row"><span>Pending GPS exceptions</span><strong>{fmt(command?.pending.gpsExceptions)}</strong></div>
+            </Panel>
+          </div></>:
+          <Panel eyebrow="MANAGER ACCESS" title="Manager workspace is permission-gated"><p className="tr-detail">The actual manager command and approval APIs only permit an authorized manager or tenant administrator. No fake results are displayed.</p></Panel>)}
 
-          {view === "visits" && <div className="tr-grid-wide">
-            <section className="tr-panel"><span className="tr-section-kicker">VISIT EXECUTION</span><h2>{currentVisit ? "Visit in progress" : "Check in to an account"}</h2>
-              {currentVisit ? <><div className="tr-highlight-visit"><Tag type="blue">On site</Tag><h3>{currentVisit.account}</h3><p>{LABEL[currentVisit.type]} · Checked in {formatTime(currentVisit.checkinAt)}</p></div><div className="tr-form"><TextArea id="visit-notes" labelText="Field notes (local only)" placeholder="Record a non-sensitive call outcome" value={notes} onChange={e => setNotes(e.target.value)} maxLength={2000}/><div className="tr-button-row"><Button kind="secondary" onClick={() => apply(() => saveNotes(workspace, currentVisit.id, notes), "Visit notes saved.")}>Save notes</Button><Button onClick={handleCheckOut}>Check out</Button></div></div></> :
-                <div className="tr-form"><p className="tr-detail">{active ? "Record your next account visit." : "Start a tour before checking in to a visit."}</p><TextInput id="visit-account" labelText="Account / HCP display name" placeholder="Enter a non-sensitive test account" value={account} onChange={e => setAccount(e.target.value)} disabled={!active} maxLength={160}/>
-                  <label className="tr-select-label" htmlFor="visit-type">Visit category</label><select className="tr-select" id="visit-type" value={visitType} disabled={!active} onChange={e => setVisitType(e.target.value as VisitType)}><option value="DOCTOR">Doctor</option><option value="CHEMIST">Chemist</option><option value="STOCKIST">Stockist</option></select>
-                  <Button onClick={handleCheckIn} disabled={!active}>Record check-in ↗</Button></div>}
-            </section>
-            <section className="tr-panel"><span className="tr-section-kicker">VISIT LEDGER</span><h3>All recorded visits</h3>
-              {workspace.visits.length === 0 ? <p className="tr-detail">No visits yet. Start a tour and check in to an account.</p> : workspace.visits.map(visit => <div className="tr-history-row" key={visit.id}><div><strong>{visit.account}</strong><p>{LABEL[visit.type]} · {formatTime(visit.checkinAt)}</p>{visit.notes && <p className="tr-note">{visit.notes}</p>}</div><Tag type={visit.status === "CHECKED_IN" ? "blue" : "green"}>{visit.status === "CHECKED_IN" ? "On site" : "Done"}</Tag></div>)}
-            </section>
-          </div>}
+        {view==="admin"&&(admin?<div className="tr-grid-wide">
+          <Panel eyebrow="ORGANIZATION STRUCTURE" title="Manage reporting hierarchy">
+            <div className="tr-form"><TextInput id="org-code" labelText="Unit code" value={unitCode} onChange={e=>setUnitCode(e.target.value)}/>
+              <TextInput id="org-name" labelText="Unit name" value={unitName} onChange={e=>setUnitName(e.target.value)}/>
+              <label className="tr-select-label" htmlFor="org-kind">Unit type</label><select className="tr-select" id="org-kind" value={unitType} onChange={e=>setUnitType(e.target.value)}>
+                {["company","division","zone","region","area","territory"].map(t=><option value={t} key={t}>{t}</option>)}</select>
+              {unitType!=="company"&&<><label className="tr-select-label" htmlFor="org-parent">Parent organization unit</label><select className="tr-select" id="org-parent" value={unitParent} onChange={e=>setUnitParent(e.target.value)}>
+                <option value="">Select parent</option>{units.map(u=><option key={u.id} value={u.id}>{u.type} · {u.name}</option>)}</select></>}
+              <Button disabled={busy||!unitCode.trim()||!unitName.trim()||(unitType!=="company"&&!unitParent)} onClick={()=>guarded(()=>api.createOrgUnit({type:unitType,code:unitCode,name:unitName,parentId:unitType==="company"?null:unitParent}),"Organization unit created")}>Create organization unit</Button></div>
+            <div className="tr-list-sm">{units.map(u=><div className="tr-history-row" key={u.id}><div><strong>{u.name}</strong><p>{u.type} · {u.code}</p></div><Status value={u.status.toUpperCase()}/></div>)}</div>
+          </Panel>
+          <Panel eyebrow="MASTER DATA & ACCESS" title="Business administration">
+            <label className="tr-select-label" htmlFor="masters-kind">Master type</label><select id="masters-kind" className="tr-select" value={masterKind} onChange={e=>setMasterKind(e.target.value)}>
+              {MASTER_KINDS.map(kind=><option value={kind} key={kind}>{kind}</option>)}</select>
+            <div className="tr-list-sm">{(masters[masterKind]??[]).map(m=><div className="tr-history-row" key={m.id}><div><strong>{m.name}</strong><p>{m.code}</p></div><Status value={m.status.toUpperCase()}/></div>)}</div>
+            <h3>Assign an existing user</h3><div className="tr-form"><TextInput id="assign-user" labelText="Existing user UUID" value={assignmentUser} onChange={e=>setAssignmentUser(e.target.value)}/>
+              <label className="tr-select-label" htmlFor="assign-role">Role</label><select className="tr-select" id="assign-role" value={assignmentRole} onChange={e=>setAssignmentRole(e.target.value as typeof assignmentRole)}>
+                <option value="MR">Field user</option><option value="MANAGER">Manager</option><option value="TENANT_ADMIN">Organization administrator</option></select>
+              {assignmentRole!=="TENANT_ADMIN"&&<><label className="tr-select-label" htmlFor="assign-scope">Organization scope</label>
+                <select className="tr-select" id="assign-scope" value={assignmentScope} onChange={e=>setAssignmentScope(e.target.value)}>
+                  <option value="">Select authorized unit</option>{units.map(u=><option value={u.id} key={u.id}>{u.name}</option>)}</select></>}
+              <Button disabled={busy||!assignmentUser||(!assignmentScope&&assignmentRole!=="TENANT_ADMIN")} onClick={()=>guarded(()=>api.assignRole(assignmentUser,assignmentRole,assignmentRole==="TENANT_ADMIN"?null:assignmentScope),"Role assignment saved")}>Assign role</Button></div>
+          </Panel>
+        </div>:<Panel eyebrow="ADMIN PERMISSIONS" title="Tenant administration requires authorization"><p className="tr-detail">This area uses existing real organization and role APIs. It does not grant elevated access to a regular field user.</p></Panel>)}
 
-          {view === "insights" && <>
-            <div className="tr-metrics"><Metric label="Recorded tours" value={workspace.tours.length} context="All local sessions"/><Metric label="Completed visits" value={completedVisits.length} context="Checked out"/><Metric label="Doctor interactions" value={countByType("DOCTOR")} context="Local records"/><Metric label="Trade interactions" value={countByType("CHEMIST") + countByType("STOCKIST")} context="Chemist + stockist"/></div>
-            <section className="tr-panel"><span className="tr-section-kicker">COVERAGE MIX</span><h3>Field interaction composition</h3><div className="tr-bars">{(["DOCTOR", "CHEMIST", "STOCKIST"] as VisitType[]).map(type => <div className="tr-bar-row" key={type}><span>{LABEL[type]}</span><div className="tr-bar"><span style={{width: workspace.visits.length ? (100 * countByType(type) / workspace.visits.length) + "%" : "0%"}}/></div><strong>{countByType(type)}</strong></div>)}</div><p className="tr-detail">Computed only from browser-local records. Not a server business report.</p></section>
-          </>}
+        {view==="platform"&&<div className="tr-grid-wide">
+          <Panel eyebrow="SUPER ADMIN / PLATFORM SCOPE" title="Terrevo control plane">
+            <p className="tr-detail">Platform-wide administration is architecturally separate from individual organization administration. The current backend defines TENANT_ADMIN, MANAGER and MR, but no verified global SUPER_ADMIN role. This interface will not pretend tenant administration grants cross-company access.</p>
+            <div className="tr-check-row"><span>Organization administration</span><Tag type={admin?"green":"gray"}>{admin?"Connected":"Permission-gated"}</Tag></div>
+            <div className="tr-check-row"><span>Cross-tenant administration</span><Tag type="gray">Backend contract pending</Tag></div>
+            <div className="tr-check-row"><span>Global user provisioning</span><Tag type="gray">Backend contract pending</Tag></div>
+            <div className="tr-check-row"><span>Platform audit overview</span><Tag type="gray">Backend contract pending</Tag></div>
+          </Panel>
+          <Panel eyebrow="PLATFORM GUARDRAILS" title="No privilege shortcuts">
+            <p className="tr-detail">When platform-level APIs are implemented, every operation must validate a distinct platform privilege server-side and record a global audit event. No shared super-admin password, email, user impersonation or unrestricted browser token is introduced.</p>
+          </Panel>
+        </div>}
 
-          {view === "integration" && <div className="tr-grid-wide">
-            <section className="tr-panel"><span className="tr-section-kicker">SERVICE CONNECTIVITY</span><h2>API environment</h2><div className="tr-check-row"><span>Health endpoint</span><Tag type={health ? "green" : apiUnavailable ? "red" : "gray"}>{health ? "Responding" : apiUnavailable ? "Unavailable" : "Checking"}</Tag></div><div className="tr-check-row"><span>Identity variables</span><Tag type={health?.provider.identity === "configured" ? "green" : "gray"}>{health?.provider.identity ?? "Unknown"}</Tag></div><div className="tr-check-row"><span>Server mutation variables</span><Tag type={health?.provider.serverMutations === "configured" ? "green" : "gray"}>{health?.provider.serverMutations ?? "Unknown"}</Tag></div><p className="tr-detail">Configured variables do not establish authenticated connectivity or database health.</p></section>
-            <section className="tr-panel"><span className="tr-section-kicker">SECURITY BOUNDARY</span><h3>Local workspace isolation</h3><p className="tr-detail">This interface never sends local tour or visit records to a remote service. Existing authenticated business endpoints are unchanged. Identity, RBAC and tenant selection remain pluggable for later activation.</p><Tag type="purple">Local device only</Tag></section>
-          </div>}
-
-          <footer className="tr-footer"><span>TERREVO / FIELD INTELLIGENCE</span><span>Operational workspace · data saved locally · not a qualified production release</span></footer>
-        </main>
-      </div>
+        {connected&&<div className="tr-footer-actions"><div><strong>{selectedTenantName}</strong>
+          <p>{access?.roles.map(r=>roles[r.roleKey]??r.roleKey).join(" · ")||"No assigned roles"}</p></div>
+          {tenants.length>1&&<select className="tr-select" aria-label="Switch organization" value={tenantId} onChange={e=>void chooseTenant(e.target.value)}>{tenants.map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select>}
+          <Button kind="ghost" onClick={()=>void disconnect()} disabled={busy}>Disconnect</Button></div>}
+        <footer className="tr-footer"><span>TERREVO / PHARMA FIELD INTELLIGENCE</span><span>Live access is role-gated · no demo records · Super Admin backend awaiting dedicated authorization</span></footer>
+      </main>
     </div>
-  );
+  </div>;
 }
