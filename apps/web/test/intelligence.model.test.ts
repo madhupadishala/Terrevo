@@ -19,3 +19,10 @@ test("AI suggestions absent unless sourced and tenant scoped",()=>{
  assert.deepEqual(visibleSuggestions("other",[x]),[]);
  assert.deepEqual(visibleSuggestions("t",[{...x,evidence:[]}]),[]);
 });
+
+test("duplicate tenant-scoped suggestion IDs are excluded to prevent confirming the wrong action",()=>{
+ const suggestion={id:"same",tenantId:"t",summary:"Review",reason:"Evidence",actionType:"REVIEW",sourceType:"case",sourceId:"123",sourceObservedAt:"2026-10-10",confidence:0.8,uncertainty:"Manual verification required",requiresHumanReview:true as const,evidence:[{label:"Item",reference:"123"}]};
+ assert.deepEqual(visibleSuggestions("t",[suggestion,{...suggestion,actionType:"DELETE"}]),[]);
+ assert.equal(visibleSuggestions("t",[suggestion,{...suggestion,tenantId:"other"}]).length,1);
+ assert.deepEqual(visibleSuggestions("t",[{...suggestion,actionType:""}]),[]);
+});
