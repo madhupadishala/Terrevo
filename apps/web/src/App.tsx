@@ -4,16 +4,25 @@ import { BusinessWorkspace, type BusinessArea } from "./BusinessWorkspace";
 import { PlatformConsole } from "./PlatformConsole";
 import { MasterEditor } from "./MasterEditor";
 import { MonthlyPlanner } from "./MonthlyPlanner";
+import { Customer360View } from "./features/customer360/Customer360View";
+import { ActivitiesView } from "./features/activities/ActivitiesView";
+import { EDetailingView } from "./features/edetailing/EDetailingView";
+import { TodayIntelligenceView } from "./features/intelligence/TodayIntelligenceView";
+import { localDate } from "./plan-calendar";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
   type Session, type StartOption, type Tenant,
 } from "./terrevo-api";
 
-type Area = "overview" | "field" | "plans" | "manager" | "admin" | "platform" | BusinessArea;
+type Area = "overview" | "today" | "customers" | "activities" | "edetailing" | "field" | "plans" | "manager" | "admin" | "platform" | BusinessArea;
 type Notice = { kind: "success" | "error" | "info"; title: string; message: string };
 const NAV: Array<{ id: Area; title: string; icon: string; subtitle: string }> = [
   { id: "overview", title: "Command overview", icon: "▦", subtitle: "Your real operational activity" },
+  { id: "today", title: "Today briefing", icon: "◴", subtitle: "Verified daily agenda and AI-ready insights" },
+  { id: "customers", title: "Customer 360", icon: "◎", subtitle: "Authorized doctors, chemists, stockists and customer profiles" },
+  { id: "activities", title: "NCA & activities", icon: "▣", subtitle: "Planned, unplanned and non-call activity drafting" },
+  { id: "edetailing", title: "E-detailing / CLM", icon: "▧", subtitle: "Approved product content and presentation workspace" },
   { id: "field", title: "Field execution", icon: "⌖", subtitle: "Tour · visits · calls · DCR" },
   { id: "plans", title: "Tour planning", icon: "▤", subtitle: "Weekly plans and approvals" },
   { id: "trade", title: "RCPA & orders", icon: "▥", subtitle: "Chemist and stockist operations" },
@@ -99,6 +108,12 @@ export default function App() {
   }
 
   const connected = Boolean(session && tenantId && access);
+  // Independent authorization/role/session epochs ensure feature-local state cannot cross accounts.
+  const contextKey = connected
+    ? [session!.user.id, tenantId, tenantGeneration.current,
+       JSON.stringify(access!.roles), JSON.stringify(access!.permissions)].join("|")
+    : "";
+  const authorizedForTenantId = connected && !loading ? tenantId : "";
   const admin = access?.roles.some(r => r.roleKey === "TENANT_ADMIN") ?? false;
   const manager = admin || (access?.roles.some(r => r.roleKey === "MANAGER") ?? false);
   const activeStop = progress?.stops.find(s => s.planStopId === visit?.planStopId);
@@ -311,6 +326,34 @@ export default function App() {
               <Empty title="No active route" detail="The visit worklist is populated from the authorized tour-progress API."/>}
           </Panel>
         </div>}
+
+        {view==="today" && <TodayIntelligenceView
+          key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
+          contextKey={contextKey} progress={progress} startOptions={options} manager={manager?command:null}
+          loading={loading} todayLocalDate={localDate()}
+          onOpenPlan={()=>setView("plans")}
+          onOpenStop={id=>{setStopId(id);setView("field");}} />}
+
+        {view==="customers" && <Customer360View
+          key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
+          contextKey={contextKey} masters={{doctors:masters.doctors??[],chemists:masters.chemists??[],stockists:masters.stockists??[]}}
+          loading={loading}
+          onOpenWorkflow={request=>setView(request.workflow==="plan"?"plans":"field")} />}
+
+        {view==="activities" && <ActivitiesView
+          key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
+          contextKey={contextKey}
+          territories={units.filter(u=>u.type==="territory"&&u.status==="active").map(u=>({id:u.id,name:u.name}))}
+          customers={{doctors:masters.doctors??[],chemists:masters.chemists??[],stockists:masters.stockists??[]}}
+          plannedCalls={progress?.stops.map(stop=>({
+            planStopId:stop.planStopId, label:stop.targetName, territoryId:progress.territoryId, workDate:progress.workDate,
+          }))??[]}
+          ncaSubtypes={[]} towns={[]} loading={loading} />}
+
+        {view==="edetailing" && <EDetailingView
+          key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
+          contextKey={contextKey} products={masters.products??[]} assets={[]} today={localDate()}
+          linkedVisitId={visit?.id} loading={loading} />}
 
         {view==="plans" && <MonthlyPlanner key={tenantId || "unconnected"} api={api} connected={connected}
           busy={busy} plans={plans} units={units} masters={masters} perform={(fn,title)=>action(fn,title)} />}
