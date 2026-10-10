@@ -3,7 +3,7 @@ export type CustomerKind = "doctor"|"chemist"|"stockist";
 export type CustomerGroups = {doctors?:Master[];chemists?:Master[];stockists?:Master[]};
 export type Customer = {kind:CustomerKind;record:Master};
 export type CustomerFilters = {query:string;kind:CustomerKind|"all";status:string;territory:string};
-export type CustomerRelationship = {tenantId:string;sourceKind:CustomerKind;sourceId:string;targetKind:CustomerKind;targetId:string;relationship:string};
+export type CustomerRelationship = {id:string;tenantId:string;sourceKind:CustomerKind;sourceId:string;targetKind:CustomerKind;targetId:string;relationship:string};
 export type CustomerActivity = {tenantId:string;customerKind:CustomerKind;customerId:string;id:string;occurredAt:string;activityType:string;summary:string};
 export type WorkflowRequest = {customerId:string;customerType:CustomerKind;workflow:"plan"|"field"};
 export type Customer360ViewProps = {tenantId:string;authorizedForTenantId:string;contextKey:string;masters:CustomerGroups;relationships?:CustomerRelationship[];history?:CustomerActivity[];loading?:boolean;error?:string|null;onOpenWorkflow?:(request:WorkflowRequest)=>void};
