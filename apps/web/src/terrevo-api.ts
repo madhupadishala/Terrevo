@@ -49,7 +49,8 @@ export type ManagerAnalytics = {
 export type Coordinates = { latitude: number; longitude: number; accuracyMeters: number };
 
 export class ApiFailure extends Error {
-  constructor(readonly status: number, message: string) { super(message); }
+  readonly status: number;
+  constructor(status: number, message: string) { super(message); this.status = status; }
 }
 
 export class TerrevoWebApi {
