@@ -80,6 +80,7 @@ export default function App() {
 
   const active = activeTour(workspace);
   const currentVisit = openVisit(workspace);
+  useEffect(() => { setNotes(currentVisit?.notes ?? ""); }, [currentVisit?.id]);
   const activeVisits = active ? workspace.visits.filter((visit) => visit.tourId === active.id) : [];
   const completedVisits = workspace.visits.filter((visit) => visit.status === "CHECKED_OUT");
   const submittedTours = workspace.tours.filter((tour) => tour.status === "SUBMITTED");
