@@ -4,15 +4,14 @@ import {authorizedCustomers,filterCustomers,safeText,visibleRelationships,visibl
 export type {Customer360ViewProps,CustomerRelationship,CustomerActivity,WorkflowRequest} from "./model";
 export {filterCustomers,authorizedCustomers,visibleRelationships,visibleHistory} from "./model";
 export function Customer360View({tenantId,authorizedForTenantId,contextKey,masters,relationships=[],history=[],loading=false,error,onOpenWorkflow}:Customer360ViewProps){
- const scope=tenantId+":"+contextKey;
  const idPrefix=useId();
- const [selection,setSelection]=useState<{scope:string;id:string}|null>(null);
+ const [selection,setSelection]=useState<{tenantId:string;contextKey:string;id:string}|null>(null);
  const [filters,setFilters]=useState<CustomerFilters>({query:"",kind:"all",status:"",territory:""});
- useEffect(()=>{setSelection(null);setFilters({query:"",kind:"all",status:"",territory:""});},[scope]);
+ useEffect(()=>{setSelection(null);setFilters({query:"",kind:"all",status:"",territory:""});},[tenantId,contextKey]);
  const authorized=Boolean(tenantId&&contextKey&&tenantId===authorizedForTenantId);
  const customers=useMemo(()=>authorized?authorizedCustomers(masters):[],[authorized,masters]);
  const matching=useMemo(()=>filterCustomers(customers,filters),[customers,filters]);
- const selected=selection?.scope===scope?customers.find(x=>x.kind+":"+x.record.id===selection.id):undefined;
+ const selected=selection?.tenantId===tenantId&&selection.contextKey===contextKey?customers.find(x=>x.kind+":"+x.record.id===selection.id):undefined;
  const links=selected?visibleRelationships(tenantId,selected,customers,relationships):[];
  const entries=selected?visibleHistory(tenantId,selected,history):[];
  const territories=[...new Set(customers.map(x=>safeText(x.record.territoryName||x.record.territory||x.record.territoryId)).filter(Boolean))].sort();
@@ -32,7 +31,7 @@ export function Customer360View({tenantId,authorizedForTenantId,contextKey,maste
  {!loading&&authorized&&!matching.length&&<p role="status">No matching authorized customers.</p>}
  <div className="tr-list-sm">{matching.map(({kind,record})=><div className="tr-history-row" key={kind+":"+record.id}>
  <div><strong>{record.name}</strong><p>{kind} · {record.code||"No code"}</p></div>
- <Button kind="ghost" size="sm" onClick={()=>setSelection({scope,id:kind+":"+record.id})} aria-label={"View "+kind+" "+record.name}>View profile</Button></div>)}</div>
+ <Button kind="ghost" size="sm" onClick={()=>setSelection({tenantId,contextKey,id:kind+":"+record.id})} aria-label={"View "+kind+" "+record.name}>View profile</Button></div>)}</div>
  </section>
  <section className="tr-panel"><span className="tr-section-kicker">PROFILE & HISTORY</span>
  {!selected?<p className="tr-detail">Select a customer to review verified information.</p>:<>
