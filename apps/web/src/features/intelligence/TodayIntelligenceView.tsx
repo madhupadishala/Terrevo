@@ -4,13 +4,12 @@ import {buildTodaySummary,visibleSuggestions,type TodayIntelligenceViewProps} fr
 export type {TodayIntelligenceViewProps,AiSuggestion,TodaySummary} from "./model";
 export {buildTodaySummary,visibleSuggestions} from "./model";
 export function TodayIntelligenceView({tenantId,authorizedForTenantId,contextKey,progress,startOptions,manager,aiSuggestions=[],todayLocalDate,loading=false,error,onOpenPlan,onOpenStop,onConfirmSuggestion}:TodayIntelligenceViewProps){
- const scope=tenantId+":"+contextKey;
- const [review,setReview]=useState<{scope:string;id:string}|null>(null);
- useEffect(()=>setReview(null),[scope]);
+ const [review,setReview]=useState<{tenantId:string;contextKey:string;id:string}|null>(null);
+ useEffect(()=>setReview(null),[tenantId,contextKey]);
  const authorized=Boolean(tenantId&&contextKey&&authorizedForTenantId===tenantId);
  const summary=useMemo(()=>buildTodaySummary(todayLocalDate,authorized?progress:null,authorized?startOptions:[],authorized?manager:null),[todayLocalDate,authorized,progress,startOptions,manager]);
  const suggestions=useMemo(()=>authorized?visibleSuggestions(tenantId,aiSuggestions):[],[authorized,tenantId,aiSuggestions]);
- const candidate=review?.scope===scope?suggestions.find(x=>x.id===review.id):undefined;
+ const candidate=review?.tenantId===tenantId&&review.contextKey===contextKey?suggestions.find(x=>x.id===review.id):undefined;
  return <div className="tr-grid-wide">
  <section className="tr-panel"><span className="tr-section-kicker">TODAY</span><h2>Field execution briefing</h2><p className="tr-detail">For {todayLocalDate}. All figures require authorized operational records.</p>
  {!authorized&&<p role="status">Select an authorized organization to view today's work.</p>}
@@ -35,7 +34,7 @@ export function TodayIntelligenceView({tenantId,authorizedForTenantId,contextKey
  <p className="tr-detail">No model is called in this view. Suggestions must be supplied by an authorized service, with provenance and uncertainty. Human approval is required.</p>
  {!suggestions.length&&<p role="status">No validated suggestions available.</p>}
  {suggestions.map(s=><div className="tr-history-row" key={s.id}><div><strong>{s.summary}</strong><p>{s.reason}</p><p>Source: {s.sourceType} · {s.sourceObservedAt}</p>
- <p>{s.uncertainty}</p></div><Button kind="ghost" size="sm" onClick={()=>setReview({scope,id:s.id})}>Inspect evidence</Button></div>)}
+ <p>{s.uncertainty}</p></div><Button kind="ghost" size="sm" onClick={()=>setReview({tenantId,contextKey,id:s.id})}>Inspect evidence</Button></div>)}
  {candidate&&<div role="region" aria-label="Suggestion review"><h3>Review: {candidate.summary}</h3>
  <p>Requested action: <strong>{candidate.actionType}</strong></p><p>Source identifier: {candidate.sourceId}</p><p>Confidence: {candidate.confidence===null?"Not supplied":Math.round(candidate.confidence*100)+"%"}</p>
  <p>Uncertainty: {candidate.uncertainty}</p><h4>Evidence</h4>{candidate.evidence.map((e,i)=><p key={i}>{e.label}: {e.reference}</p>)}
