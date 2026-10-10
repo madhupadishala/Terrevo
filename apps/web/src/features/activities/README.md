@@ -6,3 +6,5 @@ Guide pp. 17–19 distinguishes FW versus NCA in monthly planning, with NCA type
 
 ## Initial CI evidence (before latest workflow alignment)
 GitHub CI #459 foundation PASSED: npm run verify:foundation, npm run typecheck, npm test (93/93), npm run test:web (13/13), npm run build, git diff --check. Database and mobile checks also passed. Follow-up PR CI must qualify the current commit. No production deployment.
+
+Evidence UI captures only an optional user-entered reference. It does not fabricate MIME type/byte size or upload a file. If actual attachment metadata is later supplied by parent, it must be backed by a verified selected file and backend contract.
