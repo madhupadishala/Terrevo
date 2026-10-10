@@ -54,7 +54,7 @@ export function ActivitiesView({tenantId,authorizedForTenantId,contextKey,territ
  onChange={e=>patch({durationMinutes:Number(e.target.value)})}/>
  <TextArea id="activity-remarks" labelText="Remarks" value={draft.remarks} maxLength={2000} disabled={!authorized||busy} onChange={e=>patch({remarks:e.target.value})}/>
  <h3>Optional evidence metadata (no upload)</h3>
- <TextInput id="activity-evidence" labelText="Evidence filename or reference" value={draft.evidence?.name||""} onChange={e=>patch({evidence:e.target.value?{name:e.target.value,mimeType:"unknown",sizeBytes:0}:undefined})}/>
+ <TextInput id="activity-evidence" labelText="Evidence reference (no upload, size or media type verified)" value={draft.evidence?.name||""} onChange={e=>patch({evidence:e.target.value?{name:e.target.value}:undefined})}/>
  </div>
  {errors.length>0&&<div role="status"><strong>Complete before review:</strong><ul>{errors.map(e=><li key={e}>{e}</li>)}</ul></div>}
  {!review?<Button disabled={!authorized||loading||errors.length>0||busy} onClick={()=>setReview(true)}>Review activity draft</Button>:<div className="tr-panel" aria-label="Review activity">
