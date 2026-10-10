@@ -54,3 +54,47 @@ test("tenant switching requires explicit context and never supplies a global pri
   assert.equal(api.connected, false);
   await assert.rejects(api.orgUnits(), error => error instanceof ApiFailure && error.status === 401);
 });
+
+
+test("concurrent API 401 responses share a single refresh-token rotation", async () => {
+  const previous=globalThis.fetch;
+  let rotations=0;
+  const requests:string[]=[];
+  globalThis.fetch=(async (input:RequestInfo|URL,init?:RequestInit)=>{
+    const path=String(input);
+    const headers=new Headers(init?.headers);
+    if(path==="/api/v1/auth/refresh"){
+      rotations++;
+      return Response.json({accessToken:"new-token",refreshToken:"new-refresh",expiresIn:3600,user:{id:"u",email:null}});
+    }
+    requests.push(headers.get("authorization")??"");
+    if(headers.get("authorization")==="Bearer old-token")return Response.json({error:"expired"},{status:401});
+    if(path==="/api/v1/tour-executions/start-options")return Response.json({options:[]});
+    if(path==="/api/v1/tour-executions/progress")return Response.json({progress:null});
+    return Response.json({error:"unexpected"},{status:404});
+  }) as typeof fetch;
+  try{
+    const api=new TerrevoWebApi();
+    api.setSession({accessToken:"old-token",refreshToken:"old-refresh",expiresIn:3600,user:{id:"u",email:null}});
+    api.setTenant(TENANT);
+    const result=await Promise.all([api.startOptions(),api.progress()]);
+    assert.deepEqual(result,[[],null]);
+    assert.equal(rotations,1,"only one refresh exchange may consume a refresh token");
+    assert.ok(requests.includes("Bearer new-token"));
+  }finally{globalThis.fetch=previous;}
+});
+
+test("invalid refresh responses do not restore a broken session",async()=>{
+  const old=globalThis.fetch;
+  globalThis.fetch=(async (input:RequestInfo|URL,init?:RequestInit)=>{
+    if(String(input)==="/api/v1/auth/refresh")return Response.json({accessToken:"new-token",refreshToken:null,expiresIn:3600,user:{id:"u"}});
+    return Response.json({error:"expired"},{status:401});
+  }) as typeof fetch;
+  try{
+    const api=new TerrevoWebApi();
+    api.setSession({accessToken:"old",refreshToken:"expired",expiresIn:3600,user:{id:"u",email:null}});
+    api.setTenant(TENANT);
+    await assert.rejects(api.startOptions(),(error:unknown)=>error instanceof ApiFailure && error.status===401);
+    assert.equal(api.connected,false);
+  }finally{globalThis.fetch=old;}
+});
