@@ -8,10 +8,16 @@ test("search, kind, territory, and empty are exact authorized filters",()=>{
  assert.deepEqual(authorizedCustomers({}),[]);
 });
 test("links require same tenant and authorized target",()=>{
- const links=[{tenantId:"t",sourceKind:"doctor" as const,sourceId:"d",targetKind:"chemist" as const,targetId:"c",relationship:"linked"},{tenantId:"other",sourceKind:"doctor" as const,sourceId:"d",targetKind:"chemist" as const,targetId:"c",relationship:"leaked"}];
+ const links=[{id:"link-1",tenantId:"t",sourceKind:"doctor" as const,sourceId:"d",targetKind:"chemist" as const,targetId:"c",relationship:"linked"},{id:"link-2",tenantId:"other",sourceKind:"doctor" as const,sourceId:"d",targetKind:"chemist" as const,targetId:"c",relationship:"leaked"}];
  assert.equal(visibleRelationships("t",rows[0],rows,links).length,1);
  assert.equal(visibleRelationships("t",rows[0],rows.slice(0,1),links).length,0);
 });
-test("history is explicit and scoped",()=>{
- assert.deepEqual(visibleHistory("t",rows[0],[{tenantId:"other",customerKind:"doctor",customerId:"d",id:"x",occurredAt:"2026",activityType:"CALL",summary:"hidden"}]),[]);
+test("history includes only matching tenant, customer and kind",()=>{
+ const events=[
+  {tenantId:"t",customerKind:"doctor" as const,customerId:"d",id:"match",occurredAt:"2026-10-11",activityType:"CALL",summary:"authorized"},
+  {tenantId:"t",customerKind:"doctor" as const,customerId:"other",id:"othercustomer",occurredAt:"2026-10-12",activityType:"CALL",summary:"other"},
+  {tenantId:"t",customerKind:"chemist" as const,customerId:"d",id:"otherkind",occurredAt:"2026-10-13",activityType:"CALL",summary:"other"},
+  {tenantId:"other",customerKind:"doctor" as const,customerId:"d",id:"othertenant",occurredAt:"2026-10-14",activityType:"CALL",summary:"other"},
+ ];
+ assert.deepEqual(visibleHistory("t",rows[0],events).map(x=>x.id),["match"]);
 });
