@@ -189,3 +189,19 @@ button, input, textarea, select { font: inherit; }
 .tr-app .tr-connect-grid .cds--inline-notification { margin-top:0; }
 @media (max-width:1000px) { .tr-connect-grid { grid-template-columns:1fr; } }
 @media (max-width:720px) { .tr-footer-actions { align-items:flex-start; } .tr-connect-grid { margin-top:16px; } }
+
+.tr-business { margin-top:22px; }
+.tr-business .tr-panel { min-width:0; }
+.tr-business .tr-panel h3 { margin:22px 0 12px; }
+.tr-form-three { display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:12px; }
+.tr-business-error { background:#fff4e6; border-left:3px solid #bb7100; padding:13px 18px; color:#6b3d00; font-size:13px; margin-bottom:18px; }
+.tr-record-detail { min-width:0; flex:1; }
+.tr-record-detail strong { word-break:break-word; }
+.tr-record-detail p { overflow-wrap:anywhere; }
+.tr-master-editor { border-top:1px solid #e4eaf0; margin-top:28px; padding-top:18px; }
+.tr-business .cds--btn--ghost { max-width:100%; }
+@media(max-width:600px) {
+  .tr-business .tr-grid-wide { gap:12px; }
+  .tr-form-three { grid-template-columns:1fr; }
+  .tr-business .tr-panel { padding:18px; }
+}
