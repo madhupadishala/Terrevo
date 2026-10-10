@@ -23,7 +23,7 @@ test("public UI exposes role workspaces without inventing data or performing wri
   await page.getByRole("button", { name: "Manager command" }).click();
   await expect(page.getByText("Manager workspace is permission-gated")).toBeVisible();
   await page.getByRole("button", { name: "Platform Super Admin" }).click();
-  await expect(page.getByRole("heading", { name: "Terrevo control plane" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Connect an existing authorized account" })).toBeVisible();
   expect(writes).toEqual([]);
 });
 
@@ -123,5 +123,45 @@ test("tenant administrator can open manager and organization administration with
   await page.getByRole("button",{name:"Organization admin"}).click();
   await expect(page.getByRole("heading",{name:"Manage reporting hierarchy"})).toBeVisible();
   await page.getByRole("button",{name:"Platform Super Admin"}).click();
-  await expect(page.getByText("Backend contract pending").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Platform permissions required" })).toBeVisible();
+});
+
+test("platform administrator without a tenant can create and manage organizations with authorized platform APIs", async ({ page }) => {
+  const actor="11111111-1111-4111-8111-111111111111";
+  const tenantId="22222222-2222-4222-8222-222222222222";
+  let organizations:Array<{id:string;name:string;slug:string;status:"active"|"inactive"}>=[];
+  const calls:string[]=[];
+  await page.route("**/api/v1/**", async route => {
+    const req=route.request();const path=new URL(req.url()).pathname;
+    const json=(body:unknown,status=200)=>route.fulfill({contentType:"application/json",status,body:JSON.stringify(body)});
+    if(path==="/api/v1/auth/login")return json({accessToken:"test",refreshToken:"refresh",expiresIn:3600,user:{id:actor,email:null}});
+    if(path==="/api/v1/platform/context")return json({isSuperAdmin:true});
+    if(path==="/api/v1/tenants")return json({tenants:[]});
+    if(path==="/api/v1/platform/tenants"&&req.method()==="GET")return json({tenants:organizations});
+    if(path==="/api/v1/platform/audit")return json({events:[]});
+    if(path==="/api/v1/platform/tenants"&&req.method()==="POST"){
+      calls.push(path);
+      const input=req.postDataJSON() as {name:string;slug:string};
+      const item={id:tenantId,name:input.name,slug:input.slug,status:"active" as const};
+      organizations=[item];return json({tenant:item},201);
+    }
+    if(path==="/api/v1/platform/tenants/"+tenantId+"/status"){
+      calls.push(path);
+      organizations=[{...organizations[0],status:"inactive"}];return json({tenant:organizations[0]});
+    }
+    return json({error:"Unexpected request"},404);
+  });
+  await page.goto("/");
+  await page.locator("#account-email").fill("existing@example.invalid");
+  await page.locator("#account-password").fill("existing-password");
+  await page.getByRole("button",{name:"Connect to live workflows"}).click();
+  await page.getByRole("button",{name:"Platform Super Admin"}).click();
+  await expect(page.getByRole("heading",{name:"Organizations"})).toBeVisible();
+  await page.locator("#platform-tenant-name").fill("Example Pharma");
+  await page.locator("#platform-tenant-slug").fill("example-pharma");
+  await page.getByRole("button",{name:"Create organization"}).click();
+  await expect(page.getByText("Example Pharma")).toBeVisible();
+  await page.getByRole("button",{name:"Deactivate organization"}).click();
+  await expect(page.getByRole("button",{name:"Activate organization"})).toBeVisible();
+  expect(calls).toEqual(["/api/v1/platform/tenants","/api/v1/platform/tenants/"+tenantId+"/status"]);
 });
