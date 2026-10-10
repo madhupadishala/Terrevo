@@ -17,7 +17,7 @@ test("public UI exposes role workspaces without inventing data or performing wri
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Operations, connected." })).toBeVisible();
   await expect(page.getByText("Terrevo is online.")).toHaveCount(0);
-  await page.getByRole("button", { name: "Field execution" }).click();
+  await page.getByRole("button", { name: "Field execution", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Start My Tour" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Start My Tour (GPS)" })).toBeDisabled();
   await page.getByRole("button", { name: "Manager command" }).click();
@@ -70,8 +70,8 @@ test("authorized field user can use real API endpoints for tour and visit lifecy
   await page.getByRole("textbox", { name: "Existing account email" }).fill("test@example.invalid");
   await page.getByRole("textbox", { name: "Password" }).fill("test-pass");
   await page.getByRole("button", { name: "Connect to live workflows" }).click();
-  await expect(page.getByText("Test Organization").first()).toBeVisible();
-  await page.getByRole("button", { name: "Field execution" }).click();
+  await expect(page.getByRole("complementary", { name: "Terrevo navigation" }).getByText("Test Organization")).toBeVisible();
+  await page.getByRole("button", { name: "Field execution", exact: true }).click();
   await page.locator("#approved-day").selectOption(PLAN_DAY);
   await page.getByRole("button", { name: "Start My Tour (GPS)" }).click();
   await expect(page.getByText("Tour started", { exact: true })).toBeVisible();
