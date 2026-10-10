@@ -42,7 +42,8 @@ create table public.nca_records(
   foreign key(tenant_id,territory_id) references public.organization_units(tenant_id,id) on delete restrict,
   foreign key(tenant_id,category_code) references public.nca_categories(tenant_id,code) on delete restrict,
   foreign key(tenant_id,territory_id,town_id) references public.nca_towns(tenant_id,territory_id,id) on delete restrict,
-  check(phase <> 'PLAN' or town_id is not null)
+  check(phase <> 'PLAN' or town_id is not null),
+  check(phase <> 'REPORT' or length(trim(remarks))>0)
 );
 create index nca_records_own_idx on public.nca_records(tenant_id,created_by,work_date desc);
 
@@ -100,7 +101,8 @@ begin
   if v_id is not null then return v_id; end if;
   if p_phase not in ('PLAN','REPORT') or (p_phase='PLAN' and p_town_id is null) or
      p_duration_minutes not between 1 and 1440 or length(trim(p_reason)) not between 1 and 500 or
-     length(coalesce(p_remarks,''))>2000 or p_work_date is null
+     length(coalesce(p_remarks,''))>2000 or
+     (p_phase='REPORT' and length(trim(coalesce(p_remarks,'')))=0) or p_work_date is null
   then raise exception 'Invalid NCA fields' using errcode='22023'; end if;
   if not exists(select 1 from public.nca_categories c where c.tenant_id=p_tenant_id and c.code=p_category_code and c.active)
     then raise exception 'NCA category is not approved' using errcode='22023'; end if;
