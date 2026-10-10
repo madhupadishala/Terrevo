@@ -26,7 +26,10 @@ export function buildTodaySummary(today:string,progress:Progress|null,options:St
  message:fresh?"Current tour execution from authorized records.":eligibleOptions.length?"No tour started for the selected date.":"No current verified activity."};
 }
 export function visibleSuggestions(tenant:string,items:AiSuggestion[]=[]):AiSuggestion[]{
- return items.filter(x=>x.tenantId===tenant&&x.requiresHumanReview===true&&x.id&&x.summary.trim()&&x.sourceId&&x.sourceType&&x.sourceObservedAt&&
+ // Duplicate IDs are ambiguous review/action identities. Exclude every duplicate rather than selecting the first.
+ const count=new Map<string,number>();
+ for(const item of items){if(item.tenantId===tenant)count.set(item.id,(count.get(item.id)??0)+1);}
+ return items.filter(x=>x.tenantId===tenant&&count.get(x.id)===1&&x.requiresHumanReview===true&&x.id&&x.summary.trim()&&x.actionType.trim()&&x.sourceId&&x.sourceType&&x.sourceObservedAt&&
  x.evidence.length>0&&x.evidence.every(e=>e.label.trim()&&e.reference.trim())&&
  (x.confidence===null||(Number.isFinite(x.confidence)&&x.confidence>=0&&x.confidence<=1))&&x.uncertainty.trim());
 }
