@@ -41,6 +41,8 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
   const [balances, setBalances] = useState<Balance[]>([]);
   const [distributions, setDistributions] = useState<Dist[]>([]);
   const [days, setDays] = useState<Day[]>([]);
+  const [attendance, setAttendance] = useState<Array<{workDate:string;status:string;workedMinutes:number|null;requiredMinutes:number|null}>>([]);
+  const [gpsExceptions, setGpsExceptions] = useState<Array<FieldVisit & {planId:string}>>([]);
   const [weeks, setWeeks] = useState<Week[]>([]);
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -74,7 +76,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
 
   useEffect(() => {
     if (!connected) {
-      setDcrs([]);setBalances([]);setDistributions([]);setDays([]);setWeeks([]);
+      setDcrs([]);setBalances([]);setDistributions([]);setDays([]);setWeeks([]);setAttendance([]);setGpsExceptions([]);
       setLeaves([]);setExpenses([]);setJoint([]);setApprovals({leaves:[],expenses:[],timesheets:[]});
       return;
     }
@@ -94,24 +96,26 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
           if(visit){const dist=await api.distributions(visit.id);if(live)setDistributions(dist);}else if(live)setDistributions([]);
         }
         if(mode==="workforce") {
-          const all=await Promise.allSettled([api.dailyTimesheets(),api.weeklyTimesheets(),api.leaves(),api.expenses(),api.jointWork()]);
+          const all=await Promise.allSettled([api.dailyTimesheets(),api.weeklyTimesheets(),api.leaves(),api.expenses(),api.jointWork(),api.attendance()]);
           if(!live)return;
           if(all[0].status==="fulfilled")setDays(all[0].value);
           if(all[1].status==="fulfilled")setWeeks(all[1].value);
           if(all[2].status==="fulfilled")setLeaves(all[2].value);
           if(all[3].status==="fulfilled")setExpenses(all[3].value);
           if(all[4].status==="fulfilled")setJoint(all[4].value);
+          if(all[5].status==="fulfilled")setAttendance(all[5].value);
           const failed=all.filter(x=>x.status==="rejected").length;
           if(failed)setMessage(String(failed)+" workforce APIs were unavailable for this account.");
         }
         if(mode==="approvals"&&manager) {
-          const all=await Promise.allSettled([api.pendingLeaveApprovals(),api.pendingExpenseApprovals(),api.pendingWeeklyTimesheets()]);
+          const all=await Promise.allSettled([api.pendingLeaveApprovals(),api.pendingExpenseApprovals(),api.pendingWeeklyTimesheets(),api.gpsExceptions()]);
           if(!live)return;
           setApprovals({
             leaves:all[0].status==="fulfilled"?all[0].value:[],
             expenses:all[1].status==="fulfilled"?all[1].value:[],
             timesheets:all[2].status==="fulfilled"?all[2].value:[],
           });
+          if(all[3].status==="fulfilled")setGpsExceptions(all[3].value);
           if(all.some(x=>x.status==="rejected"))setMessage("Some approval queues could not be loaded for this account.");
         }
       } catch (error) {
@@ -199,6 +203,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
           <TextInput id="expense-currency" labelText="Currency (ISO 4217)" value={expenseCurrency} maxLength={3} onChange={e=>setExpenseCurrency(e.target.value.toUpperCase())}/>
           <Button disabled={!canAct||!progress||!(expenseAmount>0)||!/^[A-Z]{3}$/.test(expenseCurrency)} onClick={()=>progress&&void act(()=>api.saveExpense(progress.executionId,expenseCurrency,expenseAmount,expenseCategory,null),"Expense claim saved")}>Save expense</Button></div>
       </Box>
+      <Box title="Attendance history">{attendance.length?attendance.map(a=><Entry key={a.workDate} heading={a.workDate} detail={(a.workedMinutes??0)+" of "+(a.requiredMinutes??0)+" minutes recorded"} status={a.status}/>):empty}</Box>
       <Box title="Joint fieldwork">
         {joint.length?joint.map(x=><Entry key={x.id} heading={x.workDate} detail={"Assigned employee "+x.targetEmployeeId.slice(0,8)+" · "+(x.selfRole??"Participant")} status={x.status}>
           {x.status==="PLANNED"&&<Button kind="ghost" disabled={!canAct} size="sm" onClick={()=>void act(async()=>api.joinJointWork(x.id,await freshPosition()),"Joint work joined")}>Join with GPS</Button>}
@@ -215,6 +220,10 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
           </div>
         </Entry>):empty}
       </Box>)}
+      <Box title="GPS / presence exceptions">{gpsExceptions.length?gpsExceptions.map(x=><Entry key={x.id} heading={x.verification.replace(/_/g," ")} detail={x.checkinAt+" · "+x.id.slice(0,8)} status={x.exceptionStatus}>
+        <div className="tr-button-row"><Button size="sm" disabled={!canAct} onClick={()=>void act(()=>api.decideGpsException(x.id,"APPROVE",null),"GPS exception approved")}>Approve</Button>
+        <Button kind="secondary" size="sm" disabled={!canAct||!comment.trim()} onClick={()=>void act(()=>api.decideGpsException(x.id,"REJECT",comment),"GPS exception rejected")}>Reject</Button></div>
+      </Entry>):empty}</Box>
       <Box title="Review notes"><TextArea id="review-comment" labelText="Required for return or rejection" value={comment} onChange={e=>setComment(e.target.value)} maxLength={1000}/></Box>
     </div>:<Box title="Manager approval access required"><p className="tr-detail">The server enforces scoped approval permissions. A field user cannot approve another employee's records.</p></Box>)}
 
