@@ -176,6 +176,18 @@ export class TerrevoWebApi {
   async platformAudit(): Promise<Array<{ id: number; action: string; tenant_id: string; occurred_at: string; actor_user_id: string }>> {
     return (await this.raw("/v1/platform/audit", "GET", undefined, false) as {events: Array<{id:number;action:string;tenant_id:string;occurred_at:string;actor_user_id:string}>}).events;
   }
+  async createMaster(kind:string,input:Record<string,unknown>):Promise<Master>{
+    return (await this.raw("/v1/masters/"+encodeURIComponent(kind),"POST",input) as {item:Master}).item;
+  }
+  async attendance():Promise<Array<{workDate:string;status:string;workedMinutes:number|null;requiredMinutes:number|null}>> {
+    return (await this.raw("/v1/attendance") as {attendance:Array<{workDate:string;status:string;workedMinutes:number|null;requiredMinutes:number|null}>}).attendance;
+  }
+  async gpsExceptions():Promise<Array<FieldVisit & {planId:string}>> {
+    return (await this.raw("/v1/visit-exceptions") as {exceptions:Array<FieldVisit & {planId:string}>}).exceptions;
+  }
+  async decideGpsException(visitId:string,decision:"APPROVE"|"REJECT",comment:string|null) {
+    return this.raw("/v1/visit-exceptions/"+encodeURIComponent(visitId)+"/decision","POST",{decision,comment});
+  }
   async dcrs(): Promise<Array<{ id: string; doctorName: string; doctorCode: string; callOutcome: string; submittedAt: string; doctorId: string }>> {
     return (await this.raw("/v1/dcrs") as {dcrs: Array<{id:string;doctorName:string;doctorCode:string;callOutcome:string;submittedAt:string;doctorId:string}>}).dcrs;
   }
