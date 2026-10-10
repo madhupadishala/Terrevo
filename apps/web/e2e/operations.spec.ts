@@ -251,3 +251,56 @@ test("switching tenants clears prior organization data even when next reads fail
   await page.getByRole("button",{name:"Manager command"}).click();
   await expect(page.getByRole("heading",{name:"Manager workspace is permission-gated"})).toBeVisible();
 });
+
+
+test("monthly planner persists multiple planned calls to the real weekly tour API contract", async ({page}) => {
+  const tenant="11111111-1111-4111-8111-111111111111";
+  const territory="22222222-2222-4222-8222-222222222222";
+  const doctorA="33333333-3333-4333-8333-333333333333";
+  const doctorB="44444444-4444-4444-8444-444444444444";
+  const planId="55555555-5555-4555-8555-555555555555";
+  let saved: {weekStart:string;days:Array<{date:string;territoryId:string;stops:Array<{sequence:number;type:string;targetId:string}>}>}|null=null;
+  await page.route("**/api/v1/**",async route=>{
+    const req=route.request();const path=new URL(req.url()).pathname;
+    const ok=(body:unknown,status=200)=>route.fulfill({status,contentType:"application/json",body:JSON.stringify(body)});
+    if(path==="/api/v1/auth/login")return ok({accessToken:"test",refreshToken:"refresh",expiresIn:3600,user:{id:tenant,email:null}});
+    if(path==="/api/v1/platform/context")return ok({isSuperAdmin:false});
+    if(path==="/api/v1/tenants")return ok({tenants:[{id:tenant,name:"Pharma Pilot",slug:"pilot",status:"active"}]});
+    if(path==="/api/v1/access-context")return ok({context:{roles:[{roleKey:"MR",scopeOrgUnitId:territory}],permissions:[],orgAssignments:[]}});
+    if(path==="/api/v1/tour-executions/progress")return ok({progress:null});
+    if(path==="/api/v1/tour-executions/start-options")return ok({options:[]});
+    if(path==="/api/v1/visits/open")return ok({visit:null});
+    if(path==="/api/v1/org-units")return ok({units:[{id:territory,parentId:null,type:"territory",code:"H-01",name:"Central",status:"active"}]});
+    if(path==="/api/v1/tour-plans"&&req.method()==="GET")return ok({plans:saved?[{id:planId,weekStart:saved.weekStart,status:"DRAFT",submittedAt:null}]:[]});
+    if(path==="/api/v1/tour-plans"&&req.method()==="POST"){
+      saved=req.postDataJSON();
+      return ok({plan:{id:planId,...saved,status:"DRAFT",submittedAt:null}},201);
+    }
+    if(path==="/api/v1/tour-plans/"+planId)return ok({plan:{id:planId,...saved,status:"DRAFT",submittedAt:null}});
+    if(path==="/api/v1/masters/doctors")return ok({items:[
+      {id:doctorA,code:"D1",name:"Physician One",status:"active",territoryId:territory},
+      {id:doctorB,code:"D2",name:"Physician Two",status:"active",territoryId:territory}
+    ]});
+    if(path.includes("/api/v1/masters/"))return ok({items:[]});
+    return ok({error:"Unmocked endpoint: "+path},404);
+  });
+  await page.goto("/");
+  await page.locator("#account-email").fill("test@example.invalid");
+  await page.locator("#account-password").fill("test-secret");
+  await page.getByRole("button",{name:"Connect to live workflows"}).click();
+  await page.getByRole("button",{name:"Tour planning"}).click();
+  await expect(page.getByRole("group",{name:"Monthly tour plan calendar"})).toBeVisible();
+  await page.locator("#calendar-territory").selectOption(territory);
+  await page.locator("#calendar-account").selectOption(doctorA);
+  await page.getByRole("button",{name:"Add planned call"}).click();
+  await page.locator("#calendar-account").selectOption(doctorB);
+  await page.getByRole("button",{name:"Add planned call"}).click();
+  await expect(page.getByRole("heading",{name:"Planned calls (2)"})).toBeVisible();
+  await page.getByRole("button",{name:"Save new weekly plan"}).click();
+  await expect(page.getByText("Weekly tour plan saved")).toBeVisible();
+  expect(saved).not.toBeNull();
+  expect(saved!.days).toHaveLength(1);
+  expect(saved!.days[0].stops.map(x=>x.targetId)).toEqual([doctorA,doctorB]);
+  expect(saved!.days[0].stops.map(x=>x.sequence)).toEqual([1,2]);
+  expect(saved!.days[0].territoryId).toBe(territory);
+});
