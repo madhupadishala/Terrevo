@@ -216,3 +216,38 @@ test("business workspaces load real API records and expose submission actions", 
   expect(fetched).toContain("/api/v1/dcrs");
   expect(fetched).toContain("/api/v1/attendance");
 });
+
+
+test("switching tenants clears prior organization data even when next reads fail",async({page})=>{
+  const A="11111111-1111-4111-8111-111111111111";
+  const B="22222222-2222-4222-8222-222222222222";
+  await page.route("**/api/v1/**",async route=>{
+    const req=route.request(),path=new URL(req.url()).pathname,tenant=req.headers()["x-tenant-id"];
+    const ok=(body:unknown,status=200)=>route.fulfill({status,contentType:"application/json",body:JSON.stringify(body)});
+    if(path==="/api/v1/auth/login")return ok({accessToken:"t",refreshToken:"rt",expiresIn:3600,user:{id:A,email:null}});
+    if(path==="/api/v1/platform/context")return ok({isSuperAdmin:false});
+    if(path==="/api/v1/tenants")return ok({tenants:[{id:A,name:"Organization A",slug:"a",status:"active"},{id:B,name:"Organization B",slug:"b",status:"active"}]});
+    if(path==="/api/v1/access-context")return ok({context:{roles:[{roleKey:tenant===A?"TENANT_ADMIN":"MR",scopeOrgUnitId:null}],permissions:[],orgAssignments:[]}});
+    if(path==="/api/v1/tour-executions/progress")return tenant===A?ok({progress:{executionId:A,workDate:"2026-10-10",territoryId:A,startedAt:"2026-10-10T10:00:00Z",remainingMinutes:200,plannedCount:1,completedCount:0,inProgressCount:0,pendingCount:1,stops:[]}}):ok({error:"forbidden"},403);
+    if(path==="/api/v1/org-units")return tenant===A?ok({units:[{id:A,parentId:null,type:"territory",code:"T_A",name:"Territory Alpha",status:"active"}]}):ok({error:"forbidden"},403);
+    if(path==="/api/v1/tour-executions/start-options")return ok({options:[]});
+    if(path==="/api/v1/visits/open")return ok({visit:null});
+    if(path==="/api/v1/tour-plans"||path==="/api/v1/tour-approvals")return ok({plans:[]});
+    if(path.includes("/api/v1/masters/"))return ok({items:[]});
+    if(path==="/api/v1/manager/command-center")return ok({commandCenter:{teamMembers:1,activeTours:1,submittedToursToday:0,pending:{tourApprovals:0,gpsExceptions:0,weeklyTimesheets:0,leaves:0,expenses:0}}});
+    if(path==="/api/v1/manager/analytics")return ok({analytics:{tours:{submitted:0},coverage:{plannedStops:1,completedVisits:0,doctorCalls:0}}});
+    return ok({error:"Unexpected route"},404);
+  });
+  await page.goto("/");
+  await page.locator("#account-email").fill("existing@example.invalid");
+  await page.locator("#account-password").fill("pw");
+  await page.getByRole("button",{name:"Connect to live workflows"}).click();
+  await page.locator("#org-select").selectOption(A);
+  await expect(page.getByText("Territory Alpha")).toHaveCount(0);
+  await page.getByRole("button",{name:"Tour planning"}).click();
+  await expect(page.getByText("Territory Alpha")).toBeVisible();
+  await page.getByRole("combobox",{name:"Switch organization"}).selectOption(B);
+  await expect(page.getByText("Territory Alpha")).toHaveCount(0);
+  await page.getByRole("button",{name:"Manager command"}).click();
+  await expect(page.getByRole("heading",{name:"Manager workspace is permission-gated"})).toBeVisible();
+});
