@@ -165,3 +165,54 @@ test("platform administrator without a tenant can create and manage organization
   await expect(page.getByRole("button",{name:"Activate organization"})).toBeVisible();
   expect(calls).toEqual(["/api/v1/platform/tenants","/api/v1/platform/tenants/"+tenantId+"/status"]);
 });
+
+
+test("business workspaces load real API records and expose submission actions", async ({page})=>{
+  const actor="11111111-1111-4111-8111-111111111111";
+  const tenant="22222222-2222-4222-8222-222222222222";
+  let fetched:string[]=[];
+  await page.route("**/api/v1/**",async route=>{
+    const r=route.request();const path=new URL(r.url()).pathname;
+    fetched.push(path);
+    const respond=(body:unknown,status=200)=>route.fulfill({status,contentType:"application/json",body:JSON.stringify(body)});
+    if(path==="/api/v1/auth/login")return respond({accessToken:"test-token",refreshToken:"test-refresh",expiresIn:3600,user:{id:actor,email:null}});
+    if(path==="/api/v1/platform/context")return respond({isSuperAdmin:false});
+    if(path==="/api/v1/tenants")return respond({tenants:[{id:tenant,name:"Field Test Organization",slug:"field-test",status:"active"}]});
+    if(path==="/api/v1/access-context")return respond({context:{roles:[{roleKey:"MANAGER",scopeOrgUnitId:tenant}],permissions:[],orgAssignments:[]}});
+    if(path==="/api/v1/tour-executions/progress")return respond({progress:null});
+    if(path==="/api/v1/tour-executions/start-options")return respond({options:[]});
+    if(path==="/api/v1/visits/open")return respond({visit:null});
+    if(path==="/api/v1/tour-plans" || path==="/api/v1/tour-approvals")return respond({plans:[]});
+    if(path==="/api/v1/org-units")return respond({units:[]});
+    if(path.includes("/api/v1/masters/"))return respond({items:[]});
+    if(path==="/api/v1/dcrs")return respond({dcrs:[]});
+    if(path==="/api/v1/inventory")return respond({balances:[]});
+    if(path==="/api/v1/attendance")return respond({attendance:[]});
+    if(path==="/api/v1/timesheets/daily/own"||path==="/api/v1/timesheets/weekly/own"||path==="/api/v1/timesheet-approvals")return respond({timesheets:[]});
+    if(path==="/api/v1/leaves/own"||path==="/api/v1/leave-approvals")return respond({leaves:[]});
+    if(path==="/api/v1/expenses/own"||path==="/api/v1/expense-approvals")return respond({claims:[]});
+    if(path==="/api/v1/joint-work/own")return respond({assignments:[]});
+    if(path==="/api/v1/visit-exceptions")return respond({exceptions:[]});
+    if(path==="/api/v1/manager/command-center")return respond({commandCenter:{teamMembers:0,activeTours:0,submittedToursToday:0,pending:{tourApprovals:0,gpsExceptions:0,weeklyTimesheets:0,leaves:0,expenses:0}}});
+    if(path==="/api/v1/manager/analytics")return respond({analytics:{tours:{submitted:0},coverage:{plannedStops:0,completedVisits:0,doctorCalls:0}}});
+    return respond({error:"Unexpected path"},404);
+  });
+  await page.goto("/");
+  await page.locator("#account-email").fill("existing@example.invalid");
+  await page.locator("#account-password").fill("test-password");
+  await page.getByRole("button",{name:"Connect to live workflows"}).click();
+  await page.getByRole("button",{name:"RCPA & orders"}).click();
+  await expect(page.getByRole("heading",{name:"RCPA & prescription intelligence"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Save RCPA"})).toBeDisabled();
+  await page.getByRole("button",{name:"Samples & inventory"}).click();
+  await expect(page.getByRole("heading",{name:"Sample and gift allocation"})).toBeVisible();
+  await page.getByRole("button",{name:"Workforce operations"}).click();
+  await expect(page.getByRole("heading",{name:"Daily & weekly timesheets"})).toBeVisible();
+  await page.getByRole("button",{name:"Manager approvals"}).click();
+  await expect(page.getByRole("heading",{name:"Pending leaves"})).toBeVisible();
+  await page.getByRole("button",{name:"Daily call reports"}).click();
+  await expect(page.getByRole("heading",{name:"Daily call reports (DCR)"})).toBeVisible();
+  expect(fetched).toContain("/api/v1/inventory");
+  expect(fetched).toContain("/api/v1/dcrs");
+  expect(fetched).toContain("/api/v1/attendance");
+});
