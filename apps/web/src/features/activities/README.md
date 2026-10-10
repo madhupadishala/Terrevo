@@ -1,0 +1,2 @@
+# Activities draft UI
+Carbon forms for PLANNED_CALL, UNPLANNED_CALL and NON_CALL_ACTIVITY. Only typed onSaveDraft callback; absent callback disables handoff. No API writes, file upload, location capture or fake persisted NCA. Inputs are provided from authorized parent. Niti guide exact categories unverified. Commands to run with dependencies: npm run typecheck:web; npm run build:web; npm run test:web. Not yet run here.
