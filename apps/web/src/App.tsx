@@ -374,6 +374,7 @@ export default function App() {
           plannedCalls={progress?.stops.map(stop=>({
             planStopId:stop.planStopId, label:stop.targetName, territoryId:progress.territoryId, workDate:progress.workDate,
           }))??[]}
+          saveMode="SERVER_NCA"
           ncaSubtypes={ncaOptions.categories.map(x=>({code:x.code,label:x.label}))}
           towns={ncaOptions.towns.map(x=>({id:x.id,name:x.name}))}
           onSaveDraft={async draft=>{
