@@ -10,10 +10,11 @@ type Props = {
   plans: Plan[];
   units: OrgUnit[];
   masters: Record<string, Master[]>;
+  focusCustomer?: { kind: "doctor" | "chemist" | "stockist"; id: string; territoryId: string; name: string } | null;
   perform: (fn: () => Promise<unknown>, label: string) => Promise<void>;
 };
 
-export function MonthlyPlanner({ api, connected, busy, plans, units, masters, perform }: Props) {
+export function MonthlyPlanner({ api, connected, busy, plans, units, masters, focusCustomer, perform }: Props) {
   const [month, setMonth] = useState(localDate());
   const [selected, setSelected] = useState(localDate());
   const [details, setDetails] = useState<Record<string, Plan>>({});
@@ -80,6 +81,17 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, pe
     setTargetId("");
     setStopRemark("");
   }, [selected, detail, existingDay?.date]);
+
+
+  useEffect(() => {
+    if (!connected || !focusCustomer) return;
+    const list = masters[focusCustomer.kind==="doctor"?"doctors":focusCustomer.kind==="chemist"?"chemists":"stockists"]??[];
+    const record = list.find(m=>m.id===focusCustomer.id&&m.status==="active"&&m.territoryId===focusCustomer.territoryId);
+    if (!record || !territories.some(t=>t.id===focusCustomer.territoryId)) return;
+    setStopType(focusCustomer.kind);
+    setTerritoryId(focusCustomer.territoryId);
+    setTargetId(focusCustomer.id);
+  }, [connected, focusCustomer, masters, units]);
 
   function addStop() {
     if (!targetId || !territoryId) return;
@@ -166,6 +178,7 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, pe
         <Button kind="secondary" disabled={!connected||busy||!modifiable||!territoryId||!targetId||Boolean(plan&&!detail)}
           onClick={addStop}>Add planned call</Button>
       </div>
+      {focusCustomer&&<p className="tr-detail" role="status">Selected from Customer 360: <strong>{focusCustomer.name}</strong> ({focusCustomer.kind}). Confirm the date and add the call before saving.</p>}
       <h3>Planned calls ({stops.length})</h3>
       {stops.map((s,i)=><div key={s.type+":"+s.targetId} className="tr-history-row">
         <div><strong>{i+1}. {masters[s.type==="doctor"?"doctors":s.type==="chemist"?"chemists":"stockists"]?.find(t=>t.id===s.targetId)?.name??s.targetId}</strong>
