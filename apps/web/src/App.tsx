@@ -98,6 +98,7 @@ export default function App() {
   const [assignmentUser, setAssignmentUser] = useState("");
   const [assignmentRole, setAssignmentRole] = useState<"TENANT_ADMIN" | "MANAGER" | "MR">("MR");
   const [assignmentScope, setAssignmentScope] = useState("");
+  const [focusedCustomer, setFocusedCustomer] = useState<{kind:"doctor"|"chemist"|"stockist";id:string;territoryId:string;name:string}|null>(null);
 
   function resetTenantState() {
     setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
@@ -105,6 +106,7 @@ export default function App() {
     setSelectedOption(""); setStopId(""); setGpsReason(""); setCallOutcome("");
     setCallRemarks(""); setShortDayReason("");
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
+    setFocusedCustomer(null);
   }
 
   const connected = Boolean(session && tenantId && access);
@@ -292,6 +294,7 @@ export default function App() {
           </div>
         </>}
 
+        {view==="field" && focusedCustomer && <p className="tr-detail" role="status">Customer 360 selection: <strong>{focusedCustomer.name}</strong>. Only an authorized pending stop from the approved tour can be checked in.</p>}
         {view==="field" && <div className="tr-grid-wide">
           <Panel eyebrow="FIELD EXECUTION / REAL API" title={progress?"Tour in progress":"Start My Tour"}>
             {progress?<><div className="tr-section-line"><p>{progress.workDate} · {dateTime(progress.startedAt)}</p><Tag type="green">ACTIVE</Tag></div>
@@ -338,7 +341,20 @@ export default function App() {
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
           contextKey={contextKey} masters={{doctors:masters.doctors??[],chemists:masters.chemists??[],stockists:masters.stockists??[]}}
           loading={loading}
-          onOpenWorkflow={request=>setView(request.workflow==="plan"?"plans":"field")} />}
+          onOpenWorkflow={request=>{
+            if(!connected)return;
+            const group=masters[request.customerType==="doctor"?"doctors":request.customerType==="chemist"?"chemists":"stockists"]??[];
+            const record=group.find(m=>m.id===request.customerId&&m.status==="active"&&typeof m.territoryId==="string");
+            if(!record)return;
+            const customer={kind:request.customerType,id:record.id,territoryId:String(record.territoryId),name:record.name};
+            setFocusedCustomer(customer);
+            if(request.workflow==="field"){
+              const authorizedStop=progress?.stops.find(x=>x.targetId===record.id&&x.type===request.customerType&&x.status!=="COMPLETED");
+              if(authorizedStop){setStopId(authorizedStop.planStopId);setView("field");return;}
+              setNotice({kind:"info",title:"Approved stop required",message:"This customer is not a pending stop on the active approved tour. Add them to a plan and obtain approval before execution."});
+            }
+            setView("plans");
+          }} />}
 
         {view==="activities" && <ActivitiesView
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
@@ -355,8 +371,9 @@ export default function App() {
           contextKey={contextKey} products={masters.products??[]} assets={[]} today={localDate()}
           linkedVisitId={visit?.id} loading={loading} />}
 
-        {view==="plans" && <MonthlyPlanner key={tenantId || "unconnected"} api={api} connected={connected}
-          busy={busy} plans={plans} units={units} masters={masters} perform={(fn,title)=>action(fn,title)} />}
+        {view==="plans" && <MonthlyPlanner key={[contextKey,focusedCustomer?.kind??"",focusedCustomer?.id??""].join(":")}
+          api={api} connected={connected} busy={busy} plans={plans} units={units} masters={masters}
+          focusCustomer={focusedCustomer} perform={(fn,title)=>action(fn,title)} />}
 
         {(["trade","inventory","workforce","approvals","reports"] as Area[]).includes(view) &&
           <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} busy={busy}
