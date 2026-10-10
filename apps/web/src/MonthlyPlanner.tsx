@@ -47,6 +47,23 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, pe
 
   const selectedWeek = weekStart(selected);
   const plan = plans.find(p => p.weekStart === selectedWeek);
+
+  // The list can contain more than 100 weeks. Fetch a later selected week on
+  // demand rather than leaving a permanently unfulfilled loading indicator.
+  useEffect(() => {
+    if (!connected || !plan || plans.findIndex(p => p.id === plan.id) < 100 ||
+        details[plan.id] || readFailures.includes(plan.id)) return;
+    let active = true;
+    void api.getPlan(plan.id).then(result => {
+      if (!active) return;
+      if (result) setDetails(old => ({...old,[plan.id]:result}));
+      else setReadFailures(old => [...new Set([...old,plan.id])]);
+    }).catch(() => {
+      if (active) setReadFailures(old => [...new Set([...old,plan.id])]);
+    });
+    return () => { active = false; };
+  }, [connected, api, plan?.id, plans, details, readFailures]);
+
   const detail = plan ? details[plan.id] : undefined;
   const detailFailed = Boolean(plan && !detail && readFailures.includes(plan.id));
   const existingDay = detail?.days?.find(d => d.date === selected);
