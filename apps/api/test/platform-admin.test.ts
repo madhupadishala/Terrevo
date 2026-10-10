@@ -7,7 +7,7 @@ const TENANT = "22222222-2222-4222-8222-222222222222";
 const OTHER = "33333333-3333-4333-8333-333333333333";
 const providerUrl = "https://db.example.invalid";
 const config = { SUPABASE_URL: providerUrl, SUPABASE_PUBLISHABLE_KEY: "public-test-key", SUPABASE_SECRET_KEY: "secret-test-key" };
-function createFixture(granted: boolean) {
+function createFixture(granted: boolean, simulatedRpcStatus?: number) {
   let privilegedCalls = 0;
   let authChecks = 0;
   const fetcher = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -24,6 +24,7 @@ function createFixture(granted: boolean) {
       if(u.pathname==="/rest/v1/tenants") return Response.json([{id:TENANT,name:"Test organization",slug:"test-org",status:"active"}]);
       if(u.pathname==="/rest/v1/platform_admin_audit") return Response.json([{id:1,actor_user_id:OWNER,tenant_id:TENANT,action:"TENANT_CREATED",occurred_at:"2026-10-10T00:00:00Z",details:{slug:"test-org"}}]);
       if(u.pathname==="/rest/v1/rpc/platform_create_tenant") {
+        if (simulatedRpcStatus) return Response.json({ code: simulatedRpcStatus===403?"42501":simulatedRpcStatus===404?"P0002":"22023", message:"Provider rejected operation" },{status:simulatedRpcStatus});
         const body=JSON.parse(String(init?.body)) as Record<string,unknown>;
         assert.deepEqual(body,{p_actor_user_id:OWNER,p_name:"Example Pharma",p_slug:"example-pharma"});
         return Response.json({id:TENANT,name:body.p_name,slug:body.p_slug,status:"active"});
@@ -87,6 +88,17 @@ test("platform mutations reject invalid bearer before privileged operations",asy
   assert.equal((await fixture.send("/v1/platform/tenants","POST",{name:"Example Pharma",slug:"example-pharma"},"invalid")).status,401);
   assert.equal((await fixture.send("/v1/platform/tenants/"+TENANT+"/status","PATCH",{status:"inactive"},"invalid")).status,401);
   assert.equal(fixture.getPrivilegedCalls(),0);
+});
+
+test("revoked platform operations remain forbidden and missing tenants remain not found",async()=>{
+  const revoked=createFixture(true,403);
+  const denied=await revoked.send("/v1/platform/tenants","POST",{name:"Example Pharma",slug:"example-pharma"});
+  assert.equal(denied.status,403);
+  assert.equal(revoked.getPrivilegedCalls(),1);
+
+  const missing=createFixture(true,404);
+  const missingTenant=await missing.send("/v1/platform/tenants","POST",{name:"Example Pharma",slug:"example-pharma"});
+  assert.equal(missingTenant.status,404);
 });
 
 test("platform mutation validation denies malformed input before RPC",async()=>{
