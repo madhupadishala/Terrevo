@@ -32,6 +32,7 @@ test("valid NCA PLAN saves one server draft under the authorized territory",asyn
 test("REPORT permits omitted town; PLAN does not",async()=>{
  const {service,counts}=fixture();
  await service.save(T,U,"bearer",{...valid,phase:"REPORT",townId:null});
+ await assert.rejects(service.save(T,U,"bearer",{...valid,phase:"REPORT",townId:null,remarks:""}),NcaInputError);
  await assert.rejects(service.save(T,U,"bearer",{...valid,townId:null}),NcaInputError);
  assert.equal(counts().created,1);
 });
