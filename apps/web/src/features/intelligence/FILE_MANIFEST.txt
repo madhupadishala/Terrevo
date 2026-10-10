@@ -1,0 +1,6 @@
+apps/web/src/features/intelligence/model.ts | typed source model and deterministic briefing
+apps/web/src/features/intelligence/TodayIntelligenceView.tsx | Carbon briefing UI
+apps/web/test/intelligence.model.test.ts | staleness, source and tenant tests
+apps/web/src/features/intelligence/README.md | usage and validation status
+apps/web/src/features/intelligence/INTEGRATION_REQUEST.md | missing integration contracts
+apps/web/src/features/intelligence/FILE_MANIFEST.txt | exact ownership
