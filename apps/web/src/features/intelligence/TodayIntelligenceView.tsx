@@ -37,7 +37,7 @@ export function TodayIntelligenceView({tenantId,authorizedForTenantId,contextKey
  {suggestions.map(s=><div className="tr-history-row" key={s.id}><div><strong>{s.summary}</strong><p>{s.reason}</p><p>Source: {s.sourceType} · {s.sourceObservedAt}</p>
  <p>{s.uncertainty}</p></div><Button kind="ghost" size="sm" onClick={()=>setReview({scope,id:s.id})}>Inspect evidence</Button></div>)}
  {candidate&&<div role="region" aria-label="Suggestion review"><h3>Review: {candidate.summary}</h3>
- <p>Source identifier: {candidate.sourceId}</p><p>Confidence: {candidate.confidence===null?"Not supplied":Math.round(candidate.confidence*100)+"%"}</p>
+ <p>Requested action: <strong>{candidate.actionType}</strong></p><p>Source identifier: {candidate.sourceId}</p><p>Confidence: {candidate.confidence===null?"Not supplied":Math.round(candidate.confidence*100)+"%"}</p>
  <p>Uncertainty: {candidate.uncertainty}</p><h4>Evidence</h4>{candidate.evidence.map((e,i)=><p key={i}>{e.label}: {e.reference}</p>)}
  <p>No action is automatic. Confirmation sends a request to the parent; authorization and audit remain server responsibilities.</p>
  <Button kind="secondary" onClick={()=>setReview(null)}>Close review</Button>
