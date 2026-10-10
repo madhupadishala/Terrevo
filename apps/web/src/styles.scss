@@ -31,7 +31,8 @@ button, input, textarea, select { font: inherit; }
 .tr-workspace-dot, .tr-foot-dot, .tr-live span { display: inline-block; height: 7px; width: 7px; border-radius: 100%; background: #51d6a7; flex: 0 0 7px; }
 .tr-chevron { margin-left: auto; font-size: 15px; color: #8da9c2; }
 .tr-nav-label { margin: 0 0 10px 15px; color: #7391ad; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
-.tr-nav { display: flex; flex-direction: column; gap: 4px; }
+.tr-nav { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: #577594 transparent; scrollbar-width: thin; padding-right: 3px; }
+.tr-brand, .tr-workspace, .tr-nav-label, .tr-sidebar-foot { flex-shrink: 0; }
 .tr-nav-item { display: flex; align-items: center; gap: 13px; background: none; border: 0; color: #b1c2d3; text-align: left; cursor: pointer; padding: 13px 13px; border-radius: 5px; font-size: 13px; font-weight: 500; width: 100%; transition: background .2s; }
 .tr-nav-item:hover { background: #1b3855; color: #fff; }
 .tr-nav-item.selected { background: #244b74; color: #fff; font-weight: 700; border-left: 3px solid #6bdac7; padding-left: 10px; }
@@ -133,7 +134,7 @@ button, input, textarea, select { font: inherit; }
   .tr-brand strong { font-size: 20px; }
   .tr-mark { width: 32px; height: 32px; font-size: 23px; }
   .tr-workspace, .tr-nav-label, .tr-sidebar-foot { display: none; }
-  .tr-nav { flex-direction: row; overflow-x: auto; gap: 4px; padding-bottom: 3px; }
+  .tr-nav { flex-direction: row; flex: none; min-height: auto; overflow-x: auto; overflow-y: hidden; gap: 4px; padding: 0 0 3px; }
   .tr-nav-item { white-space: nowrap; width: auto; padding: 9px 12px; font-size: 11px; }
   .tr-nav-item.selected { padding-left: 9px; }
   .tr-nav-glyph { display: none; }
