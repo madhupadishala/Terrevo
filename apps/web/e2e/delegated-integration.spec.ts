@@ -53,7 +53,7 @@ test("delegated screens render authorized records; empty NCA/CLM/AI contracts do
   await expect(page.getByRole("button",{name:"Review activity draft"})).toBeDisabled();
 
   await page.getByRole("button",{name:"E-detailing / CLM"}).click();
-  await expect(page.getByRole("heading",{name:"E-detailing / CLM"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"E-detailing / CLM",level:2})).toBeVisible();
   await expect(page.getByText("No approved content available for these filters.")).toBeVisible();
   await expect(page.getByRole("button",{name:"Start detailing"})).toHaveCount(0);
 
@@ -72,7 +72,7 @@ test("delegated feature panels cannot disclose records while not connected",asyn
     ["Today briefing","Field execution briefing"],
   ]){
     await page.getByRole("button",{name:button,exact:true}).click();
-    await expect(page.getByRole("heading",{name:title})).toBeVisible();
+    await expect(page.getByRole("heading",{name:title,level:2})).toBeVisible();
   }
   await expect(page.getByText("No validated suggestions available.")).toBeVisible();
 });
