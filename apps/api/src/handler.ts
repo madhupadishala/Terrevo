@@ -264,7 +264,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         const {accessToken,user,context}=await resolveTenantRequest(request);
         return json(201,{record:await nca.save(context.tenantId,user.id,accessToken,await readJsonObject(request))});
       }
-      const ncaSubmit=/^\\/v1\\/nca\\/([^/]+)\\/submit$/.exec(path);
+            const ncaSubmit=/^\/v1\/nca\/([^/]+)\/submit$/.exec(path);
       if(request.method==="POST"&&ncaSubmit){
         const {accessToken,user,context}=await resolveTenantRequest(request);
         return json(200,{record:await nca.submit(context.tenantId,user.id,accessToken,ncaSubmit[1])});
