@@ -30,8 +30,9 @@ function Box({ title, children }: { title: string; children: React.ReactNode }) 
 function Entry({ heading, detail, status, children }: { heading: string; detail: string; status?: string; children?: React.ReactNode }) {
   return <div className="tr-history-row"><div className="tr-record-detail"><strong>{heading}</strong><p>{detail}</p>{children}</div>{status && <Tag type={["APPROVED","SUBMITTED","COMPLETED","REVIEWED","PRESENT"].includes(status)?"green":"blue"}>{status}</Tag>}</div>;
 }
-const thisMonday = () => { const d = new Date();d.setUTCHours(0,0,0,0);d.setUTCDate(d.getUTCDate() - ((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10); };
-const thisDate = () => new Date().toISOString().slice(0,10);
+const localDate = (d: Date) => [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
+const thisMonday = () => { const d = new Date();d.setDate(d.getDate() - ((d.getDay()+6)%7));return localDate(d); };
+const thisDate = () => localDate(new Date());
 const empty = <p className="tr-detail">No authorized records were returned for this workspace.</p>;
 
 export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, progress, masters, perform }: Props) {
@@ -98,12 +99,12 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
         if(mode==="workforce") {
           const all=await Promise.allSettled([api.dailyTimesheets(),api.weeklyTimesheets(),api.leaves(),api.expenses(),api.jointWork(),api.attendance()]);
           if(!live)return;
-          if(all[0].status==="fulfilled")setDays(all[0].value);
-          if(all[1].status==="fulfilled")setWeeks(all[1].value);
-          if(all[2].status==="fulfilled")setLeaves(all[2].value);
-          if(all[3].status==="fulfilled")setExpenses(all[3].value);
-          if(all[4].status==="fulfilled")setJoint(all[4].value);
-          if(all[5].status==="fulfilled")setAttendance(all[5].value);
+          setDays(all[0].status==="fulfilled"?all[0].value:[]);
+          setWeeks(all[1].status==="fulfilled"?all[1].value:[]);
+          setLeaves(all[2].status==="fulfilled"?all[2].value:[]);
+          setExpenses(all[3].status==="fulfilled"?all[3].value:[]);
+          setJoint(all[4].status==="fulfilled"?all[4].value:[]);
+          setAttendance(all[5].status==="fulfilled"?all[5].value:[]);
           const failed=all.filter(x=>x.status==="rejected").length;
           if(failed)setMessage(String(failed)+" workforce APIs were unavailable for this account.");
         }
@@ -115,7 +116,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
             expenses:all[1].status==="fulfilled"?all[1].value:[],
             timesheets:all[2].status==="fulfilled"?all[2].value:[],
           });
-          if(all[3].status==="fulfilled")setGpsExceptions(all[3].value);
+          setGpsExceptions(all[3].status==="fulfilled"?all[3].value:[]);
           if(all.some(x=>x.status==="rejected"))setMessage("Some approval queues could not be loaded for this account.");
         }
       } catch (error) {
