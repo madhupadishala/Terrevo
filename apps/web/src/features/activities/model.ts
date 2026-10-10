@@ -19,6 +19,7 @@ export function validateActivityDraft(d:ActivityDraft,ctx:ActivityValidationCont
  if(!Number.isInteger(d.durationMinutes)||d.durationMinutes<1||d.durationMinutes>1440)e.push("Duration must be 1–1440 minutes.");
  if(!d.reason.trim()||d.reason.trim().length>500)e.push("Reason is required (max 500 characters).");
  if(d.remarks.length>2000)e.push("Remarks exceed 2000 characters.");
+ if(d.kind==="NON_CALL_ACTIVITY"&&d.ncaPhase==="REPORT"&&!d.remarks.trim())e.push("NCA reporting remarks are required.");
  if(d.evidence&&(!d.evidence.name.trim()||d.evidence.name.length>255||(d.evidence.sizeBytes!==undefined&&(d.evidence.sizeBytes<0||!Number.isFinite(d.evidence.sizeBytes)))))e.push("Evidence metadata is invalid.");
  if(d.kind==="PLANNED_CALL"){
    if(!d.plannedStopId||!ctx.plannedCalls.some(x=>x.planStopId===d.plannedStopId&&x.territoryId===d.territoryId&&x.workDate===d.workDate))e.push("Select a planned stop for this date and territory.");
