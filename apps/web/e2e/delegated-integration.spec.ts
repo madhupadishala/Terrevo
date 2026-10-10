@@ -55,6 +55,13 @@ test("delegated screens render authorized records; empty NCA/CLM/AI contracts do
   expect(customerReads).toContain(B);
   expect(customerReads.at(-1)).toBe(B);
 
+  await page.getByRole("button",{name:"View doctor Doctor Beta"}).click();
+  await page.getByRole("button",{name:"Open plan"}).click();
+  await expect(page.getByRole("group",{name:"Monthly tour plan calendar"})).toBeVisible();
+  await expect(page.locator("#calendar-territory")).toHaveValue(TERRITORY);
+  await expect(page.locator("#calendar-account")).toHaveValue(CUSTOMER_B);
+  await expect(page.getByText("Selected from Customer 360:")).toBeVisible();
+
   await page.getByRole("button",{name:"NCA & activities"}).click();
   await expect(page.getByRole("heading",{name:"Planned, unplanned and non-call activity"})).toBeVisible();
   await expect(page.getByText("Draft only — no verified NCA submission API").first()).toBeVisible();
