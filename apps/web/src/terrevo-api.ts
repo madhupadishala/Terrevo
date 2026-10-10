@@ -161,6 +161,102 @@ export class TerrevoWebApi {
   async assignRole(userId: string, roleKey: "TENANT_ADMIN" | "MANAGER" | "MR", scopeOrgUnitId: string | null) {
     return this.raw("/v1/role-assignments", "POST", { userId, roleKey, scopeOrgUnitId });
   }
+  async platformContext(): Promise<boolean> {
+    return (await this.raw("/v1/platform/context", "GET", undefined, false) as { isSuperAdmin: boolean }).isSuperAdmin === true;
+  }
+  async platformTenants(offset = 0): Promise<Tenant[]> {
+    return (await this.raw("/v1/platform/tenants?offset=" + offset, "GET", undefined, false) as { tenants: Tenant[] }).tenants;
+  }
+  async createPlatformTenant(name: string, slug: string): Promise<Tenant> {
+    return (await this.raw("/v1/platform/tenants", "POST", { name, slug }, false) as { tenant: Tenant }).tenant;
+  }
+  async changePlatformTenantStatus(id: string, status: "active" | "inactive"): Promise<Tenant> {
+    return (await this.raw("/v1/platform/tenants/" + encodeURIComponent(id) + "/status", "PATCH", { status }, false) as { tenant: Tenant }).tenant;
+  }
+  async platformAudit(): Promise<Array<{ id: number; action: string; tenant_id: string; occurred_at: string; actor_user_id: string }>> {
+    return (await this.raw("/v1/platform/audit", "GET", undefined, false) as {events: Array<{id:number;action:string;tenant_id:string;occurred_at:string;actor_user_id:string}>}).events;
+  }
+  async dcrs(): Promise<Array<{ id: string; doctorName: string; doctorCode: string; callOutcome: string; submittedAt: string; doctorId: string }>> {
+    return (await this.raw("/v1/dcrs") as {dcrs: Array<{id:string;doctorName:string;doctorCode:string;callOutcome:string;submittedAt:string;doctorId:string}>}).dcrs;
+  }
+  async rcpa(visitId: string): Promise<{lines: Array<{sequence:number;productId:string|null;competitorBrand:string|null;prescriptionCount:number;stockQuantity:number;salesQuantity:number}>} | null> {
+    try { return (await this.raw("/v1/visits/" + encodeURIComponent(visitId) + "/rcpa") as {rcpa: {lines: Array<{sequence:number;productId:string|null;competitorBrand:string|null;prescriptionCount:number;stockQuantity:number;salesQuantity:number}>}}).rcpa; }
+    catch (e) { if (e instanceof ApiFailure && e.status === 404) return null; throw e; }
+  }
+  async saveRcpa(visitId: string, lines: Array<{sequence:number;productId:string|null;competitorBrand:string|null;prescriptionCount:number;stockQuantity:number;salesQuantity:number}>) {
+    return this.raw("/v1/visits/" + encodeURIComponent(visitId) + "/rcpa", "PUT", {operationId:crypto.randomUUID(),lines});
+  }
+  async order(visitId: string): Promise<{lines: Array<{productId:string;quantity:number;remarks:string|null}>} | null> {
+    try { return (await this.raw("/v1/visits/" + encodeURIComponent(visitId) + "/order") as {order:{lines:Array<{productId:string;quantity:number;remarks:string|null}>}}).order; }
+    catch (e) { if (e instanceof ApiFailure && e.status===404) return null; throw e; }
+  }
+  async saveOrder(visitId: string, lines: Array<{sequence:number;productId:string;quantity:number;remarks:string|null}>) {
+    return this.raw("/v1/visits/" + encodeURIComponent(visitId) + "/order", "PUT", {operationId:crypto.randomUUID(),remarks:null,lines});
+  }
+  async inventory(): Promise<Array<{id:string;employeeId:string;itemType:"sample"|"gift";itemId:string;quantity:number}>> {
+    return (await this.raw("/v1/inventory") as {balances:Array<{id:string;employeeId:string;itemType:"sample"|"gift";itemId:string;quantity:number}>}).balances;
+  }
+  async distributions(visitId: string): Promise<Array<{id:string;itemType:"sample"|"gift";itemId:string;quantity:number}>> {
+    return (await this.raw("/v1/visits/" + encodeURIComponent(visitId) + "/distributions") as {distributions:Array<{id:string;itemType:"sample"|"gift";itemId:string;quantity:number}>}).distributions;
+  }
+  async distribute(visitId: string, items: Array<{itemType:"sample"|"gift";itemId:string;quantity:number}>) {
+    return this.raw("/v1/visits/" + encodeURIComponent(visitId) + "/distributions","POST",{operationId:crypto.randomUUID(),items});
+  }
+  async dailyTimesheets(): Promise<Array<{id:string;workDate:string;totalMinutes:number;visitMinutes:number;status:string;callCount:number}>> {
+    return (await this.raw("/v1/timesheets/daily/own") as {timesheets:Array<{id:string;workDate:string;totalMinutes:number;visitMinutes:number;status:string;callCount:number}>}).timesheets;
+  }
+  async weeklyTimesheets(): Promise<Array<{id:string;weekStart:string;status:string;totalMinutes:number;dailyCount:number}>> {
+    return (await this.raw("/v1/timesheets/weekly/own") as {timesheets:Array<{id:string;weekStart:string;status:string;totalMinutes:number;dailyCount:number}>}).timesheets;
+  }
+  async generateWeeklyTimesheet(weekStart: string) {
+    return this.raw("/v1/timesheets/weekly/generate","POST",{weekStart});
+  }
+  async submitWeeklyTimesheet(id:string, comment:string|null) {
+    return this.raw("/v1/timesheets/weekly/"+encodeURIComponent(id)+"/submit","POST",{operationId:crypto.randomUUID(),comment});
+  }
+  async leaves():Promise<Array<{id:string;leaveType:string;startDate:string;endDate:string;reason:string;status:string}>> {
+    return (await this.raw("/v1/leaves/own") as {leaves:Array<{id:string;leaveType:string;startDate:string;endDate:string;reason:string;status:string}>}).leaves;
+  }
+  async requestLeave(leaveType:"FULL_DAY"|"HALF_DAY",startDate:string,endDate:string,reason:string) {
+    return this.raw("/v1/leaves","POST",{operationId:crypto.randomUUID(),leaveType,startDate,endDate,reason});
+  }
+  async expenses():Promise<Array<{id:string;workDate:string;totalAmount:number;currencyCode:string;status:string;executionId:string}>> {
+    return (await this.raw("/v1/expenses/own") as {claims:Array<{id:string;workDate:string;totalAmount:number;currencyCode:string;status:string;executionId:string}>}).claims;
+  }
+  async saveExpense(executionId:string,currencyCode:string,amount:number,category:"TRAVEL"|"MEAL"|"LODGING"|"LOCAL_CONVEYANCE"|"OTHER",remarks:string|null) {
+    return this.raw("/v1/expenses","POST",{operationId:crypto.randomUUID(),executionId,currencyCode,lines:[{sequence:1,category,amount,remarks,receiptReference:null}]});
+  }
+  async submitExpense(id:string, comment:string|null) {
+    return this.raw("/v1/expenses/"+encodeURIComponent(id)+"/submit","POST",{operationId:crypto.randomUUID(),comment});
+  }
+  async jointWork():Promise<Array<{id:string;workDate:string;status:string;targetEmployeeId:string;selfRole:string|null}>> {
+    return (await this.raw("/v1/joint-work/own") as {assignments:Array<{id:string;workDate:string;status:string;targetEmployeeId:string;selfRole:string|null}>}).assignments;
+  }
+  async joinJointWork(id:string,location:Coordinates){
+    return this.raw("/v1/joint-work/"+encodeURIComponent(id)+"/join","POST",{operationId:crypto.randomUUID(),location});
+  }
+  async leaveJointWork(id:string,location:Coordinates){
+    return this.raw("/v1/joint-work/"+encodeURIComponent(id)+"/leave","POST",{operationId:crypto.randomUUID(),location});
+  }
+  async pendingLeaveApprovals():Promise<Array<{id:string;employeeId:string;leaveType:string;startDate:string;endDate:string;status:string}>> {
+    return (await this.raw("/v1/leave-approvals") as {leaves:Array<{id:string;employeeId:string;leaveType:string;startDate:string;endDate:string;status:string}>}).leaves;
+  }
+  async decideLeave(id:string,decision:"APPROVE"|"REJECT",comment:string|null){
+    return this.raw("/v1/leave-approvals/"+encodeURIComponent(id)+"/decision","POST",{operationId:crypto.randomUUID(),decision,comment});
+  }
+  async pendingExpenseApprovals():Promise<Array<{id:string;employeeId:string;totalAmount:number;currencyCode:string;status:string}>> {
+    return (await this.raw("/v1/expense-approvals") as {claims:Array<{id:string;employeeId:string;totalAmount:number;currencyCode:string;status:string}>}).claims;
+  }
+  async decideExpense(id:string,decision:"APPROVE"|"REJECT"|"RETURN",comment:string|null){
+    return this.raw("/v1/expense-approvals/"+encodeURIComponent(id)+"/decision","POST",{operationId:crypto.randomUUID(),decision,comment});
+  }
+  async pendingWeeklyTimesheets():Promise<Array<{id:string;employeeId:string;weekStart:string;status:string}>> {
+    return (await this.raw("/v1/timesheet-approvals") as {timesheets:Array<{id:string;employeeId:string;weekStart:string;status:string}>}).timesheets;
+  }
+  async decideWeeklyTimesheet(id:string,decision:"APPROVE"|"RETURN",comment:string|null){
+    return this.raw("/v1/timesheet-approvals/"+encodeURIComponent(id)+"/decision","POST",{operationId:crypto.randomUUID(),decision,comment});
+  }
+
 }
 
 /** Geolocation is collected at user action time. Never fabricate GPS evidence. */
