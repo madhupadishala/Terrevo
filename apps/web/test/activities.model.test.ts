@@ -9,3 +9,5 @@ test("non-call cannot masquerade as doctor call",()=>{assert.deepEqual(validateA
 test("reject invalid duration, date, remarks and evidence",()=>{assert.ok(validateActivityDraft({...base,plannedStopId:"s",durationMinutes:-3},ctx).length);assert.ok(validateActivityDraft({...base,plannedStopId:"s",workDate:"2026-02-31"},ctx).length);assert.ok(validateActivityDraft({...base,plannedStopId:"s",remarks:"x".repeat(2001)},ctx).length);});
 
 test("guide-aligned NCA planning requires selected authorized town",()=>{assert.ok(validateActivityDraft({...base,kind:"NON_CALL_ACTIVITY",ncaPhase:"PLAN",ncaSubtype:"M"},ctx).length);assert.deepEqual(validateActivityDraft({...base,kind:"NON_CALL_ACTIVITY",ncaPhase:"PLAN",ncaSubtype:"M",townId:"town"},ctx),[]);});
+
+test("evidence reference does not require invented file metadata",()=>{assert.deepEqual(validateActivityDraft({...base,plannedStopId:"s",evidence:{name:"ref-123"}},ctx),[]);assert.ok(validateActivityDraft({...base,plannedStopId:"s",evidence:{name:"bad",sizeBytes:-1}},ctx).length);});
