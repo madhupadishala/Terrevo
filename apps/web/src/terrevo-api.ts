@@ -224,7 +224,7 @@ export class TerrevoWebApi {
     return (await this.raw("/v1/expenses/own") as {claims:Array<{id:string;workDate:string;totalAmount:number;currencyCode:string;status:string;executionId:string}>}).claims;
   }
   async saveExpense(executionId:string,currencyCode:string,amount:number,category:"TRAVEL"|"MEAL"|"LODGING"|"LOCAL_CONVEYANCE"|"OTHER",remarks:string|null) {
-    return this.raw("/v1/expenses","POST",{operationId:crypto.randomUUID(),executionId,currencyCode,lines:[{sequence:1,category,amount,remarks,receiptReference:null}]});
+    return this.raw("/v1/executions/" + encodeURIComponent(executionId) + "/expense","PUT",{operationId:crypto.randomUUID(),currencyCode,lines:[{sequence:1,category,amount,remarks,receiptReference:null}]});
   }
   async submitExpense(id:string, comment:string|null) {
     return this.raw("/v1/expenses/"+encodeURIComponent(id)+"/submit","POST",{operationId:crypto.randomUUID(),comment});
