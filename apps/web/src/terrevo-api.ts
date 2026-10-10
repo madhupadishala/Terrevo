@@ -57,6 +57,38 @@ export class TerrevoWebApi {
   private session: Session | null = null;
   private tenantId: string | null = null;
   private onUpdate?: (session: Session | null) => void;
+  private refreshInFlight: Promise<Session> | null = null;
+  private parseSession(body: unknown): Session {
+    if (!body || typeof body !== "object") throw new ApiFailure(502, "Session response was incomplete.");
+    const value = body as Partial<Session>;
+    if (typeof value.accessToken !== "string" || !value.accessToken ||
+      typeof value.refreshToken !== "string" || !value.refreshToken ||
+      typeof value.expiresIn !== "number" || !Number.isFinite(value.expiresIn) ||
+      !value.user || typeof value.user.id !== "string" || !value.user.id) {
+      throw new ApiFailure(502, "Session response was incomplete.");
+    }
+    return value as Session;
+  }
+  private async refreshOnce(): Promise<Session> {
+    if (!this.refreshInFlight) {
+      const refreshToken = this.session?.refreshToken;
+      if (!refreshToken) throw new ApiFailure(401, "Session expired. Reconnect your account.");
+      this.refreshInFlight = (async () => {
+        const refreshed = await fetch("/api/v1/auth/refresh", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ refreshToken }), cache: "no-store",
+        });
+        if (!refreshed.ok) throw new ApiFailure(401, "Session expired. Reconnect your account.");
+        const session = this.parseSession(await refreshed.json().catch(() => null));
+        if (this.session?.refreshToken !== refreshToken) {
+          throw new ApiFailure(401, "The account session changed during refresh.");
+        }
+        this.setSession(session);
+        return session;
+      })().finally(() => { this.refreshInFlight = null; });
+    }
+    return this.refreshInFlight;
+  }
   constructor(onUpdate?: (session: Session | null) => void) { this.onUpdate = onUpdate; }
   get connected(): boolean { return Boolean(this.session?.accessToken && this.tenantId); }
   setSession(session: Session | null) { this.session = session; this.onUpdate?.(session); }
@@ -76,18 +108,18 @@ export class TerrevoWebApi {
       method, headers, cache: "no-store",
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    if (response.status === 401 && retry && this.session.refreshToken) {
-      const refreshed = await fetch("/api/v1/auth/refresh", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ refreshToken: this.session.refreshToken }),
-        cache: "no-store",
-      });
-      if (refreshed.ok) {
-        this.setSession(await refreshed.json() as Session);
+    if (response.status === 401 && retry && this.session?.refreshToken) {
+      try {
+        // Another request may already have rotated the refresh token.
+        if (headers.authorization !== "Bearer " + this.session.accessToken) {
+          return this.raw(path, method, body, tenantScoped, false);
+        }
+        await this.refreshOnce();
         return this.raw(path, method, body, tenantScoped, false);
+      } catch {
+        this.reset();
+        throw new ApiFailure(401, "Session expired. Reconnect your account.");
       }
-      this.reset();
-      throw new ApiFailure(401, "Session expired. Reconnect your account.");
     }
     if (!response.ok) {
       const value: unknown = await response.json().catch(() => null);
@@ -105,10 +137,7 @@ export class TerrevoWebApi {
     });
     const body: unknown = await response.json().catch(() => null);
     if (!response.ok) throw new ApiFailure(response.status, "Unable to connect account. Check the provided credentials.");
-    if (!body || typeof body !== "object" || !("accessToken" in body) || typeof body.accessToken !== "string") {
-      throw new ApiFailure(502, "Session response was incomplete.");
-    }
-    const session = body as Session;
+    const session = this.parseSession(body);
     this.setSession(session);
     return session;
   }
