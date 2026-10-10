@@ -12,6 +12,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 
 export class PlatformForbiddenError extends Error {}
 export class PlatformValidationError extends Error {}
+export class PlatformNotFoundError extends Error {}
 
 /** Separate control plane; no tenant RBAC or client-supplied platform authority. */
 export function createPlatformAdminService(config: SupabaseConfig, fetcher: typeof fetch = fetch) {
@@ -32,8 +33,10 @@ export function createPlatformAdminService(config: SupabaseConfig, fetcher: type
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     if (!response.ok) {
+      if (response.status === 403) throw new PlatformForbiddenError("Platform permission denied");
+      if (response.status === 400) throw new PlatformValidationError("Invalid platform request");
       if (response.status === 409) throw new PlatformValidationError("Conflict: duplicate or invalid platform record");
-      if (response.status === 404) throw new PlatformValidationError("Requested platform record not found");
+      if (response.status === 404) throw new PlatformNotFoundError("Requested platform record not found");
       throw new ProviderError("Platform provider operation failed", response.status);
     }
     return response.status === 204 ? null : response.json();
