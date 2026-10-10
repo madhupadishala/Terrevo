@@ -205,3 +205,25 @@ button, input, textarea, select { font: inherit; }
   .tr-form-three { grid-template-columns:1fr; }
   .tr-business .tr-panel { padding:18px; }
 }
+
+
+/* Calendar-led field tour planning – Terrevo visual system with Carbon controls */
+.tr-monthly-layout { grid-template-columns: minmax(0,1.15fr) minmax(300px,.85fr); }
+.tr-month-heading { display:flex;align-items:center;justify-content:space-between;gap:12px;margin:15px 0 20px; }
+.tr-month-heading h2 { font-size:23px;margin:0; }
+.tr-month-controls { display:flex;align-items:center;gap:3px; }
+.tr-month-grid { display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px; }
+.tr-month-weekday { color:#657c95;font-size:11px;text-align:center;padding:10px 0;font-weight:700; }
+.tr-month-day { min-width:0;min-height:65px;background:#f8fafc;border:1px solid #e5edf4;display:flex;align-items:flex-start;justify-content:space-between;flex-direction:column;padding:8px;text-align:left;color:#25415a;cursor:pointer;border-radius:4px;position:relative; }
+.tr-month-day:hover { border-color:#6e9fd9;background:#f2f8ff; }
+.tr-month-day:focus-visible { outline:3px solid #2871c8;outline-offset:2px; }
+.tr-month-day.tr-month-selected { border-color:#2865bb;background:#e5effd;box-shadow:inset 0 0 0 1px #2865bb; }
+.tr-month-day.tr-month-outside { opacity:.42; }
+.tr-month-day small { color:#2871c8;font-size:9px; }
+.tr-month-day i { display:block;width:7px;height:7px;background:#138875;border-radius:100%;margin-left:auto; }
+.tr-month-summary { margin-top:26px;padding-top:20px;border-top:1px solid #e7eef5; }
+.tr-month-summary > strong { font-size:14px;color:#244661; }
+.tr-monthly-layout .tr-form { margin-top:18px; }
+.tr-monthly-layout .tr-history-row { min-height:55px; }
+@media(max-width:1100px){.tr-monthly-layout {grid-template-columns:1fr;}}
+@media(max-width:480px){.tr-month-grid{gap:2px;}.tr-month-day{min-height:50px;padding:4px;font-size:11px;}.tr-month-weekday{font-size:9px;}.tr-month-heading h2{font-size:19px;}}
