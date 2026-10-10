@@ -2,6 +2,11 @@
  * Terrevo web transport: ALL business calls use the existing authenticated, tenant-scoped API.
  * No service-role key, synthetic business data or bypass is exposed to the browser.
  */
+export type NcaCategory = {code:string;label:string;active:boolean};
+export type NcaTown = {id:string;name:string;territoryId:string;active:boolean};
+export type NcaOptions = {categories:NcaCategory[];towns:NcaTown[]};
+export type NcaRecord = {id:string;workDate:string;territoryId:string;phase:"PLAN"|"REPORT";categoryCode:string;
+  townId:string|null;reason:string;remarks:string;durationMinutes:number;status:"DRAFT"|"SUBMITTED";createdAt:string};
 export type Session = {
   accessToken: string;
   refreshToken: string;
@@ -169,6 +174,25 @@ export class TerrevoWebApi {
   }
   async submitTour(shortDayReason: string | null) {
     return this.raw("/v1/tour-executions/submit", "POST", { operationId: crypto.randomUUID(), shortDayReason });
+  }
+  async ncaOptions():Promise<NcaOptions>{
+    return (await this.raw("/v1/nca/options") as {options:NcaOptions}).options;
+  }
+  async ownNcaRecords():Promise<NcaRecord[]>{
+    return (await this.raw("/v1/nca/own") as {records:NcaRecord[]}).records;
+  }
+  async saveNcaDraft(input:{phase:"PLAN"|"REPORT";workDate:string;territoryId:string;
+    categoryCode:string;townId:string|null;reason:string;remarks:string;durationMinutes:number}):Promise<NcaRecord>{
+    return (await this.raw("/v1/nca","POST",{...input,operationId:crypto.randomUUID()}) as {record:NcaRecord}).record;
+  }
+  async submitNca(id:string):Promise<NcaRecord>{
+    return (await this.raw("/v1/nca/"+encodeURIComponent(id)+"/submit","POST") as {record:NcaRecord}).record;
+  }
+  async configureNcaCategory(code:string,label:string){
+    return this.raw("/v1/nca/categories","POST",{code,label});
+  }
+  async configureNcaTown(territoryId:string,name:string){
+    return this.raw("/v1/nca/towns","POST",{territoryId,name});
   }
   async plans(): Promise<Plan[]> { return (await this.raw("/v1/tour-plans") as { plans: Plan[] }).plans; }
   async getPlan(planId: string): Promise<Plan> {
