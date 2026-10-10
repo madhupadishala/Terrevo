@@ -1,18 +1,25 @@
 import { useCallback, useMemo, useState } from "react";
 import { Button, InlineNotification, Tag, TextArea, TextInput, Tile } from "@carbon/react";
+import { BusinessWorkspace, type BusinessArea } from "./BusinessWorkspace";
+import { PlatformConsole } from "./PlatformConsole";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
   type Session, type StartOption, type Tenant,
 } from "./terrevo-api";
 
-type Area = "overview" | "field" | "plans" | "manager" | "admin" | "platform";
+type Area = "overview" | "field" | "plans" | "manager" | "admin" | "platform" | BusinessArea;
 type Notice = { kind: "success" | "error" | "info"; title: string; message: string };
 const NAV: Array<{ id: Area; title: string; icon: string; subtitle: string }> = [
   { id: "overview", title: "Command overview", icon: "▦", subtitle: "Your real operational activity" },
   { id: "field", title: "Field execution", icon: "⌖", subtitle: "Tour · visits · calls · DCR" },
   { id: "plans", title: "Tour planning", icon: "▤", subtitle: "Weekly plans and approvals" },
+  { id: "trade", title: "RCPA & orders", icon: "▥", subtitle: "Chemist and stockist operations" },
+  { id: "inventory", title: "Samples & inventory", icon: "▧", subtitle: "Allocated stock and visit distributions" },
+  { id: "workforce", title: "Workforce operations", icon: "◷", subtitle: "Timesheets, leave, expenses and joint work" },
+  { id: "reports", title: "Daily call reports", icon: "▦", subtitle: "Submitted doctor call records" },
   { id: "manager", title: "Manager command", icon: "◫", subtitle: "Team activity and decisions" },
+  { id: "approvals", title: "Manager approvals", icon: "✓", subtitle: "Leave, expenses and timesheet decisions" },
   { id: "admin", title: "Organization admin", icon: "⚙", subtitle: "Organization · masters · roles" },
   { id: "platform", title: "Platform Super Admin", icon: "◇", subtitle: "Platform control plane" },
 ];
@@ -54,6 +61,7 @@ export default function App() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [tenantId, setTenantId] = useState("");
   const [access, setAccess] = useState<AccessContext | null>(null);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -149,12 +157,17 @@ export default function App() {
     try {
       await api.login(email, password);
       setPassword(""); setEmail("");
-      const available = await api.tenants();
+      const [platformResult, tenantsResult] = await Promise.allSettled([api.platformContext(), api.tenants()]);
+      const platformAuthorized = platformResult.status === "fulfilled" && platformResult.value;
+      setIsPlatformAdmin(platformAuthorized);
+      if (tenantsResult.status === "rejected") throw tenantsResult.reason;
+      const available = tenantsResult.value;
       setTenants(available.filter(t=>t.status === "active"));
       if (available.filter(t=>t.status === "active").length === 1) await chooseTenant(available.find(t=>t.status === "active")!.id);
-      else if (!available.length) setNotice({ kind: "info", title: "No accessible organization", message: "Your account has no active tenant memberships." });
+      else if (!available.length && !platformAuthorized) setNotice({ kind: "info", title: "No accessible organization", message: "Your account has no active tenant memberships." });
+      else if (!available.length && platformAuthorized) setView("platform");
     } catch (error) {
-      api.reset(); setTenants([]);
+      api.reset(); setTenants([]); setIsPlatformAdmin(false);
       setNotice({ kind: "error", title: "Connection failed", message: errText(error) });
     } finally { setBusy(false); }
   }
@@ -163,7 +176,7 @@ export default function App() {
     try { await api.logout(); }
     catch (error) { setNotice({ kind: "error", title: "Logout encountered a problem", message: errText(error) }); }
     finally {
-      setTenantId(""); setAccess(null); setTenants([]); setProgress(null); setVisit(null);
+      setTenantId(""); setAccess(null); setIsPlatformAdmin(false); setTenants([]); setProgress(null); setVisit(null);
       setOptions([]); setPlans([]); setPending([]); setCommand(null); setAnalytics(null);
       setUnits([]); setMasters({}); setBusy(false);
     }
@@ -307,6 +320,10 @@ export default function App() {
           </Panel>
         </div>}
 
+        {(["trade","inventory","workforce","approvals","reports"] as Area[]).includes(view) &&
+          <BusinessWorkspace mode={view as BusinessArea} api={api} connected={connected} manager={manager} busy={busy}
+            visit={visit} progress={progress} masters={masters} perform={(fn,title)=>action(fn,title)} />}
+
         {view==="manager"&&(manager?
           <><div className="tr-metrics">
             <FieldMetric label="Field team members" value={command?.teamMembers} context="Authorized team"/>
@@ -355,24 +372,14 @@ export default function App() {
           </Panel>
         </div>:<Panel eyebrow="ADMIN PERMISSIONS" title="Tenant administration requires authorization"><p className="tr-detail">This area uses existing real organization and role APIs. It does not grant elevated access to a regular field user.</p></Panel>)}
 
-        {view==="platform"&&<div className="tr-grid-wide">
-          <Panel eyebrow="SUPER ADMIN / PLATFORM SCOPE" title="Terrevo control plane">
-            <p className="tr-detail">Platform-wide administration is architecturally separate from individual organization administration. The current backend defines TENANT_ADMIN, MANAGER and MR, but no verified global SUPER_ADMIN role. This interface will not pretend tenant administration grants cross-company access.</p>
-            <div className="tr-check-row"><span>Organization administration</span><Tag type={admin?"green":"gray"}>{admin?"Connected":"Permission-gated"}</Tag></div>
-            <div className="tr-check-row"><span>Cross-tenant administration</span><Tag type="gray">Backend contract pending</Tag></div>
-            <div className="tr-check-row"><span>Global user provisioning</span><Tag type="gray">Backend contract pending</Tag></div>
-            <div className="tr-check-row"><span>Platform audit overview</span><Tag type="gray">Backend contract pending</Tag></div>
-          </Panel>
-          <Panel eyebrow="PLATFORM GUARDRAILS" title="No privilege shortcuts">
-            <p className="tr-detail">When platform-level APIs are implemented, every operation must validate a distinct platform privilege server-side and record a global audit event. No shared super-admin password, email, user impersonation or unrestricted browser token is introduced.</p>
-          </Panel>
-        </div>}
+        {view==="platform"&&<PlatformConsole api={api} authenticated={Boolean(session)}
+          isSuperAdmin={isPlatformAdmin} busy={busy} perform={(fn,title)=>action(fn,title,false)}/>}
 
         {connected&&<div className="tr-footer-actions"><div><strong>{selectedTenantName}</strong>
           <p>{access?.roles.map(r=>roles[r.roleKey]??r.roleKey).join(" · ")||"No assigned roles"}</p></div>
           {tenants.length>1&&<select className="tr-select" aria-label="Switch organization" value={tenantId} onChange={e=>void chooseTenant(e.target.value)}>{tenants.map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select>}
           <Button kind="ghost" onClick={()=>void disconnect()} disabled={busy}>Disconnect</Button></div>}
-        <footer className="tr-footer"><span>TERREVO / PHARMA FIELD INTELLIGENCE</span><span>Live access is role-gated · no demo records · Super Admin backend awaiting dedicated authorization</span></footer>
+        <footer className="tr-footer"><span>TERREVO / PHARMA FIELD INTELLIGENCE</span><span>Server-backed business workflows · platform administration separately authorized</span></footer>
       </main>
     </div>
   </div>;
