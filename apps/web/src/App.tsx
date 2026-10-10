@@ -172,8 +172,10 @@ export default function App() {
     setBusy(true); setNotice(null);
     try {
       await fn();
-      setNotice({ kind: "success", title, message: "The operation was accepted by the Terrevo API." });
       if (shouldRefresh) await refresh(access);
+      // Keep the confirmed result visible: a partial-refresh warning must not
+      // incorrectly replace an accepted business transaction.
+      setNotice({ kind: "success", title, message: "The operation was accepted by the Terrevo API." });
     } catch (error) {
       setNotice({ kind: "error", title: "Action could not be completed", message: errText(error) });
     } finally { setBusy(false); }
