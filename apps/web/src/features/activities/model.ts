@@ -1,7 +1,7 @@
 import type {Master} from "../../terrevo-api";
 export type ActivityKind = "PLANNED_CALL"|"UNPLANNED_CALL"|"NON_CALL_ACTIVITY";
 export type ActivityCustomerKind = "doctor"|"chemist"|"stockist";
-export type ActivityEvidence = {name:string;mimeType:string;sizeBytes:number;reference?:string};
+export type ActivityEvidence = {name:string;mimeType?:string;sizeBytes?:number;reference?:string};
 export type ActivityDraft = {kind:ActivityKind;tenantId:string;workDate:string;territoryId:string;reason:string;durationMinutes:number;remarks:string;
  ncaPhase?:"PLAN"|"REPORT";townId?:string;plannedStopId?:string;customerType?:ActivityCustomerKind;customerId?:string;ncaSubtype?:string;evidence?:ActivityEvidence};
 export type TerritoryOption = {id:string;name:string};
@@ -19,7 +19,7 @@ export function validateActivityDraft(d:ActivityDraft,ctx:ActivityValidationCont
  if(!Number.isInteger(d.durationMinutes)||d.durationMinutes<1||d.durationMinutes>1440)e.push("Duration must be 1–1440 minutes.");
  if(!d.reason.trim()||d.reason.trim().length>500)e.push("Reason is required (max 500 characters).");
  if(d.remarks.length>2000)e.push("Remarks exceed 2000 characters.");
- if(d.evidence&&(!d.evidence.name.trim()||d.evidence.name.length>255||d.evidence.sizeBytes<0||!Number.isFinite(d.evidence.sizeBytes)))e.push("Evidence metadata is invalid.");
+ if(d.evidence&&(!d.evidence.name.trim()||d.evidence.name.length>255||(d.evidence.sizeBytes!==undefined&&(d.evidence.sizeBytes<0||!Number.isFinite(d.evidence.sizeBytes)))))e.push("Evidence metadata is invalid.");
  if(d.kind==="PLANNED_CALL"){
    if(!d.plannedStopId||!ctx.plannedCalls.some(x=>x.planStopId===d.plannedStopId&&x.territoryId===d.territoryId&&x.workDate===d.workDate))e.push("Select a planned stop for this date and territory.");
    if(d.ncaSubtype||d.customerId||d.customerType)e.push("Planned call cannot also be NCA or unplanned.");
