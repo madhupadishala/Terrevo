@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {Button,Tag,TextInput} from "@carbon/react";
 import {clampSlideIndex,createDetailingSessionDraft,eligibleAssets,assetContentIdentity,type EDetailingViewProps,type ApprovedAsset,type SlideVisit} from "./model";
 export type {EDetailingViewProps,ApprovedAsset,DetailingSessionDraft,ApprovedSlide,SlideVisit} from "./model";
@@ -11,18 +11,25 @@ export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets
  const [search,setSearch]=useState(""),[product,setProduct]=useState(""),[category,setCategory]=useState("");
  const [viewing,setViewing]=useState<Viewing|null>(null),[review,setReview]=useState(false),[message,setMessage]=useState("");
  const [saving,setSaving]=useState(false),[handedOff,setHandedOff]=useState(false);
+ // An asynchronous completion belongs to the exact asset/tenant session that started it.
+ const epoch=useRef(0);
+ const activeContext=useRef({tenantId,contextKey});
+ if(activeContext.current.tenantId!==tenantId||activeContext.current.contextKey!==contextKey){
+  epoch.current++;
+  activeContext.current={tenantId,contextKey};
+ }
  useEffect(()=>{setViewing(null);setSearch("");setProduct("");setCategory("");setReview(false);setMessage("");setSaving(false);setHandedOff(false);},[tenantId,contextKey]);
  const results=validAssets.filter(a=>(!search||a.title.toLowerCase().includes(search.toLowerCase()))&&(!category||a.category===category)&&(!product||a.productIds.includes(product)));
  const selected=viewing?.tenantId===tenantId&&viewing.contextKey===contextKey?
   validAssets.find(x=>x.id===viewing.assetId&&assetContentIdentity(x)===viewing.assetContentId):undefined;
- useEffect(()=>{if(viewing&&!selected){setViewing(null);setReview(false);setHandedOff(false);}},[viewing,selected]);
+ useEffect(()=>{if(viewing&&!selected){epoch.current++;setViewing(null);setReview(false);setHandedOff(false);setSaving(false);}},[viewing,selected]);
  const categories=[...new Set(validAssets.map(x=>x.category))].sort();
  const usableProducts=products.filter(x=>validAssets.some(a=>a.productIds.includes(x.id)));
  const visited=(state:Viewing,asset:ApprovedAsset,now:number):SlideVisit[]=>{
   const slide=asset.slides[state.index];const elapsed=Math.max(0,now-state.enteredAt);
   return [...state.visits,{slideId:slide.id,durationMs:Math.round(elapsed)}];
  };
- function choose(asset:ApprovedAsset,mode:"REHEARSAL"|"DETAILING"){setViewing({tenantId,contextKey,assetId:asset.id,assetContentId:assetContentIdentity(asset),linkedVisitId,mode,index:0,startedAt:new Date().toISOString(),enteredAt:Date.now(),visits:[]});setReview(false);setMessage("");setSaving(false);setHandedOff(false);}
+ function choose(asset:ApprovedAsset,mode:"REHEARSAL"|"DETAILING"){epoch.current++;setViewing({tenantId,contextKey,assetId:asset.id,assetContentId:assetContentIdentity(asset),linkedVisitId,mode,index:0,startedAt:new Date().toISOString(),enteredAt:Date.now(),visits:[]});setReview(false);setMessage("");setSaving(false);setHandedOff(false);}
  function navigate(delta:number){
   if(!viewing||!selected||review||viewing.endedAt)return;
   const next=clampSlideIndex(viewing.index+delta,selected.slides.length);
@@ -32,10 +39,17 @@ export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets
  const draft=selected&&viewing&&viewing.mode==="DETAILING"&&viewing.endedAt?createDetailingSessionDraft(tenantId,selected,viewing.startedAt,viewing.endedAt,viewing.visits,viewing.linkedVisitId):null;
  async function save(){
   if(!review||!draft||!onSaveSessionDraft||saving||handedOff)return;
+  const savingEpoch=epoch.current;
   setSaving(true);setMessage("");
-  try{await onSaveSessionDraft(draft);setHandedOff(true);setMessage("Session draft passed to the parent callback; server recording remains unverified.");setReview(false);}
-  catch(e){setMessage(e instanceof Error?e.message:"Session draft handoff failed.");}
-  finally{setSaving(false);}
+  try{
+    await onSaveSessionDraft(draft);
+    if(epoch.current!==savingEpoch)return;
+    setHandedOff(true);setMessage("Session draft passed to the parent callback; server recording remains unverified.");setReview(false);
+  }catch(e){
+    if(epoch.current===savingEpoch)setMessage(e instanceof Error?e.message:"Session draft handoff failed.");
+  }finally{
+    if(epoch.current===savingEpoch)setSaving(false);
+  }
  }
  return <div className="tr-grid-wide">
  <section className="tr-panel"><span className="tr-section-kicker">CONTROLLED CONTENT LIBRARY</span><h2>E-detailing / CLM</h2>
