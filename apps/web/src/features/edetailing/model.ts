@@ -16,3 +16,8 @@ export function clampSlideIndex(index:number,size:number):number{return Math.min
 export function createDetailingSessionDraft(tenantId:string,asset:ApprovedAsset,startedAt:string,endedAt:string,visits:SlideVisit[],linkedVisitId?:string):DetailingSessionDraft{
  return {tenantId,assetId:asset.id,productIds:[...asset.productIds],startedAt,endedAt,slideVisits:visits.filter(x=>asset.slides.some(s=>s.id===x.slideId)&&x.durationMs>=0),...(linkedVisitId?{linkedVisitId}:{})};
 }
+
+/** Stable content comparison for a single authorized asset viewing session. */
+export function assetContentIdentity(asset:ApprovedAsset):string{
+ return JSON.stringify({id:asset.id,tenantId:asset.tenantId,title:asset.title,productIds:asset.productIds,category:asset.category,status:asset.status,effectiveFrom:asset.effectiveFrom,expiresAt:asset.expiresAt,slides:asset.slides});
+}
