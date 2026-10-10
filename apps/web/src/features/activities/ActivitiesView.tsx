@@ -3,17 +3,17 @@ import {Button,Tag,TextArea,TextInput} from "@carbon/react";
 import {emptyActivityDraft,validateActivityDraft,type ActivitiesViewProps,type ActivityDraft,type ActivityKind,type ActivityCustomerKind} from "./model";
 export type {ActivitiesViewProps,ActivityDraft,ActivityEvidence,NcaSubtype,PlannedCallOption} from "./model";
 export {validateActivityDraft,emptyActivityDraft} from "./model";
-export function ActivitiesView({tenantId,authorizedForTenantId,contextKey,territories,customers={},plannedCalls=[],ncaSubtypes=[],onSaveDraft,loading=false}:ActivitiesViewProps){
+export function ActivitiesView({tenantId,authorizedForTenantId,contextKey,territories,customers={},plannedCalls=[],ncaSubtypes=[],towns=[],onSaveDraft,loading=false}:ActivitiesViewProps){
  const scope=tenantId+":"+contextKey;
  const [state,setState]=useState<{scope:string;draft:ActivityDraft}>({scope,draft:emptyActivityDraft(tenantId,"")});
  const [review,setReview]=useState(false),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
  useEffect(()=>{setState({scope,draft:emptyActivityDraft(tenantId,"")});setReview(false);setMessage("");},[scope,tenantId]);
  const authorized=Boolean(tenantId&&contextKey&&authorizedForTenantId===tenantId);
  const draft=state.scope===scope?state.draft:emptyActivityDraft(tenantId,"");
- const context=useMemo(()=>({territories,customers,plannedCalls,ncaSubtypes}),[territories,customers,plannedCalls,ncaSubtypes]);
+ const context=useMemo(()=>({territories,customers,plannedCalls,ncaSubtypes,towns}),[territories,customers,plannedCalls,ncaSubtypes,towns]);
  const errors=validateActivityDraft(draft,context);
  function patch(changes:Partial<ActivityDraft>){setState({scope,draft:{...draft,...changes}});setReview(false);setMessage("");}
- function setKind(kind:ActivityKind){patch({kind,plannedStopId:undefined,customerType:undefined,customerId:undefined,ncaSubtype:undefined});}
+ function setKind(kind:ActivityKind){patch({kind,plannedStopId:undefined,customerType:undefined,customerId:undefined,ncaSubtype:undefined,ncaPhase:kind==="NON_CALL_ACTIVITY"?"REPORT":undefined,townId:undefined});}
  function setCustomerKind(kind:ActivityCustomerKind){patch({customerType:kind,customerId:undefined});}
  const group=draft.customerType==="doctor"?"doctors":draft.customerType==="chemist"?"chemists":"stockists";
  const planned=plannedCalls.filter(p=>p.workDate===draft.workDate&&p.territoryId===draft.territoryId);
@@ -41,8 +41,14 @@ export function ActivitiesView({tenantId,authorizedForTenantId,contextKey,territ
  <option value="">Choose type</option><option value="doctor">Doctor</option><option value="chemist">Chemist</option><option value="stockist">Stockist</option></select>
  <label htmlFor="activity-customer">Authorized customer</label><select id="activity-customer" className="tr-select" value={draft.customerId||""} disabled={!draft.customerType} onChange={e=>patch({customerId:e.target.value})}>
  <option value="">Choose customer</option>{(draft.customerType?customers[group]??[]:[]).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></>}
- {draft.kind==="NON_CALL_ACTIVITY"&&<><label htmlFor="activity-subtype">Approved NCA category</label><select id="activity-subtype" className="tr-select" value={draft.ncaSubtype||""} onChange={e=>patch({ncaSubtype:e.target.value})}>
- <option value="">Choose NCA category</option>{ncaSubtypes.map(x=><option key={x.code} value={x.code}>{x.label}</option>)}</select></>}
+ {draft.kind==="NON_CALL_ACTIVITY"&&<>
+ <label htmlFor="activity-phase">NCA workflow</label><select className="tr-select" id="activity-phase" value={draft.ncaPhase||"REPORT"} onChange={e=>patch({ncaPhase:e.target.value as "PLAN"|"REPORT",townId:undefined,ncaSubtype:undefined})}>
+ <option value="REPORT">Report NCA</option><option value="PLAN">Plan NCA</option></select>
+ <label htmlFor="activity-subtype">{draft.ncaPhase==="PLAN"?"NCA type":"NCA reason"}</label><select id="activity-subtype" className="tr-select" value={draft.ncaSubtype||""} onChange={e=>patch({ncaSubtype:e.target.value})}>
+ <option value="">Choose NCA category</option>{ncaSubtypes.map(x=><option key={x.code} value={x.code}>{x.label}</option>)}</select>
+ {draft.ncaPhase==="PLAN"&&<><label htmlFor="activity-town">Authorized town</label>
+ <select className="tr-select" id="activity-town" value={draft.townId||""} onChange={e=>patch({townId:e.target.value})}>
+ <option value="">Choose town</option>{towns.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></>}</>}
  <TextInput id="activity-reason" labelText="Reason" value={draft.reason} maxLength={500} disabled={!authorized||busy} onChange={e=>patch({reason:e.target.value})}/>
  <TextInput id="activity-duration" type="number" min={1} max={1440} labelText="Duration (minutes)" value={String(draft.durationMinutes||"")} disabled={!authorized||busy}
  onChange={e=>patch({durationMinutes:Number(e.target.value)})}/>
