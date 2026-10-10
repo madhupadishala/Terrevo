@@ -22,6 +22,7 @@ import { createJointWorkService, JointWorkConflictError, JointWorkInputError, Jo
 import { createManagerCommandService } from "../../../modules/manager-command/src/index.ts";
 import { AnalyticsInputError, createAnalyticsService } from "../../../modules/analytics/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
+import { createPlatformAdminService, PlatformForbiddenError, PlatformValidationError } from "./platform-admin.ts";
 import { readBoundedJsonObject, RequestBodyError } from "../../../modules/security/src/index.ts";
 
 export type ApiEnv = {
@@ -83,7 +84,8 @@ function mapError(error: unknown): Response {
     const status = error.message.includes("access denied") ? 403 : 400;
     return json(status, { error: error.message });
   }
-  if (error instanceof AuthorizationError) return json(403, { error: "Permission denied" });
+  if (error instanceof AuthorizationError || error instanceof PlatformForbiddenError) return json(403, { error: "Permission denied" });
+  if (error instanceof PlatformValidationError) return json(400, { error: error.message });
   if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError || error instanceof ExpenseInputError || error instanceof JointWorkInputError || error instanceof AnalyticsInputError) {
     return json(400, { error: error.message });
   }
@@ -125,6 +127,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const jointWork = createJointWorkService(adapter.jointWork, rbac);
   const managerCommand = createManagerCommandService(adapter.managerCommand);
   const analytics = createAnalyticsService(adapter.analytics);
+  const platform = createPlatformAdminService(requireConfig(env), deps.fetcher);
 
   /** Authenticates the caller and resolves the active tenant context for a tenant-scoped request. */
   async function resolveTenantRequest(request: Request) {
@@ -168,6 +171,32 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
 
       if (request.method === "GET" && path === "/v1/me") {
         return json(200, { user: await identity.authenticate(request.headers.get("authorization")) });
+      }
+
+      // Platform administration is strictly separate from tenant RBAC.
+      // All platform requests first validate the caller's Supabase-issued bearer token.
+      if (path === "/v1/platform/context" && request.method === "GET") {
+        const user = await identity.authenticate(request.headers.get("authorization"));
+        return json(200, { isSuperAdmin: await platform.isPlatformAdmin(user.id) });
+      }
+      if (path === "/v1/platform/tenants" && request.method === "GET") {
+        const user = await identity.authenticate(request.headers.get("authorization"));
+        const offset = Number(new URL(request.url).searchParams.get("offset") ?? "0");
+        return json(200, { tenants: await platform.listTenants(user.id, offset) });
+      }
+      if (path === "/v1/platform/tenants" && request.method === "POST") {
+        const user = await identity.authenticate(request.headers.get("authorization"));
+        return json(201, { tenant: await platform.createTenant(user.id, await readJsonObject(request)) });
+      }
+      const platformStatus = /^\/v1\/platform\/tenants\/([^/]+)\/status$/.exec(path);
+      if (platformStatus && request.method === "PATCH") {
+        const user = await identity.authenticate(request.headers.get("authorization"));
+        return json(200, { tenant: await platform.setTenantStatus(user.id, platformStatus[1], await readJsonObject(request)) });
+      }
+      if (path === "/v1/platform/audit" && request.method === "GET") {
+        const user = await identity.authenticate(request.headers.get("authorization"));
+        const offset = Number(new URL(request.url).searchParams.get("offset") ?? "0");
+        return json(200, { events: await platform.audit(user.id, offset) });
       }
 
       if (request.method === "GET" && path === "/v1/tenants") {
