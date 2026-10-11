@@ -12,7 +12,7 @@ import { localDate } from "./plan-calendar";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
-  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord,
+  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall,
 } from "./terrevo-api";
 
 type Area = "overview" | "today" | "customers" | "activities" | "edetailing" | "field" | "plans" | "manager" | "admin" | "platform" | BusinessArea;
@@ -101,6 +101,9 @@ export default function App() {
   const [focusedCustomer, setFocusedCustomer] = useState<{kind:"doctor"|"chemist"|"stockist";id:string;territoryId:string;name:string}|null>(null);
   const [ncaOptions,setNcaOptions] = useState<NcaOptions>({categories:[],towns:[]});
   const [ncaRecords,setNcaRecords] = useState<NcaRecord[]>([]);
+  const [ownUnplanned,setOwnUnplanned] = useState<UnplannedCall[]>([]);
+  const [pendingUnplanned,setPendingUnplanned] = useState<UnplannedCall[]>([]);
+  const [unplannedReviewComment,setUnplannedReviewComment] = useState("");
   const [ncaCategoryCode,setNcaCategoryCode] = useState("");
   const [ncaCategoryLabel,setNcaCategoryLabel] = useState("");
   const [ncaTownName,setNcaTownName] = useState("");
@@ -113,6 +116,7 @@ export default function App() {
     setCallRemarks(""); setShortDayReason("");
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
     setFocusedCustomer(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
+    setOwnUnplanned([]);setPendingUnplanned([]);setUnplannedReviewComment("");
   }
 
   const connected = Boolean(session && tenantId && access);
@@ -134,7 +138,7 @@ export default function App() {
       const base = await Promise.allSettled([
         api.progress(), api.startOptions(), api.openVisit(), api.plans(), api.orgUnits(),
         ...MASTER_KINDS.map(k=>api.masters(k)),
-        api.ncaOptions(),api.ownNcaRecords(),
+        api.ncaOptions(),api.ownNcaRecords(),api.ownUnplannedCalls(),
       ]);
       if (generation !== tenantGeneration.current) return;
       setProgress(base[0].status==="fulfilled"?base[0].value:null);
@@ -151,17 +155,20 @@ export default function App() {
       const ncaOptionsResult=base[5+MASTER_KINDS.length],ncaRowsResult=base[6+MASTER_KINDS.length];
       setNcaOptions(ncaOptionsResult.status==="fulfilled"?ncaOptionsResult.value as NcaOptions:{categories:[],towns:[]});
       setNcaRecords(ncaRowsResult.status==="fulfilled"?ncaRowsResult.value as NcaRecord[]:[]);
+      const unplannedResult=base[7+MASTER_KINDS.length];
+      setOwnUnplanned(unplannedResult.status==="fulfilled"?unplannedResult.value as UnplannedCall[]:[]);
       const failures=base.filter(result=>result.status==="rejected").length;
       if (failures) setNotice({kind:"info",title:"Partial data access",
         message:String(failures)+" API requests were denied or unavailable; previous tenant records have been cleared."});
       if (rights?.roles.some(r=>r.roleKey==="TENANT_ADMIN"||r.roleKey==="MANAGER")) {
-        const extra=await Promise.allSettled([api.manager(),api.pendingPlans(),api.analytics()]);
+        const extra=await Promise.allSettled([api.manager(),api.pendingPlans(),api.analytics(),api.pendingUnplannedCalls()]);
         if (generation !== tenantGeneration.current) return;
         setCommand(extra[0].status==="fulfilled"?extra[0].value:null);
         setPending(extra[1].status==="fulfilled"?extra[1].value:[]);
         setAnalytics(extra[2].status==="fulfilled"?extra[2].value:null);
+        setPendingUnplanned(extra[3].status==="fulfilled"?extra[3].value:[]);
       } else {
-        setCommand(null);setPending([]);setAnalytics(null);
+        setCommand(null);setPending([]);setAnalytics(null);setPendingUnplanned([]);
       }
     } finally {
       if (generation === tenantGeneration.current) setLoading(false);
@@ -376,16 +383,35 @@ export default function App() {
           plannedCalls={progress?.stops.map(stop=>({
             planStopId:stop.planStopId, label:stop.targetName, territoryId:progress.territoryId, workDate:progress.workDate,
           }))??[]}
-          saveMode="SERVER_NCA"
+          saveMode="SERVER_FIELD"
+          defaultWorkDate={progress?.workDate??localDate()}
+          onOpenPlannedCall={planStopId=>{
+            const selected=progress?.stops.find(x=>x.planStopId===planStopId&&x.status!=="COMPLETED");
+            if(!connected||!selected||visit?.status==="CHECKED_IN")return;
+            setStopId(planStopId);setView("field");
+          }}
           ncaSubtypes={ncaOptions.categories.map(x=>({code:x.code,label:x.label}))}
           towns={ncaOptions.towns.map(x=>({id:x.id,name:x.name}))}
           onSaveDraft={async draft=>{
             if(!connected||draft.tenantId!==tenantId)throw new Error("The organization changed; start a new authorized draft.");
-            if(draft.kind!=="NON_CALL_ACTIVITY")throw new Error("Planned and unplanned calls must use their approved tour workflows; the separate backend contract is not yet available.");
-            if(draft.evidence)throw new Error("NCA evidence uploads are not supported. Remove the unverified reference before saving.");
-            await api.saveNcaDraft({phase:draft.ncaPhase==="PLAN"?"PLAN":"REPORT",
-              workDate:draft.workDate,territoryId:draft.territoryId,categoryCode:draft.ncaSubtype??"",
-              townId:draft.townId??null,reason:draft.reason,remarks:draft.remarks,durationMinutes:draft.durationMinutes});
+            if(draft.kind==="PLANNED_CALL")throw new Error("Use the approved planned stop and GPS field execution workflow.");
+            if(draft.evidence)throw new Error("Evidence uploads are not yet supported; remove the unverified attachment reference.");
+            if(draft.kind==="UNPLANNED_CALL"){
+              if(!progress||draft.workDate!==progress.workDate||draft.territoryId!==progress.territoryId)
+                throw new Error("Start an approved tour in this territory and date before submitting an unplanned call.");
+              if(visit?.status==="CHECKED_IN")throw new Error("Check out of the open visit before recording another call.");
+              const customers=masters[draft.customerType==="doctor"?"doctors":draft.customerType==="chemist"?"chemists":"stockists"]??[];
+              if(!customers.some(x=>x.id===draft.customerId&&x.status==="active"&&x.territoryId===draft.territoryId))
+                throw new Error("Customer is not an authorized, active account in the selected territory.");
+              const gps=await freshPosition();
+              await api.submitUnplannedCall({executionId:progress.executionId,territoryId:draft.territoryId,
+                customerType:draft.customerType!,customerId:draft.customerId!,reason:draft.reason,
+                remarks:draft.remarks,durationMinutes:draft.durationMinutes,...gps});
+            }else{
+              await api.saveNcaDraft({phase:draft.ncaPhase==="PLAN"?"PLAN":"REPORT",
+                workDate:draft.workDate,territoryId:draft.territoryId,categoryCode:draft.ncaSubtype??"",
+                townId:draft.townId??null,reason:draft.reason,remarks:draft.remarks,durationMinutes:draft.durationMinutes});
+            }
             await refresh(access);
           }}
           loading={loading} />}
@@ -397,6 +423,15 @@ export default function App() {
             {record.status==="DRAFT"&&<Button size="sm" disabled={busy||loading}
               onClick={()=>guarded(()=>api.submitNca(record.id),"NCA report submitted")}>Submit NCA</Button>}
           </div>):<p className="tr-detail">No NCA records returned by the tenant API. Create an authorized draft above.</p>}
+        </Panel>}
+
+        {view==="activities"&&connected&&<Panel eyebrow="UNPLANNED FIELD CALLS" title="Submitted calls and manager decisions">
+          {ownUnplanned.length?ownUnplanned.map(row=><div className="tr-history-row" key={row.id}>
+            <div><strong>{row.workDate} · {row.customerType} · {row.customerId.slice(0,8)}</strong>
+              <p>{row.reason} · {row.durationMinutes} minutes · GPS accuracy {row.accuracyMeters} m (capture only; not geofence-verified)</p>
+              {row.managerComment&&<p>Manager: {row.managerComment}</p>}</div>
+            <Status value={row.status}/>
+          </div>):<p className="tr-detail">No unplanned calls submitted. An active approved tour and device location are required.</p>}
         </Panel>}
 
         {view==="edetailing" && <EDetailingView
@@ -412,7 +447,22 @@ export default function App() {
           <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} busy={busy}
             visit={visit} progress={progress} masters={masters} perform={(fn,title)=>action(fn,title)} />}
 
-        {view==="manager"&&(manager?
+        {view==="manager"&&manager&&<Panel eyebrow="MANAGER DECISIONS" title="Unplanned customer-call review">
+          {pendingUnplanned.length?pendingUnplanned.map(row=><div className="tr-history-row" key={row.id}>
+            <div><strong>{row.workDate} · {row.customerType} · {row.customerId.slice(0,8)}</strong>
+              <p>{row.reason}; {row.remarks} · {row.durationMinutes} minutes · GPS accuracy {row.accuracyMeters} m</p>
+            </div><div className="tr-button-row">
+              <Button size="sm" disabled={busy||loading}
+                onClick={()=>guarded(()=>api.reviewUnplannedCall(row.id,"APPROVE",unplannedReviewComment||null),"Unplanned call approved")}>Approve</Button>
+              <Button size="sm" kind="secondary" disabled={busy||loading||!unplannedReviewComment.trim()}
+                onClick={()=>guarded(()=>api.reviewUnplannedCall(row.id,"REJECT",unplannedReviewComment),"Unplanned call rejected")}>Reject</Button>
+            </div>
+          </div>):<p className="tr-detail">No submitted unplanned calls awaiting authorized review.</p>}
+          {pendingUnplanned.length>0&&<TextInput id="unplanned-manager-comment" labelText="Manager comment (required on rejection)"
+            value={unplannedReviewComment} maxLength={1000} onChange={e=>setUnplannedReviewComment(e.target.value)}/>}
+        </Panel>}
+
+{view==="manager"&&(manager?
           <><div className="tr-metrics">
             <FieldMetric label="Field team members" value={command?.teamMembers} context="Authorized team"/>
             <FieldMetric label="Active tours" value={command?.activeTours} context="Currently executing"/>
