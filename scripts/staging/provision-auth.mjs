@@ -20,7 +20,7 @@ export function createAuthProvisioner(config, env, fetcher = fetch, now = Date.n
     const owned=(user,identity)=>typeof user?.id==='string'&&user.email===identity.email&&user.app_metadata?.qualification_run===config.runId&&user.app_metadata?.qualification_role===identity.role;
     async function findUser(email){
       for(let page=1;page<=10;page++){
-        const response=await provider(`${env.url}/auth/v1/admin/users?page=${page}&per_page=100`);
+        const response=await provider(`${env.url}/auth/v1/admin/users?page=${page}&per_page=100&filter=${encodeURIComponent(email)}`);
         if(!response.ok)throw Error('Provider unavailable');
         const body=await response.json();if(!Array.isArray(body.users)||body.users.length>100)throw Error('Invalid user list');
         const matches=body.users.filter(user=>user.email===email);if(matches.length>1)throw Error('Ambiguous user');

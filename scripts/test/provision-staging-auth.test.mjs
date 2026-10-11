@@ -40,7 +40,7 @@ test('password rotation requires fixed identity ownership and refuses unrelated 
 test('fresh handler reconciles an owned identity after response loss without duplicate creation',async()=>{
  let stored=null,creates=0;
  const fetcher=async(url,init)=>{
-  if(!init.method)return Response.json({users:stored?[stored]:[]});
+  if(!init.method){assert.equal(new URL(url).searchParams.get('filter'),config.identities[0].email);return Response.json({users:stored?[stored]:[]});}
   const body=JSON.parse(init.body);
   if(init.method==='POST'){creates++;stored={id:'durable-id',email:body.email,app_metadata:body.app_metadata};}
   else assert.equal(init.method,'PUT');
