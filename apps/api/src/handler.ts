@@ -18,6 +18,7 @@ import { createRcpaService, RcpaConflictError, RcpaInputError, RcpaNotFoundError
 import { createOrderService, OrderConflictError, OrderInputError, OrderNotFoundError } from "../../../modules/orders/src/index.ts";
 import { createAttendanceLeaveService, LeaveConflictError, LeaveInputError, LeaveNotFoundError } from "../../../modules/attendance-leave/src/index.ts";
 import { createNcaService, NcaInputError, NcaConflictError, NcaNotFoundError } from "../../../modules/nca/src/index.ts";
+import {createUnplannedCallService,UnplannedInputError,UnplannedConflictError,UnplannedNotFoundError} from "../../../modules/unplanned-calls/src/index.ts";
 import { createExpenseService, ExpenseConflictError, ExpenseInputError, ExpenseNotFoundError } from "../../../modules/expenses/src/index.ts";
 import { createJointWorkService, JointWorkConflictError, JointWorkInputError, JointWorkNotFoundError } from "../../../modules/joint-work/src/index.ts";
 import { createManagerCommandService } from "../../../modules/manager-command/src/index.ts";
@@ -88,11 +89,11 @@ function mapError(error: unknown): Response {
   if (error instanceof AuthorizationError || error instanceof PlatformForbiddenError) return json(403, { error: "Permission denied" });
   if (error instanceof PlatformValidationError) return json(400, { error: error.message });
   if (error instanceof PlatformNotFoundError) return json(404, { error: error.message });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError || error instanceof NcaInputError || error instanceof ExpenseInputError || error instanceof JointWorkInputError || error instanceof AnalyticsInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError || error instanceof NcaInputError || error instanceof UnplannedInputError || error instanceof ExpenseInputError || error instanceof JointWorkInputError || error instanceof AnalyticsInputError) {
     return json(400, { error: error.message });
   }
-  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError || error instanceof TradeCallNotFoundError || error instanceof RcpaNotFoundError || error instanceof OrderNotFoundError || error instanceof LeaveNotFoundError || error instanceof NcaNotFoundError || error instanceof ExpenseNotFoundError || error instanceof JointWorkNotFoundError) return json(404, { error: error.message });
-  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError || error instanceof LeaveConflictError || error instanceof NcaConflictError || error instanceof ExpenseConflictError || error instanceof JointWorkConflictError) return json(409, { error: error.message });
+  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError || error instanceof TradeCallNotFoundError || error instanceof RcpaNotFoundError || error instanceof OrderNotFoundError || error instanceof LeaveNotFoundError || error instanceof NcaNotFoundError || error instanceof UnplannedNotFoundError || error instanceof ExpenseNotFoundError || error instanceof JointWorkNotFoundError) return json(404, { error: error.message });
+  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError || error instanceof LeaveConflictError || error instanceof NcaConflictError || error instanceof UnplannedConflictError || error instanceof ExpenseConflictError || error instanceof JointWorkConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
     if (error.status === 400) return json(400, { error: "Provider rejected request" });
@@ -126,6 +127,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const orders = createOrderService(adapter.orders);
   const attendanceLeave = createAttendanceLeaveService(adapter.attendanceLeave, rbac);
   const nca = createNcaService(adapter.nca,rbac);
+  const unplanned = createUnplannedCallService(adapter.unplanned,rbac,adapter.masters);
   const expenses = createExpenseService(adapter.expenses, rbac);
   const jointWork = createJointWorkService(adapter.jointWork, rbac);
   const managerCommand = createManagerCommandService(adapter.managerCommand);
@@ -250,6 +252,26 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
       const expenseSubmit=/^\/v1\/expenses\/([^/]+)\/submit$/.exec(path);if(request.method==="POST"&&expenseSubmit){const {accessToken,user,context}=await resolveTenantRequest(request);return json(200,{claim:await expenses.submit(context.tenantId,user.id,accessToken,expenseSubmit[1],await readJsonObject(request))});}
       const expenseDecision=/^\/v1\/expense-approvals\/([^/]+)\/decision$/.exec(path);if(request.method==="POST"&&expenseDecision){const {accessToken,user,context}=await resolveTenantRequest(request);await expenses.decide(context.tenantId,user.id,accessToken,expenseDecision[1],await readJsonObject(request));return new Response(null,{status:204});}
       if(request.method==="GET"&&path==="/v1/attendance"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{attendance:await attendanceLeave.listAttendance(context.tenantId,accessToken)});}
+
+      // Planned calls remain on approved tour stops with GPS visit/DCR workflow.
+      // Unplanned calls are separate GPS-evidenced transactions awaiting manager review.
+      if(request.method==="GET"&&path==="/v1/unplanned-calls/own"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(200,{calls:await unplanned.own(context.tenantId,user.id,accessToken)});
+      }
+      if(request.method==="POST"&&path==="/v1/unplanned-calls"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(201,{call:await unplanned.submit(context.tenantId,user.id,accessToken,await readJsonObject(request))});
+      }
+      if(request.method==="GET"&&path==="/v1/unplanned-approvals"){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{calls:await unplanned.pending(context.tenantId,accessToken)});
+      }
+      const unplannedDecision=/^\/v1\/unplanned-approvals\/([^/]+)\/decision$/.exec(path);
+      if(request.method==="POST"&&unplannedDecision){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(200,{call:await unplanned.decide(context.tenantId,user.id,accessToken,unplannedDecision[1],await readJsonObject(request))});
+      }
 
       // NCA is a distinct governed field-activity contract, never a doctor call.
       if(request.method==="GET"&&path==="/v1/nca/options"){
