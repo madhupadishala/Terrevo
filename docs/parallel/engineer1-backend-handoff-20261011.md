@@ -1,6 +1,6 @@
 # Engineer 1 backend handoff — 2026-10-11
 
-Source: `chore/r01-repository-consolidation`, continuing from `9cec0cd8be76f364b93872fc0693c4547e67efaf`. All routes below exist in `apps/api/src/handler.ts`; browser transport adds `/api`. Bearer authentication and the authorized `x-tenant-id` are mandatory. Server identity and permission checks remain authoritative. This is a contract index, not live HTTP acceptance evidence.
+Source: `chore/r01-repository-consolidation`, continuing from `9cec0cd8be76f364b93872fc0693c4547e67efaf`. All routes below exist in `apps/api/src/handler.ts`; browser transport adds `/api`. Bearer authentication and the authorized `x-tenant-id` are mandatory. Server identity and permission checks remain authoritative. This contract index is backed by the live synthetic traces and limits in the consolidated Engineer 1 execution report. Engineering source `987eae68be97a17c7afecbe740250f5345ac0010` passes all five CI jobs.
 
 ## Canonical boundaries and ownership
 
@@ -39,7 +39,7 @@ For full request/response fields, consume the existing exported domain types and
 
 `operationId` identifies one command payload. Keep the same UUID and normalized payload when retrying a lost response. Starting an already active execution now returns the stored execution after current territory permission is rechecked. Changed plan/GPS/device evidence under that UUID is a conflict. The database also binds start/check-in operation IDs to their persisted payloads and locks their owner row before resolving concurrent retries.
 
-The database regression proves sequential replay, conflicting payload rejection and revoked permission rejection. CI additionally passed 16 independently launched connections per start/check-in/conflict race with one unchanged persisted execution and visit. Real interrupted HTTP sessions and representative API/device load remain unqualified. Location coordinates in test fixtures do not prove real device presence. Preserve `verification` and exception states; never replace them with a frontend success inference.
+The database regression proves sequential replay, conflicting payload rejection and revoked permission rejection. CI additionally passed 16 independently launched connections per start/check-in/conflict race with one unchanged persisted execution and visit. Four simultaneous actual HTTP start retries also returned one persisted execution. Small-pilot read load has zero errors but fails its predeclared end-to-end p99 budget; representative physical-device/network evidence remains unqualified. Location coordinates in test fixtures do not prove real device presence. Preserve `verification` and exception states; never replace them with a frontend success inference.
 
 ## Existing metric meanings
 
@@ -54,15 +54,34 @@ The database regression proves sequential replay, conflicting payload rejection 
 | Short days / minutes | Submitted executions, persisted worked minutes compared with required minutes |
 | Expense totals | SUBMITTED/APPROVED scoped claims grouped by currency; currencies are not summed together |
 
-An existing aggregate does not provide immutable row-level as-of snapshots or export provenance. Unplanned submission/approval/rejection and NCA are distinct ledgers and must not be added to planned coverage without an approved metric contract. One completed planned doctor workflow was reconciled against the actual staging SQL projection; large-volume performance and all date-boundary cases remain open.
+An existing aggregate does not provide immutable row-level as-of snapshots or export provenance. Unplanned submission/approval/rejection and NCA are distinct ledgers and must not be added to planned coverage without an approved metric contract. Two submitted tours, two completed planned doctor visits and two DCRs reconcile between actual API and staging SQL. A 90-day small-fixture SQL diagnostic took 76.822 ms; large-volume and all date-boundary qualification remain open.
 
 ## Wave 2 contracts still missing
 
 | Engineer 2 package | Backend gap verified from its `INTEGRATION_REQUEST.md` | Mounting condition |
 |---|---|---|
-| Customer relationships (#60) | Approved relationship edges, redacted patient-safe history, source access audit and pagination | Source-approved records and tenant/territory/subject authority available |
+| Customer relationships (#60) | Approved edge reads now exist through the canonical endpoint. Redacted patient-safe history, source access audit and UI pagination remain contract gaps | Source-approved records and tenant/territory/subject authority available |
 | CLM library (#61) | MLR approved asset/version catalog, product/region ACL, revocation, binary grants and idempotent session persistence | Server approval/version/active-visit authority verified |
 | Workforce evidence (#62) | Receipt manifest ACL, approved policy versions, verified travel evidence and safe binary access | Server-backed owner/team scope, amounts, policy and evidence lineage verified |
 | Manager reporting (#63) | Immutable consistent as-of row projection and reauthorized, audited CSV export | Snapshot semantics, deduplication, source lineage and export authorization verified |
 
-Their typed props and callbacks remain intents until the backend work is assigned and accepted. Do not invent endpoints or adapt unrelated aggregate fields into these facts. Parent integration must rotate context keys, discard stale async responses, and reauthorize every source/export request server-side. No Engineer 2 files were edited or merged in this delivery.
+Their typed props and callbacks remain intents until the backend work is assigned and accepted. Do not invent endpoints or adapt unrelated aggregate fields into these facts. Parent integration must rotate context keys, discard stale async responses, and reauthorize every source/export request server-side. Engineer 2 UI files remain untouched. Reviewed PR64 backend source 300f36cc is integrated with ancestry; later supplemental fixed-fixture qualifiers are not selected over the canonical supported-identity runners.
+
+
+## Qualified shared relationship bridge
+
+Use `TerrevoWebApi.customerLinks(sourceId)` and the canonical `CustomerLink` type. The server uses bearer identity, active tenant membership, user-JWT grants and canonical master RLS; neither requested tenant nor territory claims imply authorization. Pagination is bounded to 1,000 results and one 10-second overall deadline. Overflow rejects the request instead of silently returning a partial list. The response remains `{links}`.
+
+`customerRelationships(tenantId, sourceId, authorizedGroups, links)` in `apps/web/src/customer-links-adapter.ts` maps approved evidenced edges into the existing Customer360 relationship props. It derives customer kinds from unique active authorized master rows and discards foreign, hidden, inactive or ambiguous counterparts. This exported bridge does not mount Wave 2 UI or invent its missing facts.
+
+All shared web requests discard completions after an account/tenant transition, including 401 retries and late login/refresh responses. Parent feature adapters must continue rotating their context keys. Live source labels and approvals are explicitly synthetic qualification fixtures.
+
+## Reproducible qualification order
+
+Provision fixed, isolated identities through the supported Auth helper, save the private manifest with mode 0600, and disable the helper immediately. Generate the synthetic fixture once; subsequent generation preserves the same IDs. Optional MR2 and UNSCOPED identities produce the corresponding scoped employee/member fixture. Apply only to the attested existing staging project.
+
+Run `qualify-live-journey.mjs manifest private-state evidence`, then `qualify-manager-services.mjs manifest private-state evidence`. The manifest may carry `fixture.executionId` to identify the first journey; otherwise exactly one own daily timesheet is required. The manager runner derives the week from that record and uses `fixture.mr2Employee`, not fixed run IDs. Private operation IDs are atomically checkpointed before dispatch, and completed 204 steps are cached by presence.
+
+`qualify-security-load.mjs manifest evidence` preserves failures against the declared latency/error budgets. Optional `manifest.region` pins the known provider region; inspect returned region/timing and retain earlier measurements. `qualify-curl-load.mjs manifest evidence` independently measures the same four-client/60-read budget with native curl and private header files.
+
+Platform qualification needs a bounded temporary grant on the isolated UNSCOPED test identity, followed by `qualify-platform-governance.mjs manifest private-state evidence`, immediate grant revocation and a fresh-session denial check. The actual delivered run completed these steps; the governance test tenant is inactive. This procedure must not grant a customer or production account platform authority.

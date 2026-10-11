@@ -1,0 +1,532 @@
+{
+  "date": "2026-10-11",
+  "engineeringCodeSha": "987eae68be97a17c7afecbe740250f5345ac0010",
+  "engineeringTree": "a822188035089ffde196b44153af04c8ee187f1f",
+  "deployedApiSourceSha": "d3d0e085e186579d722e19ddde0474982d6a2372",
+  "stagingApi": {
+    "projectRef": "eirlubfbjexjilvskqxq",
+    "version": 4,
+    "bundleSha256": "ad807880a792b5c5373894cc97a0cdbf16e4f6585339e0b96c3ea5ab8215bfaf"
+  },
+  "authProvisionerDisabled": true,
+  "temporaryPlatformGrantRevoked": true,
+  "productionModified": false,
+  "paidResourcesCreated": false,
+  "ci": {
+    "runId": 38142059168,
+    "headSha": "987eae68be97a17c7afecbe740250f5345ac0010",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "id": 114477760545,
+        "name": "scope-lock",
+        "conclusion": "success"
+      },
+      {
+        "id": 114477760761,
+        "name": "foundation",
+        "conclusion": "success"
+      },
+      {
+        "id": 114477760773,
+        "name": "database-migrations",
+        "conclusion": "success"
+      },
+      {
+        "id": 114477760885,
+        "name": "mobile",
+        "conclusion": "success"
+      },
+      {
+        "id": 114477890701,
+        "name": "browser-smoke",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "tests": {
+    "apiDomain": 125,
+    "web": 41,
+    "releaseSafety": 24,
+    "mobile": 12,
+    "browser": 13
+  },
+  "databaseReconciliation": {
+    "dcrs": 2,
+    "rlsTables": 61,
+    "publicTables": 61,
+    "submittedTours": 2,
+    "completedVisits": 2,
+    "completedJointWork": 1,
+    "attributedAuditEvents": 21,
+    "governanceTenantStatus": "inactive",
+    "approvedWeeklyTimesheets": 1,
+    "temporaryPlatformGrantActive": false
+  },
+  "reportQueryPlan": [
+    {
+      "Plan": {
+        "Node Type": "CTE Scan",
+        "Parallel Aware": false,
+        "Async Capable": false,
+        "CTE Name": "identity",
+        "Alias": "identity",
+        "Startup Cost": 0.01,
+        "Total Cost": 0.28,
+        "Plan Rows": 1,
+        "Plan Width": 32,
+        "Actual Startup Time": 76.717,
+        "Actual Total Time": 76.719,
+        "Actual Rows": 1,
+        "Actual Loops": 1,
+        "Shared Hit Blocks": 2961,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Plans": [
+          {
+            "Node Type": "Result",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE identity",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 0,
+            "Total Cost": 0.01,
+            "Plan Rows": 1,
+            "Plan Width": 32,
+            "Actual Startup Time": 0.008,
+            "Actual Total Time": 0.008,
+            "Actual Rows": 1,
+            "Actual Loops": 1,
+            "Shared Hit Blocks": 0,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          }
+        ]
+      },
+      "Planning": {
+        "Shared Hit Blocks": 0,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0
+      },
+      "Planning Time": 0.056,
+      "Triggers": [],
+      "Execution Time": 76.822
+    }
+  ],
+  "securityAdvisors": {
+    "lints": [
+      {
+        "name": "rls_enabled_no_policy",
+        "title": "RLS Enabled No Policy",
+        "level": "INFO",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects cases where row level security (RLS) has been enabled on a table but no RLS policies have been created.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy",
+        "count": 10,
+        "findings": [
+          {
+            "detail": "Table \\`public.doctor_call_operations\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "doctor_call_operations",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-11T13:01:25.060Z"
+          },
+          {
+            "detail": "Table \\`public.expense_operations\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "expense_operations",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-11T13:01:25.060Z"
+          },
+          {
+            "detail": "Table \\`public.inventory_ledger\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "inventory_ledger",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-11T13:01:25.060Z"
+          },
+          {
+            "detail": "Table \\`public.inventory_operations\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "inventory_operations",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-11T13:01:25.060Z"
+          },
+          {
+            "detail": "Table \\`public.platform_admin_audit\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "platform_admin_audit",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-11T13:01:25.060Z"
+          },
+          {
+            "detail": "Table \\`public.platform_admin_grants\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "platform_admin_grants",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-11T13:01:25.060Z"
+          },
+          {
+            "detail": "Table \\`public.rcpa_operations\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "rcpa_operations",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-11T13:01:25.060Z"
+          },
+          {
+            "detail": "Table \\`public.sales_order_operations\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "sales_order_operations",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-11T13:01:25.060Z"
+          },
+          {
+            "detail": "Table \\`public.security_audit_events\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "security_audit_events",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-11T13:01:25.060Z"
+          },
+          {
+            "detail": "Table \\`public.trade_call_operations\\` has RLS enabled, but no policies exist",
+            "metadata": {
+              "name": "trade_call_operations",
+              "type": "table",
+              "schema": "public"
+            },
+            "observed_at": "2026-10-11T13:01:25.060Z"
+          }
+        ]
+      },
+      {
+        "name": "auth_leaked_password_protection",
+        "title": "Leaked Password Protection Disabled",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Leaked password protection is currently disabled.",
+        "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection",
+        "count": 1,
+        "findings": [
+          {
+            "detail": "Supabase Auth prevents the use of compromised passwords by checking against HaveIBeenPwned.org. Enable this feature to enhance security.",
+            "metadata": {
+              "type": "auth",
+              "entity": "Auth"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "migrations": {
+    "migrations": [
+      {
+        "version": "20261011045539",
+        "name": "0001_identity_tenant"
+      },
+      {
+        "version": "20261011045549",
+        "name": "0002_organization_rbac"
+      },
+      {
+        "version": "20261011045602",
+        "name": "0003_core_masters"
+      },
+      {
+        "version": "20261011045614",
+        "name": "0004_tour_planning"
+      },
+      {
+        "version": "20261011045625",
+        "name": "0005_tour_approval"
+      },
+      {
+        "version": "20261011045643",
+        "name": "0006_start_my_tour"
+      },
+      {
+        "version": "20261011045701",
+        "name": "0007_show_my_tour"
+      },
+      {
+        "version": "20261011045708",
+        "name": "0008_gps_visits"
+      },
+      {
+        "version": "20261011045716",
+        "name": "0009_doctor_call_dcr"
+      },
+      {
+        "version": "20261011045726",
+        "name": "0010_samples_gifts"
+      },
+      {
+        "version": "20261011045734",
+        "name": "0011_submit_tour"
+      },
+      {
+        "version": "20261011045743",
+        "name": "0012_daily_timesheet"
+      },
+      {
+        "version": "20261011045750",
+        "name": "0013_weekly_timesheet"
+      },
+      {
+        "version": "20261011045805",
+        "name": "0014_trade_calls"
+      },
+      {
+        "version": "20261011045812",
+        "name": "0015_rcpa"
+      },
+      {
+        "version": "20261011045819",
+        "name": "0016_orders"
+      },
+      {
+        "version": "20261011045827",
+        "name": "0017_attendance_leave"
+      },
+      {
+        "version": "20261011045836",
+        "name": "0018_expenses"
+      },
+      {
+        "version": "20261011045843",
+        "name": "0019_joint_work"
+      },
+      {
+        "version": "20261011045851",
+        "name": "0020_manager_command"
+      },
+      {
+        "version": "20261011045859",
+        "name": "0020a_visit_progress_stop_id"
+      },
+      {
+        "version": "20261011045914",
+        "name": "0020b_presence_integrity"
+      },
+      {
+        "version": "20261011045921",
+        "name": "0021_analytics"
+      },
+      {
+        "version": "20261011045929",
+        "name": "0023_security_audit"
+      },
+      {
+        "version": "20261011045937",
+        "name": "0024_lockdown_public_definers"
+      },
+      {
+        "version": "20261011045945",
+        "name": "0025_immutable_function_search_paths"
+      },
+      {
+        "version": "20261011045953",
+        "name": "9997_unplanned_call_review"
+      },
+      {
+        "version": "20261011050001",
+        "name": "9998_nca_controlled_field_activities"
+      },
+      {
+        "version": "20261011050008",
+        "name": "9999_platform_admin_control_plane"
+      },
+      {
+        "version": "20261011065214",
+        "name": "field_operation_replay_integrity"
+      },
+      {
+        "version": "20261011065601",
+        "name": "business_customer_links_r04b"
+      },
+      {
+        "version": "20261011081128",
+        "name": "private_business_read_helpers"
+      },
+      {
+        "version": "20261011081130",
+        "name": "customer_link_counterpart_authorization"
+      },
+      {
+        "version": "20261011112522",
+        "name": "trusted_audit_actor_attribution"
+      },
+      {
+        "version": "20261011112546",
+        "name": "internal_trigger_function_privileges"
+      }
+    ]
+  },
+  "formalAcceptanceComplete": false,
+  "releaseDecision": "HOLD",
+  "remainingAcceptance": [
+    "Authorized integration baseline and independent final review",
+    "Representative physical-device GPS, interruption and offline UAT",
+    "End-to-end p99 latency exceeds the predeclared small-pilot budget",
+    "Two unresolved upstream toolchain advisories: node-forge and braces; 15 propagated high entries",
+    "Assigned-service/metric/product-contract acceptance where original specification requires it",
+    "Managed Auth/Storage/configuration recovery beyond tested PostgreSQL dump/restore if included in release scope"
+  ],
+  "evidenceFiles": [
+    "engineer1-live-journey-20261011.json",
+    "engineer1-manager-services-20261011.json",
+    "engineer1-platform-governance-20261011.json",
+    "engineer1-security-load-initial-20261011.json",
+    "engineer1-security-load-regional-20261011.json",
+    "engineer1-curl-load-diagnostic-20261011.json"
+  ],
+  "review": {
+    "implementerResponses": "All actionable findings through d3d0e085 addressed with targeted fixes and regressions. Independent final re-review remains separate.",
+    "supersededFixtureQualifier": "PR64 core 300f36cc5aa922a27f36bbeb3f778ebbe21af4cd integrated; later 71fd8a295a54749c0c39af513416f95a64dbb09b adds a separate fixed-legacy-fixture qualifier, not selected over the supported identity canonical qualification runners."
+  },
+  "dependencyAudit": {
+    "root": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "mobile": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 15,
+      "critical": 0,
+      "total": 15
+    },
+    "remediated": "xcode -> uuid override 11.1.1; Xcode API compatibility, bounds regression, TypeScript, mobile tests and Android export passed",
+    "unresolved": [
+      {
+        "name": "braces",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1240992,
+            "name": "braces",
+            "dependency": "braces",
+            "title": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns",
+            "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+            "severity": "high",
+            "cwe": [
+              "CWE-674"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+            },
+            "range": "<=3.0.3"
+          }
+        ],
+        "effects": [
+          "micromatch"
+        ],
+        "range": "*",
+        "nodes": [
+          "node_modules/braces"
+        ],
+        "fixAvailable": {
+          "name": "expo",
+          "version": "44.0.6",
+          "isSemVerMajor": true
+        }
+      },
+      {
+        "name": "node-forge",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1240912,
+            "name": "node-forge",
+            "dependency": "node-forge",
+            "title": "node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements",
+            "url": "https://github.com/advisories/GHSA-86w9-cpqp-85rv",
+            "severity": "high",
+            "cwe": [
+              "CWE-347"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"
+            },
+            "range": "<=1.4.0"
+          }
+        ],
+        "effects": [
+          "@expo/cli",
+          "@expo/code-signing-certificates"
+        ],
+        "range": "*",
+        "nodes": [
+          "node_modules/node-forge"
+        ],
+        "fixAvailable": {
+          "name": "expo",
+          "version": "44.0.6",
+          "isSemVerMajor": true
+        }
+      }
+    ]
+  },
+  "artifactSha256": {
+    "engineer1-live-journey-20261011.json": "22862ae7dd5455ba4c3cf3e2550eba40f5147f30d437f23940517b0144a0f0ff",
+    "engineer1-manager-services-20261011.json": "75280a1e4d480cfb069a11dbf627644b2dae3ae8fbf78e12f5a04910e02a31ba",
+    "engineer1-platform-governance-20261011.json": "5658c99ba8010e5394d1b3706f1b4aa063f34d6db43e1150fdc4eb76bd6d7d48",
+    "engineer1-security-load-initial-20261011.json": "afef95aebefdcb36c017007cea59b9330b1479c13f7c5b8703fcb53a9093e208",
+    "engineer1-security-load-regional-20261011.json": "fdae44aa74fcaf68b0cdcbabc745e6d3701d14536d65eebee78d8d24d898f406",
+    "engineer1-curl-load-diagnostic-20261011.json": "c81e40af0f13d9f0847fef3361a0cd12e44398bf0cba73ca07fbc8f030588608"
+  }
+}
