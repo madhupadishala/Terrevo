@@ -2,10 +2,11 @@ begin;
 select set_config('request.jwt.claim.sub','',true);
 select set_config('request.jwt.claims','{}',true);
 select set_config('request.headers','{"x-terrevo-actor":"f6000000-0000-4000-8000-000000000002"}',true);
-set local role service_role;
 insert into public.tenants(id,name,slug)values('f6000000-0000-4000-8000-000000000011','Synthetic attributed change','ci-attributed-change');
+set local role service_role;
+update public.tenants set geofence_radius_meters=100 where id='f6000000-0000-4000-8000-000000000011';
 do $$begin
- if not exists(select 1 from public.security_audit_events where tenant_id='f6000000-0000-4000-8000-000000000011' and actor_user_id='f6000000-0000-4000-8000-000000000002' and table_name='tenants' and operation='INSERT')then
+ if not exists(select 1 from public.security_audit_events where tenant_id='f6000000-0000-4000-8000-000000000011' and actor_user_id='f6000000-0000-4000-8000-000000000002' and table_name='tenants' and operation='UPDATE')then
   raise exception 'Server-mediated mutation lost trusted actor';
  end if;
 end;$$;

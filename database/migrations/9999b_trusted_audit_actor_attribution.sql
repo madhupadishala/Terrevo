@@ -1,5 +1,8 @@
 begin;
 -- Ordered after the legacy 9997/9998/9999 domain tables.
+-- Existing tenant-settings PATCH uses the trusted server role. Declare its
+-- required privileges explicitly instead of relying on hosted default grants.
+grant select,update on public.tenants to service_role;
 create or replace function public.capture_security_audit_event()
 returns trigger
 language plpgsql
