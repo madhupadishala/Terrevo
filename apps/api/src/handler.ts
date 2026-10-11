@@ -1,3 +1,4 @@
+import { createCustomerLinksService, createCustomerLinksPostgrest, BusinessAccessError } from "../../../modules/business-customer-links/src/index.ts";
 import { AuthInputError, createIdentityService, readBearerToken } from "../../../modules/identity/src/index.ts";
 import { createTenantService, TenantAccessError } from "../../../modules/tenant/src/index.ts";
 import { createOrganizationService, OrganizationInputError } from "../../../modules/organization/src/index.ts";
@@ -89,6 +90,7 @@ export function runtimeQualificationProof(env: ApiEnv, tenantId: string) {
 /** Maps domain and provider failures to stable public API responses. */
 function mapError(error: unknown): Response {
   if (error instanceof ApiError || error instanceof RequestBodyError) return json(error.status, { error: error.message });
+  if (error instanceof BusinessAccessError) return json(403, { error: "Customer scope denied" });
   if (error instanceof AuthInputError) {
     const status = error.message.includes("Authorization header") ? 401 : 400;
     return json(status, { error: error.message });
@@ -117,8 +119,34 @@ function mapError(error: unknown): Response {
 
 /** Creates the HTTP API handler with tenant-scoped domain services wired to the provider adapter. */
 export function createHandler(env: ApiEnv, deps: Deps = {}) {
-  const adapter = createSupabaseAdapter(requireConfig(env), deps.fetcher);
-  const identity = createIdentityService(adapter.auth);
+  requireConfig(env);
+  return (request: Request) => createRequestHandler(env, deps)(request);
+}
+
+// Actor state belongs to exactly one request, including concurrent callers of
+// the same handler. Only a provider-validated identity can populate it.
+function createRequestHandler(env: ApiEnv, deps: Deps) {
+  const config = requireConfig(env);
+  let trustedActorId: string | null = null;
+  const fetcher: typeof fetch = (input, init) => {
+    const headers = new Headers(init?.headers);
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+    headers.delete("x-terrevo-actor");
+    if (trustedActorId && config.serviceRoleKey && headers.get("apikey") === config.serviceRoleKey &&
+        url.origin === new URL(config.url).origin && url.pathname.startsWith("/rest/v1/")) {
+      headers.set("x-terrevo-actor", trustedActorId);
+    }
+    const forwardedHeaders: Record<string,string> = {};
+    headers.forEach((value,key)=>{forwardedHeaders[key]=value;});
+    return (deps.fetcher ?? fetch)(input, {...init,headers:forwardedHeaders,signal:init?.signal ?? AbortSignal.timeout(10_000),redirect:"error"});
+  };
+  const adapter = createSupabaseAdapter(config, fetcher);
+  const authentication = createIdentityService(adapter.auth);
+  const identity = {...authentication, async authenticate(value: string | null) {
+    const user = await authentication.authenticate(value);
+    trustedActorId = user.id;
+    return user;
+  }};
   const tenants = createTenantService(adapter.tenants);
   const rbac = createRbacService(adapter.rbac);
   const organization = createOrganizationService(adapter.organization, rbac);
@@ -143,7 +171,8 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const jointWork = createJointWorkService(adapter.jointWork, rbac);
   const managerCommand = createManagerCommandService(adapter.managerCommand);
   const analytics = createAnalyticsService(adapter.analytics);
-  const platform = createPlatformAdminService(requireConfig(env), deps.fetcher);
+  const platform = createPlatformAdminService(config, fetcher);
+  const customerLinks = createCustomerLinksService(createCustomerLinksPostgrest(config.url, config.anonKey, fetcher));
 
   /** Authenticates the caller and resolves the active tenant context for a tenant-scoped request. */
   async function resolveTenantRequest(request: Request) {
@@ -220,6 +249,25 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         const user = await identity.authenticate(request.headers.get("authorization"));
         const offset = Number(new URL(request.url).searchParams.get("offset") ?? "0");
         return json(200, { events: await platform.audit(user.id, offset) });
+      }
+
+      const customerLinksMatch=new RegExp("^/v1/business/customer-links/([^/]+)$").exec(path);
+      if(request.method==="GET"&&customerLinksMatch){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        // Fetch grants through user-JWT RLS: never accept caller-supplied territory authorization.
+        const config=requireConfig(env);
+        const grantUrl=new URL("/rest/v1/business_customer_link_grants",config.url);
+        grantUrl.searchParams.set("select","territory_id");
+        grantUrl.searchParams.set("tenant_id",`eq.${context.tenantId}`);
+        grantUrl.searchParams.set("user_id",`eq.${user.id}`);
+        grantUrl.searchParams.set("limit","1000");
+        const grantResponse=await fetcher(grantUrl.toString(),{headers:{apikey:config.anonKey,authorization:`Bearer ${accessToken}`,accept:"application/json"},cache:"no-store",signal:AbortSignal.timeout(10_000),redirect:"error"});
+        if(!grantResponse.ok)throw new BusinessAccessError("Customer grant retrieval denied");
+        const grantRows:unknown=await grantResponse.json();
+        if(!Array.isArray(grantRows)||grantRows.some((g:unknown)=>!g||typeof g!=="object"||typeof (g as {territory_id?:unknown}).territory_id!=="string"))throw new BusinessAccessError("Invalid customer grants");
+        const permittedTerritoryIds=[...new Set(grantRows.map(g=>(g as {territory_id:string}).territory_id))];
+        const links=await customerLinks.list({tenantId:context.tenantId,userId:user.id,accessToken,permittedTerritoryIds},customerLinksMatch[1]);
+        return json(200,{links});
       }
 
       if (request.method === "GET" && path === "/v1/tenants") {

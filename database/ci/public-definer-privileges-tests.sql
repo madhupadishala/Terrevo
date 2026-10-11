@@ -12,6 +12,15 @@ begin
  where ns.nspname='public' and p.prosecdef and p.proname like 'admin_%'
    and pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE');
  if n<>0 then raise exception 'Administrative mutation RPCs callable by authenticated clients: %',n;end if;
+ select count(*) into n from pg_catalog.pg_proc p
+ join pg_catalog.pg_namespace ns on ns.oid=p.pronamespace
+ where ns.nspname='public' and p.prosecdef
+   and pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE');
+ if n<>0 then raise exception 'Elevated client-readable bodies must be outside the exposed schema';end if;
+ if pg_catalog.has_function_privilege('authenticated','public.user_has_permission(uuid,uuid,text,uuid)','EXECUTE')
+   or pg_catalog.has_function_privilege('authenticated','public.employee_division(uuid,uuid)','EXECUTE') then
+   raise exception 'Internal actor-parameterized helpers are exposed';
+ end if;
  if not pg_catalog.has_function_privilege('authenticated','public.has_permission(uuid,text,uuid)','EXECUTE')
    or not pg_catalog.has_function_privilege('authenticated','public.my_start_tour_options(uuid)','EXECUTE')
    or not pg_catalog.has_function_privilege('authenticated','public.manager_command_center(uuid)','EXECUTE') then

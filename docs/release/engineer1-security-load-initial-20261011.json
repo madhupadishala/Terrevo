@@ -1,0 +1,844 @@
+{
+  "projectRef": "eirlubfbjexjilvskqxq",
+  "runId": "eng1-3809150601dc",
+  "synthetic": true,
+  "completedAt": "2026-10-11T08:18:42.615Z",
+  "qualified": false,
+  "budgets": {
+    "requests": 60,
+    "concurrency": 4,
+    "p95Ms": 3000,
+    "p99Ms": 5000,
+    "unexpectedErrors": 0
+  },
+  "measured": {
+    "count": 60,
+    "p50Ms": 820,
+    "p95Ms": 1347,
+    "p99Ms": 9382,
+    "maxMs": 9382,
+    "elapsedMs": 19476,
+    "unexpectedErrors": 0
+  },
+  "checks": [
+    {
+      "path": "/v1/auth/login",
+      "method": "POST",
+      "role": null,
+      "status": 200,
+      "elapsedMs": 8016,
+      "serverTiming": null,
+      "requestId": "778a3a8d-c9c3-4e8f-8db3-e4b29684e3e5"
+    },
+    {
+      "path": "/v1/auth/login",
+      "method": "POST",
+      "role": null,
+      "status": 200,
+      "elapsedMs": 537,
+      "serverTiming": null,
+      "requestId": "6516c963-eac9-42fe-911d-3af100096bb1"
+    },
+    {
+      "path": "/v1/auth/login",
+      "method": "POST",
+      "role": null,
+      "status": 200,
+      "elapsedMs": 608,
+      "serverTiming": null,
+      "requestId": "24762fc2-3149-4f2a-887b-8d7b29b8a714"
+    },
+    {
+      "path": "/v1/auth/login",
+      "method": "POST",
+      "role": null,
+      "status": 200,
+      "elapsedMs": 510,
+      "serverTiming": null,
+      "requestId": "8d975efe-60a6-44f1-9837-b4e831364d6f"
+    },
+    {
+      "path": "/rest/v1/doctors?select=id&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 10195,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/doctors?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
+      "method": "GET",
+      "role": "FOREIGN_MR",
+      "status": 200,
+      "elapsedMs": 8601,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/chemists?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
+      "method": "GET",
+      "role": "FOREIGN_MR",
+      "status": 200,
+      "elapsedMs": 8444,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/tour_plans?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
+      "method": "GET",
+      "role": "FOREIGN_MR",
+      "status": 200,
+      "elapsedMs": 8272,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/tour_executions?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
+      "method": "GET",
+      "role": "FOREIGN_MR",
+      "status": 200,
+      "elapsedMs": 8444,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/field_visits?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
+      "method": "GET",
+      "role": "FOREIGN_MR",
+      "status": 200,
+      "elapsedMs": 8301,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/dcrs?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
+      "method": "GET",
+      "role": "FOREIGN_MR",
+      "status": 200,
+      "elapsedMs": 8417,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/unplanned_calls?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
+      "method": "GET",
+      "role": "FOREIGN_MR",
+      "status": 200,
+      "elapsedMs": 8319,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/nca_records?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
+      "method": "GET",
+      "role": "FOREIGN_MR",
+      "status": 200,
+      "elapsedMs": 8269,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/leave_requests?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
+      "method": "GET",
+      "role": "FOREIGN_MR",
+      "status": 200,
+      "elapsedMs": 8288,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/expense_claims?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
+      "method": "GET",
+      "role": "FOREIGN_MR",
+      "status": 200,
+      "elapsedMs": 8451,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/business_customer_links?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
+      "method": "GET",
+      "role": "FOREIGN_MR",
+      "status": 200,
+      "elapsedMs": 8200,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/business_customer_link_grants?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
+      "method": "GET",
+      "role": "FOREIGN_MR",
+      "status": 200,
+      "elapsedMs": 8370,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/doctors?id=eq.fa72468c-813f-49f2-9088-d4e38bdc9b32",
+      "method": "POST",
+      "role": "MR",
+      "status": 403,
+      "elapsedMs": 8367,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/doctors?id=eq.fa72468c-813f-49f2-9088-d4e38bdc9b32",
+      "method": "PATCH",
+      "role": "MR",
+      "status": 403,
+      "elapsedMs": 8444,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/doctors?id=eq.fa72468c-813f-49f2-9088-d4e38bdc9b32",
+      "method": "DELETE",
+      "role": "MR",
+      "status": 403,
+      "elapsedMs": 245,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/business_customer_links",
+      "method": "POST",
+      "role": "MR",
+      "status": 403,
+      "elapsedMs": 252,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/business_customer_link_grants",
+      "method": "POST",
+      "role": "MR",
+      "status": 403,
+      "elapsedMs": 243,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/security_audit_events",
+      "method": "POST",
+      "role": "MR",
+      "status": 403,
+      "elapsedMs": 236,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/platform_admin_grants",
+      "method": "POST",
+      "role": "MR",
+      "status": 403,
+      "elapsedMs": 240,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/rpc/admin_start_tour",
+      "method": "POST",
+      "role": "MR",
+      "status": 404,
+      "elapsedMs": 236,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/rpc/admin_checkin_visit",
+      "method": "POST",
+      "role": "MR",
+      "status": 404,
+      "elapsedMs": 237,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/rpc/user_has_permission",
+      "method": "POST",
+      "role": "MR",
+      "status": 403,
+      "elapsedMs": 243,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/rest/v1/rpc/employee_division",
+      "method": "POST",
+      "role": "MR",
+      "status": 403,
+      "elapsedMs": 252,
+      "serverTiming": null,
+      "requestId": null
+    },
+    {
+      "path": "/v1/manager/analytics?days=0",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 400,
+      "elapsedMs": 840,
+      "serverTiming": null,
+      "requestId": "f96d05b5-e014-4b71-b5b3-b079018aed75"
+    },
+    {
+      "path": "/v1/manager/analytics?days=91",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 400,
+      "elapsedMs": 640,
+      "serverTiming": null,
+      "requestId": "115b4337-58e3-4461-b768-229f7cff0ff1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MR",
+      "status": 400,
+      "elapsedMs": 1116,
+      "serverTiming": null,
+      "requestId": "7cc5b6a4-3935-435c-a404-78f776cdd571"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 836,
+      "serverTiming": null,
+      "requestId": "08bc7eaa-6819-4434-9ac0-ad0ce10d8745"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 820,
+      "serverTiming": null,
+      "requestId": "af8912ec-3e16-420b-8e18-9e8de0e7d59a"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 852,
+      "serverTiming": null,
+      "requestId": "02bc4d9b-09f9-4d9f-8ccf-29c5afb9393d"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 828,
+      "serverTiming": null,
+      "requestId": "fd128773-0ca0-417a-9bbc-6799d540938e"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 824,
+      "serverTiming": null,
+      "requestId": "b1cf07c9-16a7-45a9-9b91-ab513ae2df65"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 1132,
+      "serverTiming": null,
+      "requestId": "5b5bf5d1-e168-4662-8a43-40d9a120b40e"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 848,
+      "serverTiming": null,
+      "requestId": "8bcfa3ff-2aa9-4b56-aa52-c9fd9d117f18"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 822,
+      "serverTiming": null,
+      "requestId": "995eb83d-d384-4731-a45d-f477e1a007a7"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 689,
+      "serverTiming": null,
+      "requestId": "8580a896-5329-4389-afc4-c62b134deb1a"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 816,
+      "serverTiming": null,
+      "requestId": "1262310d-4aae-40f4-bbfc-787556b3bff9"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 9090,
+      "serverTiming": null,
+      "requestId": "c34acf6c-664d-4ca6-916d-3559f7f195f7"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 9099,
+      "serverTiming": null,
+      "requestId": "f186711f-97e7-416d-9f1a-4a92aa8396ee"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 844,
+      "serverTiming": null,
+      "requestId": "f6e282e8-9cf6-4c33-9fc4-7eab642e5ff1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 9382,
+      "serverTiming": null,
+      "requestId": "44518814-536b-44be-a12c-9a8e7c4fe3a8"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 712,
+      "serverTiming": null,
+      "requestId": "66ba7085-2c0d-4e2f-aee9-d538f2e96017"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 796,
+      "serverTiming": null,
+      "requestId": "8ef08510-61a8-4dcf-a377-dab8e2e010b9"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 817,
+      "serverTiming": null,
+      "requestId": "80da82cf-c9c0-4f75-b327-95f43af0919d"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 1181,
+      "serverTiming": null,
+      "requestId": "f2df8036-5534-4d70-912b-1ea567ab8403"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 836,
+      "serverTiming": null,
+      "requestId": "7685cb12-392c-479b-9e3c-17887f760459"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 868,
+      "serverTiming": null,
+      "requestId": "e7bfd127-a6b6-491a-a48d-910e509e3e70"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 876,
+      "serverTiming": null,
+      "requestId": "93c9a49e-be4a-48d7-a684-ff55ca0a485b"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 850,
+      "serverTiming": null,
+      "requestId": "98090095-5bda-410c-8b30-da9482792d83"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 784,
+      "serverTiming": null,
+      "requestId": "6bc7f214-0b87-4881-b4b9-4ed32ba68f5a"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 1347,
+      "serverTiming": null,
+      "requestId": "3ab9bf23-0643-4c67-bc30-bbd2910f278a"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 1228,
+      "serverTiming": null,
+      "requestId": "6cf7ed0b-c388-4cde-a7f3-d06a9b988686"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 819,
+      "serverTiming": null,
+      "requestId": "d30af5e8-2d65-4465-84be-933de0b4831f"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 716,
+      "serverTiming": null,
+      "requestId": "a60174d2-0b9b-4f99-bee5-f95f7837d484"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 840,
+      "serverTiming": null,
+      "requestId": "d238ff08-7d25-48bf-be17-122120638e01"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 706,
+      "serverTiming": null,
+      "requestId": "6b7fb97a-5684-49fc-91c8-5797502f3e0d"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 828,
+      "serverTiming": null,
+      "requestId": "45f3b062-5a49-4af9-9b95-58dab853a441"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 1065,
+      "serverTiming": null,
+      "requestId": "877a9206-1093-4374-8fdb-d53e0d0d1232"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 765,
+      "serverTiming": null,
+      "requestId": "74940c88-5291-4dc6-9f10-af040a07379e"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 1200,
+      "serverTiming": null,
+      "requestId": "885a3695-51b2-431b-9ce4-dfb4c834e9a2"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 823,
+      "serverTiming": null,
+      "requestId": "e6c90f1b-c58b-4ee8-a84b-95f09c22d9ee"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 1128,
+      "serverTiming": null,
+      "requestId": "711cb053-6a45-4d6e-a694-05065c89246c"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 804,
+      "serverTiming": null,
+      "requestId": "9a262517-1f57-43b3-a6c2-bfc0e6036794"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 780,
+      "serverTiming": null,
+      "requestId": "008befa8-1698-4e8d-9dfe-c222ce1a03d0"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 824,
+      "serverTiming": null,
+      "requestId": "bee1da48-aa76-4b17-8f83-914740ad10b6"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 784,
+      "serverTiming": null,
+      "requestId": "f58caa9b-8e3f-4b14-b909-7d15bc9669e0"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 1092,
+      "serverTiming": null,
+      "requestId": "14cb24b2-a9d8-43ca-8d8c-7e632c5c16c9"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 789,
+      "serverTiming": null,
+      "requestId": "d1cbca1a-4e76-4736-8fa1-68a3a31ce1f3"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 792,
+      "serverTiming": null,
+      "requestId": "f04b77d2-7bd9-4574-b44e-6161b883c858"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 808,
+      "serverTiming": null,
+      "requestId": "1e5cb796-b0f4-486f-9013-e06be0d39153"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 896,
+      "serverTiming": null,
+      "requestId": "f9e3b71c-c294-4690-ad6a-6f4a2b4c876e"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 799,
+      "serverTiming": null,
+      "requestId": "b1fc5e62-32d9-4469-a9e8-238bf6e65bbf"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 792,
+      "serverTiming": null,
+      "requestId": "6f6d9a82-8a1f-4d43-b13b-9b8d49fd07ec"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 800,
+      "serverTiming": null,
+      "requestId": "e392ce12-4088-4006-b532-6bbe50dbfa5f"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 684,
+      "serverTiming": null,
+      "requestId": "5b97ce6d-c7ee-406f-a6b6-691a69cb01e9"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 780,
+      "serverTiming": null,
+      "requestId": "4de0c868-84a1-4147-801b-0c896fa42770"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 800,
+      "serverTiming": null,
+      "requestId": "7417454c-f46c-4237-a4fc-9cc128546c29"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 794,
+      "serverTiming": null,
+      "requestId": "4e2650ea-99e8-4619-a331-d18586c15f30"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 1088,
+      "serverTiming": null,
+      "requestId": "5e00bbe4-5389-40d7-b2b7-250b470aac64"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 716,
+      "serverTiming": null,
+      "requestId": "e37f1919-128f-4a53-a90f-cbfdc1e7d00e"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 796,
+      "serverTiming": null,
+      "requestId": "c919bbab-9752-486e-aecf-dbd1954ef338"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 859,
+      "serverTiming": null,
+      "requestId": "6cf1181f-13f9-4e80-ad50-c228e3c0b9e7"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 816,
+      "serverTiming": null,
+      "requestId": "0cb6d3cb-a773-4d70-95c0-c13a70746cc8"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 800,
+      "serverTiming": null,
+      "requestId": "117e3e84-7214-4af7-9a7a-4ac11c6b3e98"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "method": "GET",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 856,
+      "serverTiming": null,
+      "requestId": "912f637c-29eb-417c-88b8-42d18bc26dd0"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 815,
+      "serverTiming": null,
+      "requestId": "2bf296aa-8545-47e8-a52e-57b2739c9b30"
+    },
+    {
+      "path": "/v1/dcrs",
+      "method": "GET",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 784,
+      "serverTiming": null,
+      "requestId": "a85c90d4-115e-4b86-a648-e54da671696d"
+    }
+  ]
+}

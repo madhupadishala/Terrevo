@@ -16,6 +16,7 @@ function fixture({platformLeak=false,crossTenantLeak=false,missingManagerPermiss
   const id=opts.headers["x-tenant-id"];
   visits.push({method:opts.method,path:u.pathname,role,tenant:id});
   if(opts.method!=="GET")throw Error("Unexpected write");
+  assert.equal(opts.redirect,"error","qualification must not follow credential-bearing redirects");
   const reply=(status,body)=>Response.json(body,{status});
   if(!role)return reply(401,{error:"Anonymous not authorized"});
   if(u.pathname==="/api/v1/qualification/target")return reply(200,{environment:wrongRuntime?"unverified":"staging",projectRef:productionBackend?PRODUCTION_PROJECT_REF:ref,tenantId:T});
@@ -85,5 +86,16 @@ test("a preview connected to production or missing runtime attestation never qua
   const mock=fixture(opts),outcome=await auditStagingApi(env,mock.fetcher);
   assert.equal(outcome.passed,false);
   assert.ok(outcome.failures.some(x=>x.includes("Remote API did not attest")));
+  assert.equal(mock.visits.length,1,"must stop before sending other role credentials");
+  assert.equal(mock.visits[0].role,"MR");
  }
+});
+test("redirect and transport failures stop qualification before further credentials",async()=>{
+ let requests=0;
+ await assert.rejects(auditStagingApi(env,async (_url,opts)=>{
+  requests++;
+  assert.equal(opts.redirect,"error");
+  throw new TypeError("redirect refused");
+ }),/redirect refused/);
+ assert.equal(requests,1);
 });

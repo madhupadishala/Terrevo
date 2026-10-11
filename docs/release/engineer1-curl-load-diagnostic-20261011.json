@@ -1,0 +1,507 @@
+{
+  "projectRef": "eirlubfbjexjilvskqxq",
+  "runId": "eng1-3809150601dc",
+  "synthetic": true,
+  "transport": "curl 8.5.0 through managed proxy, four clients",
+  "region": "ap-northeast-1",
+  "budgets": {
+    "requests": 60,
+    "concurrency": 4,
+    "p95Ms": 3000,
+    "p99Ms": 5000,
+    "unexpectedErrors": 0
+  },
+  "measured": {
+    "count": 60,
+    "p50Ms": 8265,
+    "p95Ms": 9796,
+    "p99Ms": 10047,
+    "maxMs": 10047,
+    "unexpectedErrors": 0,
+    "elapsedMs": 126568
+  },
+  "qualified": false,
+  "checks": [
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8758,
+      "serverTiming": "app;dur=243",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8812,
+      "serverTiming": "app;dur=576",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8829,
+      "serverTiming": "app;dur=633",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8872,
+      "serverTiming": "app;dur=629",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 9091,
+      "serverTiming": "app;dur=149",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 9200,
+      "serverTiming": "app;dur=170",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 9203,
+      "serverTiming": "app;dur=149",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 9620,
+      "serverTiming": "app;dur=197",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8149,
+      "serverTiming": "app;dur=111",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8236,
+      "serverTiming": "app;dur=132",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8265,
+      "serverTiming": "app;dur=165",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8073,
+      "serverTiming": "app;dur=123",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8270,
+      "serverTiming": "app;dur=190",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8054,
+      "serverTiming": "app;dur=197",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8482,
+      "serverTiming": "app;dur=154",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8443,
+      "serverTiming": "app;dur=137",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8182,
+      "serverTiming": "app;dur=167",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8140,
+      "serverTiming": "app;dur=187",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 7949,
+      "serverTiming": "app;dur=180",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8173,
+      "serverTiming": "app;dur=131",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 7846,
+      "serverTiming": "app;dur=118",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8096,
+      "serverTiming": "app;dur=145",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8175,
+      "serverTiming": "app;dur=189",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8386,
+      "serverTiming": "app;dur=184",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 7849,
+      "serverTiming": "app;dur=132",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8086,
+      "serverTiming": "app;dur=160",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8468,
+      "serverTiming": "app;dur=141",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8569,
+      "serverTiming": "app;dur=202",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8429,
+      "serverTiming": "app;dur=163",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8461,
+      "serverTiming": "app;dur=151",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8351,
+      "serverTiming": "app;dur=138",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8480,
+      "serverTiming": "app;dur=148",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 7688,
+      "serverTiming": "app;dur=169",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 7986,
+      "serverTiming": "app;dur=174",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 7926,
+      "serverTiming": "app;dur=174",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8290,
+      "serverTiming": "app;dur=165",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8272,
+      "serverTiming": "app;dur=147",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8653,
+      "serverTiming": "app;dur=142",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8699,
+      "serverTiming": "app;dur=164",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8550,
+      "serverTiming": "app;dur=246",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 9920,
+      "serverTiming": "app;dur=188",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 9796,
+      "serverTiming": "app;dur=270",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 10047,
+      "serverTiming": "app;dur=305",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 9980,
+      "serverTiming": "app;dur=309",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8135,
+      "serverTiming": "app;dur=166",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8035,
+      "serverTiming": "app;dur=143",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8264,
+      "serverTiming": "app;dur=350",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8317,
+      "serverTiming": "app;dur=145",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8044,
+      "serverTiming": "app;dur=121",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8039,
+      "serverTiming": "app;dur=171",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 7876,
+      "serverTiming": "app;dur=134",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 7818,
+      "serverTiming": "app;dur=183",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 7993,
+      "serverTiming": "app;dur=86",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8122,
+      "serverTiming": "app;dur=150",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8122,
+      "serverTiming": "app;dur=192",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8396,
+      "serverTiming": "app;dur=144",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/dcrs",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 7704,
+      "serverTiming": "app;dur=93",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/analytics?days=7",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8147,
+      "serverTiming": "app;dur=164",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/unplanned-calls/own",
+      "role": "MR",
+      "status": 200,
+      "elapsedMs": 8077,
+      "serverTiming": "app;dur=161",
+      "edgeRegion": "ap-northeast-1"
+    },
+    {
+      "path": "/v1/manager/command-center",
+      "role": "MANAGER",
+      "status": 200,
+      "elapsedMs": 8357,
+      "serverTiming": "app;dur=137",
+      "edgeRegion": "ap-northeast-1"
+    }
+  ],
+  "completedAt": "2026-10-11T13:06:03.945Z"
+}

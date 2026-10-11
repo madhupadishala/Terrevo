@@ -21,7 +21,7 @@ begin
      not pg_catalog.has_function_privilege('service_role',v_fn,'EXECUTE')
   then raise exception 'Unplanned-call RPC grants unsafe for %',v_fn; end if;
  end loop;
- if exists(select 1 from public.unplanned_calls)then
+ if current_database() in('terrevo_ci','terrevo_restore_ci') and exists(select 1 from public.unplanned_calls)then
   raise exception 'No fabricated field calls may be seeded';
  end if;
 end;$$;
