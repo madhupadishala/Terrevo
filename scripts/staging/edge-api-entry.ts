@@ -8,7 +8,8 @@ const api=url==='https://eirlubfbjexjilvskqxq.supabase.co' ? createVercelApiHand
 Deno.serve(async(request:Request)=>{
  if(!api)return Response.json({error:'Isolated staging configuration required'},{status:503});
  const target=new URL(request.url);
- // The gateway forwards the function prefix at the start of this pathname.
+ // Gateways may retain the fixed /functions/v1 transport prefix.
+ target.pathname=target.pathname.replace(/^\/functions\/v1(?=\/)/,'');
  const marker='/terrevo-staging-api';
  if(target.pathname!==marker&&!target.pathname.startsWith(marker+'/'))return new Response(null,{status:404});
  target.pathname=target.pathname.slice(marker.length)||'/health';

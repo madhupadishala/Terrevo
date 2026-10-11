@@ -32,7 +32,7 @@ begin
   execute format('create or replace function public.%I(%s) returns %s language sql %s security invoker set search_path = '''' as %L',
     f.proname,f.args,f.result,
     case f.provolatile when 's' then 'stable' when 'i' then 'immutable' else 'volatile' end,
-    format('select %s terrevo_security.%I(%s);',case when f.proretset then '*' else '' end,f.proname,coalesce(arguments,'')));
+    format('select %s terrevo_security.%I(%s);',case when f.proretset then '* from' else '' end,f.proname,coalesce(arguments,'')));
   -- These are internal actor-parameterized checks, never application RPCs.
   if f.proname in('employee_division','inventory_item_division','user_has_permission','user_has_plan_permission') then
    execute format('revoke execute on function %s from authenticated',signature);
