@@ -90,6 +90,8 @@ jobs:
           done
       - name: Platform administrator isolation and audit tests
         run: psql -v ON_ERROR_STOP=1 -f database/ci/platform-admin-policy-tests.sql
+      - name: Public security definer and administrative RPC privilege isolation
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/public-definer-privileges-tests.sql
       - name: NCA tenant isolation and denied-write policy tests
         run: psql -v ON_ERROR_STOP=1 -f database/ci/nca-policy-tests.sql
       - name: Unplanned call persistence-security policy checks
