@@ -485,6 +485,22 @@ export default function App() {
           </div></>:
           <Panel eyebrow="MANAGER ACCESS" title="Manager workspace is permission-gated"><p className="tr-detail">The actual manager command and approval APIs only permit an authorized manager or tenant administrator. No fake results are displayed.</p></Panel>)}
 
+        {view==="admin"&&admin&&<Panel eyebrow="SUPERUSER CONFIGURATION" title="Set up your organization">
+          <p className="tr-detail">Use the actual Terrevo APIs below to configure the tenant. Every write is restricted to the current tenant and requires the server-side administrator role. Never enter synthetic staging identities as real clients.</p>
+          <div className="tr-form">
+            <h3>Customer and workforce master data</h3>
+            <div className="tr-footer-actions">
+              {([["employees","Employees"],["doctors","Doctors"],["chemists","Chemists"],["stockists","Stockists"],["products","Products"],["samples","Samples"],["gifts","Gifts"]] as const).map(([key,label])=>
+                <Button key={key} kind={masterKind===key?"primary":"tertiary"} size="sm" onClick={()=>setMasterKind(key)}>{label}</Button>)}
+            </div>
+            <p className="tr-detail">Select a master above, then use the Business administration form to create records. Organization hierarchy, role assignment and NCA master configuration are available below.</p>
+          </div>
+        </Panel>}
+        {view==="admin"&&isPlatformAdmin&&<Panel eyebrow="PLATFORM CONTROL PLANE" title="Client organizations">
+          <p className="tr-detail">Platform Super Admin can create and manage client tenants in the separate audited control plane. Tenant master-data access is not automatically elevated.</p>
+          <Button kind="secondary" size="sm" onClick={()=>setView("platform")}>Open client organization administration</Button>
+        </Panel>}
+
         {view==="admin"&&(admin?<div className="tr-grid-wide">
           <Panel eyebrow="ORGANIZATION STRUCTURE" title="Manage reporting hierarchy">
             <div className="tr-form"><TextInput id="org-code" labelText="Unit code" value={unitCode} onChange={e=>setUnitCode(e.target.value)}/>
