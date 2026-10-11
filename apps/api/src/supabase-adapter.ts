@@ -21,6 +21,7 @@ import type { JointWork, JointWorkRepository } from "../../../modules/joint-work
 import type { ManagerCommandCenter, ManagerCommandRepository } from "../../../modules/manager-command/src/index.ts";
 import type { AnalyticsRepository, ManagerAnalytics } from "../../../modules/analytics/src/index.ts";
 import type { NcaRepository, NcaRecord } from "../../../modules/nca/src/index.ts";
+import type {UnplannedRepository,UnplannedCall} from "../../../modules/unplanned-calls/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -153,6 +154,7 @@ export function createSupabaseAdapter(
   managerCommand: ManagerCommandRepository;
   analytics: AnalyticsRepository;
   nca: NcaRepository;
+  unplanned: UnplannedRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -1078,5 +1080,51 @@ export function createSupabaseAdapter(
       }));
     },
   };
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders, attendanceLeave, expenses, jointWork, managerCommand, analytics, nca };
+
+  const mapUnplanned=(row:Record<string,unknown>):UnplannedCall=>({
+    id:String(row.id),executionId:String(row.execution_id),workDate:String(row.work_date),
+    territoryId:String(row.territory_id),customerType:row.customer_type as UnplannedCall["customerType"],
+    customerId:String(row.customer_id),reason:String(row.reason),remarks:String(row.remarks),
+    durationMinutes:Number(row.duration_minutes),latitude:Number(row.latitude),longitude:Number(row.longitude),
+    accuracyMeters:Number(row.accuracy_meters),status:row.status as UnplannedCall["status"],
+    managerComment:row.manager_comment==null?null:String(row.manager_comment),
+    submittedAt:String(row.submitted_at),reviewedAt:row.reviewed_at==null?null:String(row.reviewed_at),
+  });
+  const unplanned:UnplannedRepository={
+    async submit(t,u,v){
+      const response=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_submit_unplanned_call`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:t,p_user_id:u,p_operation_id:v.operationId,p_execution_id:v.executionId,
+          p_territory_id:v.territoryId,p_customer_type:v.customerType,p_customer_id:v.customerId,
+          p_reason:v.reason,p_remarks:v.remarks,p_duration:v.durationMinutes,
+          p_latitude:v.latitude,p_longitude:v.longitude,p_accuracy:v.accuracyMeters,
+        }),
+      }));
+      return await response.json() as string;
+    },
+    async own(t,u,token){
+      const q=new URLSearchParams({select:"*",tenant_id:"eq."+t,actor_user_id:"eq."+u,order:"submitted_at.desc",limit:"200"});
+      const response=await expectOk(await fetcher(`${base}/rest/v1/unplanned_calls?${q}`,{headers:authHeaders(config,token)}));
+      return (await response.json() as Array<Record<string,unknown>>).map(mapUnplanned);
+    },
+    async pending(t,token){
+      const q=new URLSearchParams({select:"*",tenant_id:"eq."+t,status:"eq.SUBMITTED",order:"submitted_at.asc",limit:"200"});
+      const response=await expectOk(await fetcher(`${base}/rest/v1/unplanned_calls?${q}`,{headers:authHeaders(config,token)}));
+      return (await response.json() as Array<Record<string,unknown>>).map(mapUnplanned);
+    },
+    async byId(t,id,token){
+      const q=new URLSearchParams({select:"*",tenant_id:"eq."+t,id:"eq."+id,limit:"1"});
+      const response=await expectOk(await fetcher(`${base}/rest/v1/unplanned_calls?${q}`,{headers:authHeaders(config,token)}));
+      const row=(await response.json() as Array<Record<string,unknown>>)[0];
+      return row?mapUnplanned(row):null;
+    },
+    async decide(t,actor,id,decision,comment){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_decide_unplanned_call`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:t,p_actor:actor,p_call_id:id,p_decision:decision,p_comment:comment,
+        }),
+      }));
+    },
+  };
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders, attendanceLeave, expenses, jointWork, managerCommand, analytics, nca, unplanned };
 }
