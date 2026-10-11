@@ -225,7 +225,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         return json(200, { events: await platform.audit(user.id, offset) });
       }
 
-      const customerLinksMatch=/^\\/v1\\/business\\/customer-links\\/([^/]+)$/.exec(path);
+      const customerLinksMatch=new RegExp("^/v1/business/customer-links/([^/]+)$").exec(path);
       if(request.method==="GET"&&customerLinksMatch){
         const {accessToken,user,context}=await resolveTenantRequest(request);
         // Fetch grants through user-JWT RLS: never accept caller-supplied territory authorization.
