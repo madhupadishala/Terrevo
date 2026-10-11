@@ -1082,7 +1082,7 @@ export function createSupabaseAdapter(
   };
 
   const mapUnplanned=(row:Record<string,unknown>):UnplannedCall=>({
-    id:String(row.id),executionId:String(row.execution_id),workDate:String(row.work_date),
+    id:String(row.id),actorUserId:String(row.actor_user_id),executionId:String(row.execution_id),workDate:String(row.work_date),
     territoryId:String(row.territory_id),customerType:row.customer_type as UnplannedCall["customerType"],
     customerId:String(row.customer_id),reason:String(row.reason),remarks:String(row.remarks),
     durationMinutes:Number(row.duration_minutes),latitude:Number(row.latitude),longitude:Number(row.longitude),
