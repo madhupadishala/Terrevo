@@ -188,8 +188,8 @@ export class TerrevoWebApi {
   }
   async submitUnplannedCall(input:{executionId:string;territoryId:string;customerType:"doctor"|"chemist"|"stockist";
     customerId:string;reason:string;remarks:string;durationMinutes:number;
-    latitude:number;longitude:number;accuracyMeters:number;}):Promise<UnplannedCall>{
-    return (await this.raw("/v1/unplanned-calls","POST",{...input,operationId:crypto.randomUUID()}) as {call:UnplannedCall}).call;
+    latitude:number;longitude:number;accuracyMeters:number;operationId?:string;}):Promise<UnplannedCall>{
+    return (await this.raw("/v1/unplanned-calls","POST",{...input,operationId:input.operationId??crypto.randomUUID()}) as {call:UnplannedCall}).call;
   }
   async reviewUnplannedCall(id:string,decision:"APPROVE"|"REJECT",comment:string|null):Promise<UnplannedCall>{
     return (await this.raw("/v1/unplanned-approvals/"+encodeURIComponent(id)+"/decision","POST",{decision,comment}) as {call:UnplannedCall}).call;
@@ -201,8 +201,8 @@ export class TerrevoWebApi {
     return (await this.raw("/v1/nca/own") as {records:NcaRecord[]}).records;
   }
   async saveNcaDraft(input:{phase:"PLAN"|"REPORT";workDate:string;territoryId:string;
-    categoryCode:string;townId:string|null;reason:string;remarks:string;durationMinutes:number}):Promise<NcaRecord>{
-    return (await this.raw("/v1/nca","POST",{...input,operationId:crypto.randomUUID()}) as {record:NcaRecord}).record;
+    categoryCode:string;townId:string|null;reason:string;remarks:string;durationMinutes:number;operationId?:string}):Promise<NcaRecord>{
+    return (await this.raw("/v1/nca","POST",{...input,operationId:input.operationId??crypto.randomUUID()}) as {record:NcaRecord}).record;
   }
   async submitNca(id:string):Promise<NcaRecord>{
     return (await this.raw("/v1/nca/"+encodeURIComponent(id)+"/submit","POST") as {record:NcaRecord}).record;
