@@ -239,7 +239,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         if(!grantResponse.ok)throw new BusinessAccessError("Customer grant retrieval denied");
         const grantRows:unknown=await grantResponse.json();
         if(!Array.isArray(grantRows)||grantRows.some((g:unknown)=>!g||typeof g!=="object"||typeof (g as {territory_id?:unknown}).territory_id!=="string"))throw new BusinessAccessError("Invalid customer grants");
-        const permittedTerritoryIds=[...new Set(grantRows.map((g:{territory_id:string})=>g.territory_id))];
+        const permittedTerritoryIds=[...new Set(grantRows.map(g=>(g as {territory_id:string}).territory_id))];
         const links=await customerLinks.list({tenantId:context.tenantId,userId:user.id,accessToken,permittedTerritoryIds},customerLinksMatch[1]);
         return json(200,{links});
       }
