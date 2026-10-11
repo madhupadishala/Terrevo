@@ -52,7 +52,7 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 
 function uuid(value:unknown,field:string):string {
   if(typeof value!=="string"||!UUID.test(value)) throw new TourExecutionInputError(`${field} must be a UUID`);
-  return value;
+  return value.toLowerCase();
 }
 function number(value:unknown,field:string,min:number,max:number):number {
   if(typeof value!=="number"||!Number.isFinite(value)||value<min||value>max) {
@@ -98,6 +98,21 @@ export function createTourExecutionService(repository:TourExecutionRepository,rb
         appVersion:optionalText(value.appVersion,"appVersion",80),
       };
 
+      // A committed start disappears from start options. Recover a lost response
+      // from the authenticated owner's active execution before requiring options.
+      const existing=await repository.getActive(tenantId,accessToken);
+      if(existing?.operationId===command.operationId){
+        await rbac.authorize(tenantId,"TOUR_PLAN_OWN",existing.territoryId,accessToken);
+        if(existing.planDayId!==command.planDayId ||
+          optionalTimestamp(existing.deviceStartedAt)!==command.deviceStartedAt ||
+          existing.startLatitude!==command.latitude || existing.startLongitude!==command.longitude ||
+          existing.startAccuracyMeters!==command.accuracyMeters ||
+          existing.deviceId!==command.deviceId || existing.networkType!==command.networkType ||
+          existing.appVersion!==command.appVersion){
+          throw new TourExecutionConflictError("Operation ID reused with different start payload");
+        }
+        return existing;
+      }
       const options=await repository.listStartOptions(tenantId,accessToken);
       const option=options.find((item)=>item.planDayId===command.planDayId);
       if(!option) throw new TourExecutionNotFoundError("Approved tour day is not available to start");

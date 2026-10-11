@@ -14,7 +14,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run verify:foundation
       - run: npm run verify:release
       - run: npm run test:release-safety
@@ -34,7 +34,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run typecheck
       - run: npm test
       - run: npm run bundle:android
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run build:web
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
@@ -98,6 +98,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/ci/nca-policy-tests.sql
       - name: Real PostgreSQL NCA persistence, idempotency and tenant-isolation tests
         run: psql -v ON_ERROR_STOP=1 -f database/ci/nca-integration-tests.sql
+      - name: Planned field lifecycle, conflicting retries and manager metric reconciliation
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/planned-field-lifecycle-tests.sql
       - name: Unplanned call persistence-security policy checks
         run: psql -v ON_ERROR_STOP=1 -f database/ci/unplanned-call-policy-tests.sql
       - name: Unplanned call PostgreSQL persistence and manager-review integration tests
@@ -114,6 +116,17 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Enforce Engineer 1 / Engineer 2 file ownership
+        env:
+          TERREVO_DIFF_BASE: ${{ github.event.pull_request.base.sha }}
+          TERREVO_HEAD_BRANCH: ${{ github.head_ref }}
+        run: node scripts/r01-ownership.mjs
       - name: Require PR scope declaration
         env:
           PR_BODY: ${{ github.event.pull_request.body }}

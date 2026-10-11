@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // R01: fail-closed path ownership check. No external packages or network access.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
 export const engine2Paths = [
   /^apps\/web\/src\/features\/(customer-relations|clm-library|workforce-evidence|manager-reporting)\//,
@@ -31,15 +32,36 @@ export function parseNameStatus(text) {
   }
   return paths;
 }
+// NUL-delimited git output preserves tabs, newlines and quoted names verbatim.
+export function parseNameStatusZ(text) {
+  if (!text) return [];
+  const fields = text.split('\0');
+  if (fields.pop() !== '') throw new Error('Unterminated git diff output');
+  const paths = [];
+  for (let i = 0; i < fields.length;) {
+    const status = fields[i++];
+    if (!/^[ACDMRTUXB][0-9]*$/.test(status)) throw new Error('Unrecognized git diff status: ' + status);
+    const count = /^[RC]/.test(status) ? 2 : 1;
+    for (let n = 0; n < count; n++) {
+      if (!fields[i]) throw new Error('Missing git diff path');
+      paths.push(fields[i++]);
+    }
+  }
+  return paths;
+}
+export function ownerForBranch(branch) {
+  return /^feature\/terrevo-s(09-customer-relations|11-clm-library|13-workforce-evidence|14-manager-reporting)-ui$/.test(branch)
+    ? 'engineer2' : 'engineer1';
+}
 function main() {
-  const owner = process.env.TERREVO_OWNER ?? 'engineer1';
+  const owner = process.env.TERREVO_OWNER ?? ownerForBranch(process.env.TERREVO_HEAD_BRANCH ?? '');
   const base = process.env.TERREVO_DIFF_BASE;
   if (!base || !/^[a-zA-Z0-9._\/-]+$/.test(base) || base.startsWith('-')) {
     throw new Error('TERREVO_DIFF_BASE must be an explicit trusted git ref');
   }
   execFileSync('git', ['rev-parse', '--verify', base + '^{commit}'], {stdio:'pipe'});
-  const output = execFileSync('git', ['diff', '--name-status', '--find-renames', base + '...HEAD'], {encoding:'utf8'});
-  const paths = parseNameStatus(output);
+  const output = execFileSync('git', ['diff', '--name-status', '-z', '--find-renames', base + '...HEAD'], {encoding:'utf8'});
+  const paths = parseNameStatusZ(output);
   const violations = validateChangedPaths(paths, owner);
   if (violations.length) {
     process.stderr.write('R01 OWNERSHIP VIOLATION for ' + owner + ':\n' + violations.join('\n') + '\n');
@@ -48,6 +70,6 @@ function main() {
     console.log('R01 path ownership PASS (' + owner + '): ' + paths.length + ' paths checked');
   }
 }
-if (process.argv[1] && import.meta.url === new URL('file://' + process.argv[1]).href) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   try { main(); } catch (err) { console.error('R01 check failed:', err.message); process.exitCode = 1; }
 }

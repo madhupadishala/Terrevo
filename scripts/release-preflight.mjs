@@ -21,6 +21,7 @@ const requiredFiles = [
   "apps/web/e2e/nca-flow.spec.ts",
   "apps/web/e2e/planned-unplanned-flow.spec.ts",
   "database/ci/platform-admin-policy-tests.sql",
+  "database/ci/planned-field-lifecycle-tests.sql",
   "database/ci/unplanned-call-integration-tests.sql",
   "database/ci/unplanned-call-policy-tests.sql",
   "database/ci/nca-policy-tests.sql",
@@ -30,6 +31,10 @@ const requiredFiles = [
   "database/migrations/9999_platform_admin_control_plane.sql",
   "database/migrations/0024_lockdown_public_definers.sql",
   "database/migrations/0025_immutable_function_search_paths.sql",
+  "database/migrations/20261011065020_field_operation_replay_integrity.sql",
+  "database/migrations/20261011065020_field_operation_replay_integrity.down.sql",
+  "scripts/r01-ownership.mjs",
+  "package-lock.json",
   "docs/requirements/planned-unplanned-call-qualification.md",
   "docs/requirements/nca-controlled-field-activities.md",
 ];
