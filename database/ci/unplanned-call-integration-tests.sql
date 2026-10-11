@@ -88,5 +88,34 @@ begin
   raise exception 'Approved unplanned call was reviewed twice';
  exception when unique_violation then null;
  end;
-end;$$;
+end;$;
+
+-- Exercise actual RLS under the authenticated role and simulated Supabase JWT claim.
+select set_config('request.jwt.claim.sub','f0000000-0000-4000-8000-000000000002',true);
+set local role authenticated;
+do $
+begin
+ if (select count(*) from public.unplanned_calls where tenant_id='f0000000-0000-4000-8000-000000000001')<>1
+ then raise exception 'Representative cannot read their own persisted unplanned call';end if;
+end;$;
+reset role;
+select set_config('request.jwt.claim.sub','f0000000-0000-4000-8000-000000000003',true);
+set local role authenticated;
+do $
+begin
+ if (select count(*) from public.unplanned_calls where tenant_id='f0000000-0000-4000-8000-000000000001')<>1
+ then raise exception 'Authorized manager cannot read the reviewed team call';end if;
+ if (select count(*) from public.unplanned_call_decisions where tenant_id='f0000000-0000-4000-8000-000000000001')<>1
+ then raise exception 'Authorized manager cannot read call decision evidence';end if;
+end;$;
+reset role;
+select set_config('request.jwt.claim.sub','f0000000-0000-4000-8000-000000000004',true);
+set local role authenticated;
+do $
+begin
+ if exists(select 1 from public.unplanned_calls where tenant_id='f0000000-0000-4000-8000-000000000001')
+   or exists(select 1 from public.unplanned_call_decisions where tenant_id='f0000000-0000-4000-8000-000000000001')
+ then raise exception 'Unaffiliated actor bypassed tenant isolation';end if;
+end;$;
+reset role;
 rollback;
