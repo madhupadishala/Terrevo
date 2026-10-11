@@ -16,6 +16,7 @@ jobs:
           node-version: "22"
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run verify:foundation
+      - run: npm run verify:release
       - run: npm run typecheck
       - run: npm test
       - run: npm run test:web
