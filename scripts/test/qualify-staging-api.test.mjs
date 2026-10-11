@@ -9,7 +9,7 @@ const env={TERREVO_ENVIRONMENT:"staging",TERREVO_STAGING_PROJECT_REF:ref,
  SUPABASE_URL:`https://${ref}.supabase.co`,TERREVO_STAGING_API_ORIGIN:"http://127.0.0.1:3000",
  TERREVO_UAT_TENANT_ID:T,TERREVO_UAT_FOREIGN_TENANT_ID:O,
  TERREVO_MR_ACCESS_TOKEN:"mr-secret",TERREVO_MANAGER_ACCESS_TOKEN:"manager-secret",TERREVO_ADMIN_ACCESS_TOKEN:"admin-secret"};
-function fixture({platformLeak=false,crossTenantLeak=false,missingManagerPermission=false}={}){
+function fixture({platformLeak=false,crossTenantLeak=false,missingManagerPermission=false,wrongRuntime=false,productionBackend=false}={}){
  const visits=[];
  const fetcher=async (url,opts)=>{
   const u=new URL(url),role={ "Bearer mr-secret":"MR","Bearer manager-secret":"MANAGER","Bearer admin-secret":"TENANT_ADMIN"}[opts.headers.authorization];
@@ -18,6 +18,7 @@ function fixture({platformLeak=false,crossTenantLeak=false,missingManagerPermiss
   if(opts.method!=="GET")throw Error("Unexpected write");
   const reply=(status,body)=>Response.json(body,{status});
   if(!role)return reply(401,{error:"Anonymous not authorized"});
+  if(u.pathname==="/api/v1/qualification/target")return reply(200,{environment:wrongRuntime?"unverified":"staging",projectRef:productionBackend?PRODUCTION_PROJECT_REF:ref,tenantId:T});
   if(u.pathname==="/api/v1/tenants")return reply(200,{tenants:[{id:T}]});
   if(id===O&&crossTenantLeak)return reply(200,{context:{permissions:[]}});
   if(id===O)return reply(403,{error:"Other tenant"});
@@ -77,4 +78,12 @@ test("cross-tenant evidence cannot be silently omitted",async()=>{
  const mock=fixture(),outcome=await auditStagingApi({...env,TERREVO_UAT_FOREIGN_TENANT_ID:""},mock.fetcher);
  assert.equal(outcome.passed,false);
  assert.match(outcome.missingEvidence.join(" " ),/Cross-tenant denial/);
+});
+
+test("a preview connected to production or missing runtime attestation never qualifies",async()=>{
+ for(const opts of [{wrongRuntime:true},{productionBackend:true}]){
+  const mock=fixture(opts),outcome=await auditStagingApi(env,mock.fetcher);
+  assert.equal(outcome.passed,false);
+  assert.ok(outcome.failures.some(x=>x.includes("Remote API did not attest")));
+ }
 });
