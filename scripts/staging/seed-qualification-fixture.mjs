@@ -4,7 +4,9 @@ import {randomUUID} from 'node:crypto';
 const path=process.argv[2];if(!path)throw Error('Private identity manifest required');
 const manifest=JSON.parse(fs.readFileSync(path,'utf8'));
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-for(const role of ['MR','MANAGER','TENANT_ADMIN','FOREIGN_MR'])if(!uuid.test(manifest.users.find(u=>u.role===role)?.id??''))throw Error('Supported Auth identity missing');
+const mainRoles=['MR','MANAGER','TENANT_ADMIN',...['MR2','UNSCOPED'].filter(role=>manifest.users.some(u=>u.role===role))];
+const identityRoles=[...mainRoles,'FOREIGN_MR'];
+for(const role of identityRoles)if(manifest.users.filter(u=>u.role===role).length!==1||!uuid.test(manifest.users.find(u=>u.role===role)?.id??''))throw Error('Supported Auth identity missing or ambiguous');
 const ids=manifest.fixture??Object.fromEntries(['tenant','foreignTenant','company','division','zone','region','area','territory','foreignCompany','foreignDivision','foreignZone','foreignRegion','foreignArea','foreignTerritory','mrEmployee','managerEmployee','doctor','unplannedDoctor','chemist','product'].map(k=>[k,randomUUID()]));
 if(manifest.users.some(u=>u.role==='MR2')&&!ids.mr2Employee){ids.mr2Employee=randomUUID();manifest.fixture=ids;fs.writeFileSync(path,JSON.stringify(manifest),{mode:0o600});}
 if(Object.values(ids).some(id=>!uuid.test(id)))throw Error("Invalid stored fixture IDs");
@@ -12,9 +14,8 @@ if(!manifest.fixture){manifest.fixture=ids;fs.writeFileSync(path,JSON.stringify(
 const user=role=>manifest.users.find(u=>u.role===role).id;
 const q=value=>"'"+value.replaceAll("'","''")+"'";
 const sql=['begin;'];
-sql.push(`do $$begin if not exists(select 1 from auth.users where id=${q(user('MR'))} and raw_app_meta_data->>'qualification_run'=${q(manifest.runId)}) then raise exception 'Supported qualification identity required';end if;end;$$;`);
+sql.push(`do $$begin if exists(select 1 from (values ${identityRoles.map(role=>`(${q(user(role))}::uuid,${q(role)},${q(manifest.runId+'-'+role.toLowerCase()+'@example.invalid')})`).join(',')}) as expected(id,role,email) where not exists(select 1 from auth.users u where u.id=expected.id and u.email=expected.email and u.raw_app_meta_data->>'qualification_run'=${q(manifest.runId)} and u.raw_app_meta_data->>'qualification_role'=expected.role)) then raise exception 'Supported qualification identity required';end if;end;$$;`);
 sql.push(`insert into public.tenants(id,name,slug,time_zone) values (${q(ids.tenant)},'Synthetic Engineering Qualification',${q(manifest.runId)},'Asia/Kolkata'),(${q(ids.foreignTenant)},'Synthetic Foreign Qualification',${q(manifest.runId+'-foreign')},'Asia/Kolkata');`);
-const mainRoles=['MR','MANAGER','TENANT_ADMIN',...['MR2','UNSCOPED'].filter(role=>manifest.users.some(u=>u.role===role))];
 sql.push(`insert into public.tenant_memberships(tenant_id,user_id) values ${mainRoles.map(r=>`(${q(ids.tenant)},${q(user(r))})`).join(',')},(${q(ids.foreignTenant)},${q(user('FOREIGN_MR'))});`);
 for(const prefix of ['','foreign']){
  const tenant=prefix?ids.foreignTenant:ids.tenant;let parent=null;

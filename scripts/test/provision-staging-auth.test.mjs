@@ -42,11 +42,12 @@ test('fresh handler reconciles an owned identity after response loss without dup
  const fetcher=async(url,init)=>{
   if(!init.method){assert.equal(new URL(url).searchParams.get('filter'),config.identities[0].email);return Response.json({users:stored?[stored]:[]});}
   const body=JSON.parse(init.body);
-  if(init.method==='POST'){creates++;stored={id:'durable-id',email:body.email,app_metadata:body.app_metadata};}
+  if(init.method==='POST'){creates++;stored={id:'durable-id',email:body.email,app_metadata:body.app_metadata};throw Error('Create committed but response lost');}
   else assert.equal(init.method,'PUT');
   return Response.json(stored);
  };
- for(let attempt=0;attempt<2;attempt++){const response=await createAuthProvisioner(config,env,fetcher,()=>0)(request());assert.equal(response.status,200);assert.equal((await response.json()).users[0].id,'durable-id');}
+ const lost=await createAuthProvisioner(config,env,fetcher,()=>0)(request());assert.equal(lost.status,502);
+ const retried=await createAuthProvisioner(config,env,fetcher,()=>0)(request());assert.equal(retried.status,200);assert.equal((await retried.json()).users[0].id,'durable-id');
  assert.equal(creates,1);
 });
 test('provider failures preserve partial created IDs and do not masquerade as ownership denial',async()=>{
