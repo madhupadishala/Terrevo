@@ -13,7 +13,8 @@ cleanup() {
 trap cleanup EXIT
 createdb terrevo_concurrency_ci
 concurrency_created=true
-pg_dump --schema-only --no-owner | PGDATABASE=terrevo_concurrency_ci psql -X -v ON_ERROR_STOP=1 >/dev/null
+# Include the migrated role/permission catalogs, not just table definitions.
+pg_dump --no-owner | PGDATABASE=terrevo_concurrency_ci psql -X -v ON_ERROR_STOP=1 >/dev/null
 export PGDATABASE=terrevo_concurrency_ci
 psql -X -v ON_ERROR_STOP=1 -f database/ci/planned-field-concurrency-fixture.sql
 
