@@ -77,6 +77,15 @@ function requireConfig(env: ApiEnv): SupabaseConfig {
   };
 }
 
+/** Deployment identity is derived from server-owned runtime configuration, never a query/header. */
+export function runtimeQualificationProof(env: ApiEnv, tenantId: string) {
+  const ref=/^https:\/\/([a-z0-9]{20})\.supabase\.co\/?$/.exec(env.SUPABASE_URL??"")?.[1]??null;
+  const isStaging=env.TERREVO_ENVIRONMENT==="staging" &&
+    env.VERCEL_ENV!=="production" && ref!==null &&
+    ref!=="dfqsnkmmumvjwmvtnlcs";
+  return { environment:isStaging?"staging":"unverified", projectRef:ref, tenantId };
+}
+
 /** Maps domain and provider failures to stable public API responses. */
 function mapError(error: unknown): Response {
   if (error instanceof ApiError || error instanceof RequestBodyError) return json(error.status, { error: error.message });
@@ -184,15 +193,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
       // client-supplied environment or project reference as evidence of safety.
       if (request.method === "GET" && path === "/v1/qualification/target") {
         const {context}=await resolveTenantRequest(request);
-        const ref=/^https:\/\/([a-z0-9]{20})\.supabase\.co\/?$/.exec(env.SUPABASE_URL??"")?.[1]??null;
-        const isStaging=env.TERREVO_ENVIRONMENT==="staging" &&
-          env.VERCEL_ENV!=="production" && ref!==null &&
-          ref!=="dfqsnkmmumvjwmvtnlcs";
-        return json(200,{
-          environment:isStaging?"staging":"unverified",
-          projectRef:ref,
-          tenantId:context.tenantId,
-        });
+        return json(200,runtimeQualificationProof(env,context.tenantId));
       }
 
       // Platform administration is strictly separate from tenant RBAC.
