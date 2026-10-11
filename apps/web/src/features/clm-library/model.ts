@@ -7,13 +7,15 @@ export type DetailingHandoff={tenantId:string;contextKey:string;assetId:string;a
 export type ClmLibraryProps={scope:CatalogScope;assets?:CatalogAsset[];sessions?:SessionSummary[];activeVisit?:ActiveVisit|null;loading?:boolean;error?:string|null;onRequestDetailing?:(intent:DetailingHandoff)=>void};
 export function allowedCatalog(s:CatalogScope,assets:CatalogAsset[]):CatalogAsset[]{
  if(!s.tenantId||s.tenantId!==s.authorizedForTenantId||!s.contextKey)return [];
- const keys=new Set<string>();return assets.filter(a=>{
+ const counts=new Map<string,number>();for(const a of assets){const key=JSON.stringify([a.id,a.version]);counts.set(key,(counts.get(key)||0)+1);}
+ return assets.filter(a=>{
   if(a.tenantId!==s.tenantId||!s.allowedProductIds.includes(a.productId)||!s.allowedRegions.includes(a.regionCode)||!a.id||!a.version||!a.provenanceId)return false;
-  const key=`${a.id}:${a.version}`;if(keys.has(key))return false;keys.add(key);return true;
+  const key=JSON.stringify([a.id,a.version]);return counts.get(key)===1;
  });
 }
 export function isEligible(s:CatalogScope,a:CatalogAsset):boolean{
- return a.status==="APPROVED"&&a.approvedBy.trim().length>0&&Number.isFinite(Date.parse(a.approvedAt))&&!!a.effectiveFrom&&!!a.expiresAt&&a.effectiveFrom<=s.today&&a.expiresAt>=s.today;
+ const civilDate=(d:string)=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&!Number.isNaN(Date.parse(`${d}T00:00:00Z`))&&new Date(`${d}T00:00:00Z`).toISOString().slice(0,10)===d;
+ return a.status==="APPROVED"&&a.approvedBy.trim().length>0&&Number.isFinite(Date.parse(a.approvedAt))&&civilDate(s.today)&&civilDate(a.effectiveFrom)&&civilDate(a.expiresAt)&&a.effectiveFrom<=s.today&&a.expiresAt>=s.today;
 }
 export function canDetail(s:CatalogScope,a:CatalogAsset,visit?:ActiveVisit|null):boolean{
  return s.roleCanDetail&&allowedCatalog(s,[a]).length===1&&isEligible(s,a)&&!!visit&&visit.tenantId===s.tenantId&&visit.status==="CHECKED_IN"&&visit.productIds.includes(a.productId)&&!!visit.id;
