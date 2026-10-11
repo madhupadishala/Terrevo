@@ -43,6 +43,28 @@ The guard refuses the known production ref, non-HTTPS URLs, mismatched refs and 
 
 The current Chromium suite uses mocked HTTP fixtures and PostgreSQL CI tests use isolated rollback transactions. Those are necessary **but not sufficient** for this staging UAT.
 
+## Staging API qualification — GET only, separate verified sessions
+Once a **separate** authorized staging Supabase project and matching Vercel preview or local API are available, provide three distinct staging bearer tokens through your local shell/secret manager. This checks access; it cannot create accounts, configure RBAC, or complete field records.
+
+```bash
+export TERREVO_ENVIRONMENT=staging
+export TERREVO_STAGING_PROJECT_REF=<20-character-nonproduction-project-ref>
+export SUPABASE_URL=https://<20-character-nonproduction-project-ref>.supabase.co
+export TERREVO_STAGING_API_ORIGIN=https://<staging-preview>.vercel.app
+export TERREVO_UAT_TENANT_ID=<authorized-tenant-uuid>
+export TERREVO_UAT_FOREIGN_TENANT_ID=<second-authorized-tenant-uuid>
+export TERREVO_MR_ACCESS_TOKEN=<short-lived-test-representative-token>
+export TERREVO_MANAGER_ACCESS_TOKEN=<short-lived-test-manager-token>
+export TERREVO_ADMIN_ACCESS_TOKEN=<short-lived-test-tenant-admin-token>
+npm run qualify:staging-api
+```
+
+The command uses **GET requests only** and tests MR/Manager/Tenant Admin membership, role-specific permission presence, NCA read contract, unplanned-call manager queue, denial of platform tenant enumeration, anonymous read denial and cross-tenant rejection. It refuses the primary production Supabase reference, the production Vercel URL and a missing distinct foreign tenant. It prints only route/status evidence and never prints tokens or response data. The tool does not connect directly to Supabase with privileged credentials and cannot change production records.
+
+**CI:** `npm run test:release-safety` exercises this verifier with isolated mocks to prove forbidden cases cause failure. Such mocks are **not** actual staging-user qualification.
+
+**Remaining evidence even after this command passes:** authenticated write-path UAT, persistence after refresh/relogin, device GPS, NCA and unplanned manager decisions, real approval trail and an independent production rollout check.
+
 ## Manual Vercel release gates
 - All expected CI jobs green at **one exact commit SHA**; no unresolved blocking review.
 - Authorized staging UAT with evidence recorded; no production credentials in preview environments.
