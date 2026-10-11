@@ -11,5 +11,5 @@ const app=createHandler({SUPABASE_URL:"https://staging.example.invalid",SUPABASE
  return Response.json({error:"Unhandled "+url.pathname},{status:404});
  }) as typeof fetch
 });
-test("new route enforces authenticated tenant context and reads RLS-scoped customer links",async()=>{const r=await app(new Request("https://api.example.invalid/v1/business/customer-links/"+source,{headers:{authorization:"Bearer valid","x-tenant-id":tenant}}));assert.equal(r.status,200,await r.text());const body=await r.json();assert.equal(body.links.length,1);assert.equal(body.links[0].territoryId,"north");});
+test("new route enforces authenticated tenant context and reads RLS-scoped customer links",async()=>{const r=await app(new Request("https://api.example.invalid/v1/business/customer-links/"+source,{headers:{authorization:"Bearer valid","x-tenant-id":tenant}}));const body=await r.json();assert.equal(r.status,200,JSON.stringify(body));assert.equal(body.links.length,1);assert.equal(body.links[0].territoryId,"north");});
 test("new route denies missing bearer token",async()=>{const r=await app(new Request("https://api.example.invalid/v1/business/customer-links/"+source,{headers:{"x-tenant-id":tenant}}));assert.notEqual(r.status,200);});
