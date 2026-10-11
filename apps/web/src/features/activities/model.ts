@@ -2,7 +2,7 @@ import type {Master} from "../../terrevo-api";
 export type ActivityKind = "PLANNED_CALL"|"UNPLANNED_CALL"|"NON_CALL_ACTIVITY";
 export type ActivityCustomerKind = "doctor"|"chemist"|"stockist";
 export type ActivityEvidence = {name:string;mimeType?:string;sizeBytes?:number;reference?:string};
-export type ActivityDraft = {kind:ActivityKind;tenantId:string;workDate:string;territoryId:string;reason:string;durationMinutes:number;remarks:string;
+export type ActivityDraft = {operationId:string;kind:ActivityKind;tenantId:string;workDate:string;territoryId:string;reason:string;durationMinutes:number;remarks:string;
  ncaPhase?:"PLAN"|"REPORT";townId?:string;plannedStopId?:string;customerType?:ActivityCustomerKind;customerId?:string;ncaSubtype?:string;evidence?:ActivityEvidence};
 export type TerritoryOption = {id:string;name:string};
 export type PlannedCallOption = {planStopId:string;label:string;territoryId:string;workDate:string};
@@ -37,5 +37,5 @@ export function validateActivityDraft(d:ActivityDraft,ctx:ActivityValidationCont
  return e;
 }
 export function emptyActivityDraft(tenantId:string,date:string):ActivityDraft{
- return {kind:"PLANNED_CALL",tenantId,workDate:date,territoryId:"",reason:"",durationMinutes:0,remarks:""};
+ return {operationId:crypto.randomUUID(),kind:"PLANNED_CALL",tenantId,workDate:date,territoryId:"",reason:"",durationMinutes:0,remarks:""};
 }
