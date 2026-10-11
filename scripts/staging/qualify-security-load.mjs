@@ -8,6 +8,7 @@ const api=provider+'/functions/v1/terrevo-staging-api';
 const sessions={};const checks=[];
 async function request(origin,path,{role='MR',method='GET',body,expected=200,tenant=m.fixture.tenant}={}){
  const start=performance.now();const headers={'content-type':'application/json',apikey:m.anonKey.trim(),'x-tenant-id':tenant};
+ if(origin===api && m.region)headers['x-region']=m.region;
  if(role)headers.authorization='Bearer '+sessions[role].accessToken;
  const res=await fetch(origin+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(30000)});
  const data=res.status===204?null:await res.json();
@@ -39,13 +40,13 @@ try{
  // Predeclared small-pilot engineering budgets, not a claim of fleet capacity.
  // Four simultaneous authenticated clients, sixty read requests, no new writes.
  const budgets={requests:60,concurrency:4,p95Ms:3000,p99Ms:5000,unexpectedErrors:0};
- const samples=[];let next=0;const wallStart=performance.now();
+ const samples=[];let unexpectedErrors=0;let next=0;const wallStart=performance.now();
  const paths=['/v1/manager/analytics?days=7','/v1/manager/command-center','/v1/unplanned-calls/own','/v1/dcrs'];
- await Promise.all(Array.from({length:budgets.concurrency},async()=>{while(next<budgets.requests){const i=next++;const start=performance.now();await request(api,paths[i%4],{role:i%4<2?'MANAGER':'MR'});samples.push(Math.round(performance.now()-start));}}));
+ await Promise.all(Array.from({length:budgets.concurrency},async()=>{while(next<budgets.requests){const i=next++;const start=performance.now();try{await request(api,paths[i%4],{role:i%4<2?'MANAGER':'MR'});}catch{unexpectedErrors++;}samples.push(Math.round(performance.now()-start));}}));
  samples.sort((a,b)=>a-b);const percentile=p=>samples[Math.ceil(samples.length*p)-1];
- const measured={count:samples.length,p50Ms:percentile(.5),p95Ms:percentile(.95),p99Ms:percentile(.99),maxMs:samples.at(-1),elapsedMs:Math.round(performance.now()-wallStart),unexpectedErrors:0};
- const qualified=measured.p95Ms<=budgets.p95Ms&&measured.p99Ms<=budgets.p99Ms;
- await writeFile(evidencePath,JSON.stringify({projectRef:'eirlubfbjexjilvskqxq',runId:m.runId,synthetic:true,completedAt:new Date().toISOString(),qualified,budgets,measured,checks},null,2)+'\n');console.log(JSON.stringify({qualified,checks:checks.length,measured,evidencePath}));
+ const measured={count:samples.length,p50Ms:percentile(.5),p95Ms:percentile(.95),p99Ms:percentile(.99),maxMs:samples.at(-1),elapsedMs:Math.round(performance.now()-wallStart),unexpectedErrors};
+ const qualified=measured.p95Ms<=budgets.p95Ms&&measured.p99Ms<=budgets.p99Ms&&measured.unexpectedErrors<=budgets.unexpectedErrors;
+ await writeFile(evidencePath,JSON.stringify({projectRef:'eirlubfbjexjilvskqxq',runId:m.runId,region:m.region??'default',synthetic:true,completedAt:new Date().toISOString(),qualified,budgets,measured,checks},null,2)+'\n');console.log(JSON.stringify({qualified,checks:checks.length,measured,evidencePath}));
  assert.ok(qualified,'Small-pilot engineering latency budget exceeded');
 }finally{
  for(const [role]of Object.entries(sessions)){await request(api,'/v1/auth/logout',{role,method:'POST',expected:204}).catch(()=>console.error('Session cleanup failed for '+role));}

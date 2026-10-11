@@ -1,4 +1,5 @@
 begin;
+revoke select,update on public.tenants from service_role;
 drop trigger if exists terrevo_security_audit on public.nca_categories;
 drop trigger if exists terrevo_security_audit on public.nca_towns;
 drop trigger if exists terrevo_security_audit on public.nca_records;

@@ -5,8 +5,9 @@ const path=process.argv[2];if(!path)throw Error('Private identity manifest requi
 const manifest=JSON.parse(fs.readFileSync(path,'utf8'));
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 for(const role of ['MR','MANAGER','TENANT_ADMIN','FOREIGN_MR'])if(!uuid.test(manifest.users.find(u=>u.role===role)?.id??''))throw Error('Supported Auth identity missing');
-const ids=Object.fromEntries(['tenant','foreignTenant','company','division','zone','region','area','territory','foreignCompany','foreignDivision','foreignZone','foreignRegion','foreignArea','foreignTerritory','mrEmployee','managerEmployee','doctor','unplannedDoctor','chemist','product'].map(k=>[k,randomUUID()]));
-manifest.fixture=ids;fs.writeFileSync(path,JSON.stringify(manifest),{mode:0o600});
+const ids=manifest.fixture??Object.fromEntries(['tenant','foreignTenant','company','division','zone','region','area','territory','foreignCompany','foreignDivision','foreignZone','foreignRegion','foreignArea','foreignTerritory','mrEmployee','managerEmployee','doctor','unplannedDoctor','chemist','product'].map(k=>[k,randomUUID()]));
+if(Object.values(ids).some(id=>!uuid.test(id)))throw Error("Invalid stored fixture IDs");
+if(!manifest.fixture){manifest.fixture=ids;fs.writeFileSync(path,JSON.stringify(manifest),{mode:0o600});}
 const user=role=>manifest.users.find(u=>u.role===role).id;
 const q=value=>"'"+value.replaceAll("'","''")+"'";
 const sql=['begin;'];

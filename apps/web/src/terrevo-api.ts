@@ -57,6 +57,8 @@ export type ManagerAnalytics = {
   coverage: { plannedStops: number; completedVisits: number; doctorCalls: number; chemistCalls: number; stockistCalls: number };
 };
 export type Coordinates = { latitude: number; longitude: number; accuracyMeters: number };
+export type { CustomerLink } from "../../../modules/business-customer-links/src/index.ts";
+import type { CustomerLink } from "../../../modules/business-customer-links/src/index.ts";
 
 export class ApiFailure extends Error {
   readonly status: number;
@@ -68,6 +70,7 @@ export class TerrevoWebApi {
   private tenantId: string | null = null;
   private onUpdate?: (session: Session | null) => void;
   private refreshInFlight: Promise<Session> | null = null;
+  private contextVersion = 0;
   private parseSession(body: unknown): Session {
     if (!body || typeof body !== "object") throw new ApiFailure(502, "Session response was incomplete.");
     const value = body as Partial<Session>;
@@ -101,13 +104,15 @@ export class TerrevoWebApi {
   }
   constructor(onUpdate?: (session: Session | null) => void) { this.onUpdate = onUpdate; }
   get connected(): boolean { return Boolean(this.session?.accessToken && this.tenantId); }
-  setSession(session: Session | null) { this.session = session; this.onUpdate?.(session); }
-  setTenant(id: string | null) { this.tenantId = id; }
-  reset() { this.session = null; this.tenantId = null; this.onUpdate?.(null); }
+  setSession(session: Session | null) { if(this.session?.user.id!==session?.user.id)this.contextVersion++;this.session = session; this.onUpdate?.(session); }
+  setTenant(id: string | null) { if(this.tenantId!==id)this.contextVersion++;this.tenantId = id; }
+  reset() { this.contextVersion++;this.session = null; this.tenantId = null; this.onUpdate?.(null); }
+  private assertContext(version:number) {if(version!==this.contextVersion)throw new ApiFailure(409,"The account or organization changed. Reload records before retrying.");}
 
   private async raw(path: string, method = "GET", body?: unknown, tenantScoped = true, retry = true): Promise<unknown> {
     if (!this.session) throw new ApiFailure(401, "Connect an existing account to use live business records.");
     if (tenantScoped && !this.tenantId) throw new ApiFailure(400, "Select an organization first.");
+    const version=this.contextVersion;
     const headers: Record<string, string> = {
       accept: "application/json",
       authorization: `Bearer ${this.session.accessToken}`,
@@ -118,44 +123,60 @@ export class TerrevoWebApi {
       method, headers, cache: "no-store",
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
+    this.assertContext(version);
     if (response.status === 401 && retry && this.session?.refreshToken) {
       // A parallel request may already have rotated the token.
       if (headers.authorization === "Bearer " + this.session.accessToken) {
         try { await this.refreshOnce(); }
         catch {
+          this.assertContext(version);
           this.reset();
           throw new ApiFailure(401, "Session expired. Reconnect your account.");
         }
       }
+      this.assertContext(version);
       // Errors from the retried business operation must not invalidate a valid session.
       return this.raw(path, method, body, tenantScoped, false);
     }
     if (!response.ok) {
       const value: unknown = await response.json().catch(() => null);
+      this.assertContext(version);
       const serverMessage = value && typeof value === "object" && "error" in value && typeof value.error === "string" ? value.error : null;
       throw new ApiFailure(response.status, serverMessage ?? `Request failed: ${response.status}`);
     }
     if (response.status === 204 || response.status === 202) return null;
-    return response.json();
+    const value=await response.json();this.assertContext(version);return value;
   }
 
   async login(email: string, password: string): Promise<Session> {
+    const version=++this.contextVersion;
     const response = await fetch("/api/v1/auth/login", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: email.trim(), password }), cache: "no-store",
     });
     const body: unknown = await response.json().catch(() => null);
+    this.assertContext(version);
     if (!response.ok) throw new ApiFailure(response.status, "Unable to connect account. Check the provided credentials.");
     const session = this.parseSession(body);
     this.setSession(session);
     return session;
   }
   async logout() {
+    const version=this.contextVersion;
     try { if (this.session) await this.raw("/v1/auth/logout", "POST", undefined, false, false); }
-    finally { this.reset(); }
+    finally { if(version===this.contextVersion)this.reset(); }
   }
   async tenants(): Promise<Tenant[]> { return (await this.raw("/v1/tenants", "GET", undefined, false) as { tenants: Tenant[] }).tenants; }
   async access(): Promise<AccessContext> { return (await this.raw("/v1/access-context") as { context: AccessContext }).context; }
+  async customerLinks(sourceId:string):Promise<CustomerLink[]> {
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sourceId))throw new ApiFailure(400,"Customer ID must be a UUID.");
+    const tenant=this.tenantId;
+    const result=await this.raw(`/v1/business/customer-links/${encodeURIComponent(sourceId)}`) as {links?:unknown};
+    if(!Array.isArray(result.links))throw new ApiFailure(502,"Invalid customer relationship response.");
+    const fields=["id","tenantId","sourceId","targetId","territoryId","relation","evidenceId","verifiedAt"] as const;
+    if(result.links.some(row=>!row||typeof row!=="object"||fields.some(key=>typeof row[key]!=="string")||row.tenantId!==tenant||row.sourceId!==sourceId||row.approval!=="APPROVED"||!row.evidenceId||!Number.isFinite(Date.parse(row.verifiedAt))))throw new ApiFailure(502,"Invalid customer relationship scope or evidence.");
+    return result.links as CustomerLink[];
+  }
   async progress(): Promise<Progress | null> { return (await this.raw("/v1/tour-executions/progress") as { progress: Progress | null }).progress; }
   async startOptions(): Promise<StartOption[]> { return (await this.raw("/v1/tour-executions/start-options") as { options: StartOption[] }).options; }
   async openVisit(): Promise<FieldVisit | null> { return (await this.raw("/v1/visits/open") as { visit: FieldVisit | null }).visit; }

@@ -20,3 +20,18 @@ test('supported Auth create uses only fixed identities and never returns credent
  },()=>0)(request());
  assert.equal(response.status,200);const text=await response.text();assert.ok(!text.includes(env.serverKey));assert.ok(!text.includes('password'));assert.ok(!text.includes('must-not-return'));
 });
+test('password rotation requires fixed identity ownership and refuses unrelated users',async()=>{
+ const identity={...config.identities[0],id:'fixed-id'};
+ for(const metadata of [{qualification_run:'another',qualification_role:'MR'}, {qualification_run:'test',qualification_role:'MANAGER'}]){
+  let calls=0;
+  const response=await createAuthProvisioner({...config,identities:[identity]},env,async()=>{calls++;return Response.json({id:identity.id,email:identity.email,app_metadata:metadata});},()=>0)(request());
+  assert.equal(response.status,403);assert.equal(calls,1);
+ }
+ let calls=0;
+ const response=await createAuthProvisioner({...config,identities:[identity]},env,async(url,init)=>{
+  calls++;assert.equal(url,env.url+'/auth/v1/admin/users/fixed-id');
+  assert.ok(init.signal);assert.equal(init.redirect,'error');
+  if(calls===1)return Response.json({id:identity.id,email:identity.email,app_metadata:{qualification_run:'test',qualification_role:'MR'}});
+  assert.equal(init.method,'PUT');return Response.json({id:identity.id});
+ },()=>0)(request());assert.equal(response.status,200);assert.equal(calls,2);
+});

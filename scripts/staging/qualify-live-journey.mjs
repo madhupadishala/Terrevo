@@ -24,7 +24,7 @@ async function check(name,method,path,{role='MR',body,status=200,tenant=f.tenant
   if(role)headers.authorization='Bearer '+sessions[role].accessToken;
   const response=await fetch(origin+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(30000)});
   const result=response.status===204?null:await response.json();
-  const evidence={name,method,path,status:response.status,expected:status,elapsedMs:Math.round(performance.now()-start),requestId:response.headers.get('x-request-id'),executedAt:new Date().toISOString()};
+  const evidence={name,method,path,status:response.status,expected:status,passed:(Array.isArray(status)?status:[status]).includes(response.status),elapsedMs:Math.round(performance.now()-start),requestId:response.headers.get('x-request-id'),executedAt:new Date().toISOString()};
   state.checks.push(evidence);await persist();console.log(JSON.stringify(evidence));
   assert.ok((Array.isArray(status)?status:[status]).includes(response.status),`${name}: unexpected ${response.status}: ${result?.error??'response rejected'}`);
   if(cache){state.steps[name]={body:result};await persist();}

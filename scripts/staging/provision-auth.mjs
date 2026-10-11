@@ -14,8 +14,15 @@ export function createAuthProvisioner(config, env, fetcher = fetch, now = Date.n
     if (typeof body.password !== 'string' || body.password.length < 24 || body.password.length > 128) return denied();
     const users=[];
     for (const identity of config.identities) {
-      const response=await fetcher(`${env.url}/auth/v1/admin/users`,{
-        method:'POST', redirect:'error', headers:{apikey:env.serverKey,authorization:`Bearer ${env.serverKey}`,'content-type':'application/json'},
+      const headers={apikey:env.serverKey,authorization:`Bearer ${env.serverKey}`,'content-type':'application/json'};
+      if(identity.id){
+        const owned=await fetcher(`${env.url}/auth/v1/admin/users/${encodeURIComponent(identity.id)}`,{headers,redirect:'error',signal:AbortSignal.timeout(10000)});
+        if(!owned.ok)return denied();
+        const user=await owned.json();
+        if(user.id!==identity.id||user.email!==identity.email||user.app_metadata?.qualification_run!==config.runId||user.app_metadata?.qualification_role!==identity.role)return denied();
+      }
+      const response=await fetcher(`${env.url}/auth/v1/admin/users${identity.id?'/'+encodeURIComponent(identity.id):''}`,{
+        method:identity.id?'PUT':'POST', redirect:'error', signal:AbortSignal.timeout(10000), headers,
         body:JSON.stringify({email:identity.email,password:body.password,email_confirm:true,
           app_metadata:{qualification_run:config.runId,qualification_role:identity.role}})
       });

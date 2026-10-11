@@ -67,9 +67,10 @@ export function createVercelApiHandler(env: ApiEnv, log: (entry: ApiRequestLog) 
       const path = internalPath(url);
       const started = performance.now();
       const finish = (response: Response) => {
-        response.headers.set("server-timing",`app;dur=${Math.round(performance.now()-started)}`);
+        const elapsedMs = Math.round(performance.now()-started);
         const hardened = hardenApiResponse(response, requestId);
-        try { log({event:"api_request",requestId,method:request.method,route:logRoute(path),status:response.status,elapsedMs:Math.round(performance.now()-started)}); }
+        hardened.headers.set("server-timing",`app;dur=${elapsedMs}`);
+        try { log({event:"api_request",requestId,method:request.method,route:logRoute(path),status:response.status,elapsedMs}); }
         catch { /* Logging failure must not replay or fail a committed mutation. */ }
         return hardened;
       };
@@ -87,7 +88,11 @@ export function createVercelApiHandler(env: ApiEnv, log: (entry: ApiRequestLog) 
         ));
       }
 
-      return finish(await createHandler(env)(internalRequest(request)));
+      try {
+        return finish(await createHandler(env)(internalRequest(request)));
+      } catch {
+        return finish(Response.json({error:"Internal server error"},{status:500}));
+      }
     },
   };
 }

@@ -11,7 +11,12 @@ begin
   execute replace(f.definition,'FUNCTION terrevo_security.'||f.proname||'(',
     'FUNCTION public.'||f.proname||'(');
   execute format('revoke all on function public.%I(%s) from public, anon',f.proname,f.args);
-  execute format('grant execute on function public.%I(%s) to authenticated, service_role',f.proname,f.args);
+  execute format('grant execute on function public.%I(%s) to service_role',f.proname,f.args);
+  if f.proname not in('employee_division','inventory_item_division','user_has_permission','user_has_plan_permission') then
+   execute format('grant execute on function public.%I(%s) to authenticated',f.proname,f.args);
+  else
+   execute format('revoke execute on function public.%I(%s) from authenticated',f.proname,f.args);
+  end if;
   execute format('drop function terrevo_security.%I(%s)',f.proname,f.args);
  end loop;
 end;$rollback$;

@@ -141,3 +141,32 @@ test("unplanned call retries preserve caller operation identity and tenant scope
   assert.deepEqual(seen,[op,op]);
  }finally{globalThis.fetch=previous;}
 });
+
+function deferred<T>() {let resolve!:(value:T)=>void;const promise=new Promise<T>(r=>{resolve=r;});return {promise,resolve};}
+test('late 401 and successful responses cannot replay or reveal records after tenant switch',async()=>{
+ const previous=fetch;
+ try{for(const status of [200,401]){
+  const pending=deferred<Response>();let calls=0;globalThis.fetch=async()=>{calls++;return pending.promise;};
+  const api=new TerrevoWebApi();api.setSession(SESSION);api.setTenant(TENANT);
+  const request=api.plans();api.setTenant('22222222-2222-4222-8222-222222222222');
+  pending.resolve(Response.json({plans:[]},{status}));
+  await assert.rejects(request,e=>e instanceof ApiFailure&&e.status===409);assert.equal(calls,1);assert.equal(api.connected,true);
+ }}finally{globalThis.fetch=previous;}
+});
+test('failed old refresh cannot disconnect a newly selected account',async()=>{
+ const previous=fetch;const pending=deferred<Response>();const started=deferred<boolean>();
+ globalThis.fetch=async(input)=>{if(String(input).endsWith('/auth/refresh')){started.resolve(true);return pending.promise;}return Response.json({error:'expired'},{status:401});};
+ try{const api=new TerrevoWebApi();api.setSession(SESSION);api.setTenant(TENANT);const request=api.plans();await started.promise;
+  api.setSession({...SESSION,user:{id:'new-user',email:null},accessToken:'new-token',refreshToken:'new-refresh'});pending.resolve(Response.json({error:'failed'},{status:401}));
+  await assert.rejects(request,e=>e instanceof ApiFailure&&e.status===409);assert.equal(api.connected,true);
+ }finally{globalThis.fetch=previous;}
+});
+test('late login cannot reconnect an explicitly disconnected account',async()=>{
+ const previous=fetch;const pending=deferred<Response>();globalThis.fetch=async()=>pending.promise;
+ try{const api=new TerrevoWebApi();const login=api.login('test@example.invalid','test-password');api.reset();pending.resolve(Response.json(SESSION));await assert.rejects(login,e=>e instanceof ApiFailure&&e.status===409);assert.equal(api.connected,false);}finally{globalThis.fetch=previous;}
+});
+test('relationship transport validates actual route, tenant, evidence and source',async()=>{
+ const previous=fetch;const source='33333333-3333-4333-8333-333333333333';let foreign=false;
+ globalThis.fetch=async(input,init)=>{assert.equal(String(input),'/api/v1/business/customer-links/'+source);assert.equal(new Headers(init?.headers).get('x-tenant-id'),TENANT);assert.equal(new Headers(init?.headers).get('authorization'),'Bearer '+SESSION.accessToken);return Response.json({links:[{id:source,tenantId:foreign?'other':TENANT,sourceId:source,targetId:TENANT,territoryId:TENANT,relation:'verified',approval:'APPROVED',evidenceId:'test-evidence',verifiedAt:'2026-10-11T10:00:00Z'}]});};
+ try{const api=new TerrevoWebApi();api.setSession(SESSION);api.setTenant(TENANT);assert.equal((await api.customerLinks(source)).length,1);foreign=true;await assert.rejects(api.customerLinks(source),e=>e instanceof ApiFailure&&e.status===502);}finally{globalThis.fetch=previous;}
+});
