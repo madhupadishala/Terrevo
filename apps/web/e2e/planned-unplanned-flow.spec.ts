@@ -94,7 +94,7 @@ test("manager reviews submitted unplanned call using distinct approval API",asyn
  await page.goto("/");await page.locator("#account-email").fill("manager@example.invalid");
  await page.locator("#account-password").fill("password");
  await page.getByRole("button",{name:"Connect to live workflows"}).click();
- await page.getByRole("button",{name:"Manager command center"}).click();
+ await page.getByRole("button",{name:"Manager command"}).click();
  await expect(page.getByRole("heading",{name:"Unplanned customer-call review"})).toBeVisible();
  await page.getByRole("button",{name:"Approve",exact:true}).first().click();
  await expect(page.getByText("Unplanned call approved")).toBeVisible();
