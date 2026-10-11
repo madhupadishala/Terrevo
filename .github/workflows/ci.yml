@@ -96,6 +96,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/ci/public-definer-privileges-tests.sql
       - name: Customer relationship source and counterpart authorization
         run: psql -v ON_ERROR_STOP=1 -f database/ci/customer-link-policy-tests.sql
+      - name: Trusted actor audit attribution and denied forgery
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/audit-attribution-policy-tests.sql
       - name: NCA tenant isolation and denied-write policy tests
         run: psql -v ON_ERROR_STOP=1 -f database/ci/nca-policy-tests.sql
       - name: Real PostgreSQL NCA persistence, idempotency and tenant-isolation tests

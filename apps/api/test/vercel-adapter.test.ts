@@ -13,6 +13,7 @@ test("request logs correlate responses without credentials, identifiers or locat
   for(const sensitive of ["secret-query","secret-token","secret-password","17.385","00000000-0000"])assert.equal(serialized.includes(sensitive),false);
   const entry=logs[0] as {requestId:string;route:string;elapsedMs:number;status:number};
   assert.equal(entry.requestId,response.headers.get("x-request-id"));
+  assert.match(response.headers.get("server-timing")??"",/^app;dur=\d+$/);
   assert.equal(entry.route,"/v1/visits");assert.equal(entry.status,503);assert.ok(entry.elapsedMs>=0);
   const unknown:unknown[]=[];
   await createVercelApiHandler({},entry=>unknown.push(entry)).fetch(new Request("https://terrevo.example/api/v1/private-credential"));

@@ -119,8 +119,34 @@ function mapError(error: unknown): Response {
 
 /** Creates the HTTP API handler with tenant-scoped domain services wired to the provider adapter. */
 export function createHandler(env: ApiEnv, deps: Deps = {}) {
-  const adapter = createSupabaseAdapter(requireConfig(env), deps.fetcher);
-  const identity = createIdentityService(adapter.auth);
+  requireConfig(env);
+  return (request: Request) => createRequestHandler(env, deps)(request);
+}
+
+// Actor state belongs to exactly one request, including concurrent callers of
+// the same handler. Only a provider-validated identity can populate it.
+function createRequestHandler(env: ApiEnv, deps: Deps) {
+  const config = requireConfig(env);
+  let trustedActorId: string | null = null;
+  const fetcher: typeof fetch = (input, init) => {
+    const headers = new Headers(init?.headers);
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+    headers.delete("x-terrevo-actor");
+    if (trustedActorId && config.serviceRoleKey && headers.get("apikey") === config.serviceRoleKey &&
+        url.origin === new URL(config.url).origin && url.pathname.startsWith("/rest/v1/")) {
+      headers.set("x-terrevo-actor", trustedActorId);
+    }
+    const forwardedHeaders: Record<string,string> = {};
+    headers.forEach((value,key)=>{forwardedHeaders[key]=value;});
+    return (deps.fetcher ?? fetch)(input, {...init,headers:forwardedHeaders,signal:init?.signal ?? AbortSignal.timeout(10_000),redirect:"error"});
+  };
+  const adapter = createSupabaseAdapter(config, fetcher);
+  const authentication = createIdentityService(adapter.auth);
+  const identity = {...authentication, async authenticate(value: string | null) {
+    const user = await authentication.authenticate(value);
+    trustedActorId = user.id;
+    return user;
+  }};
   const tenants = createTenantService(adapter.tenants);
   const rbac = createRbacService(adapter.rbac);
   const organization = createOrganizationService(adapter.organization, rbac);
@@ -145,8 +171,8 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const jointWork = createJointWorkService(adapter.jointWork, rbac);
   const managerCommand = createManagerCommandService(adapter.managerCommand);
   const analytics = createAnalyticsService(adapter.analytics);
-  const platform = createPlatformAdminService(requireConfig(env), deps.fetcher);
-  const customerLinks = createCustomerLinksService(createCustomerLinksPostgrest(requireConfig(env).url, requireConfig(env).anonKey, deps.fetcher));
+  const platform = createPlatformAdminService(config, fetcher);
+  const customerLinks = createCustomerLinksService(createCustomerLinksPostgrest(config.url, config.anonKey, fetcher));
 
   /** Authenticates the caller and resolves the active tenant context for a tenant-scoped request. */
   async function resolveTenantRequest(request: Request) {
@@ -235,7 +261,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         grantUrl.searchParams.set("tenant_id",`eq.${context.tenantId}`);
         grantUrl.searchParams.set("user_id",`eq.${user.id}`);
         grantUrl.searchParams.set("limit","1000");
-        const grantResponse=await (deps.fetcher??fetch)(grantUrl.toString(),{headers:{apikey:config.anonKey,authorization:`Bearer ${accessToken}`,accept:"application/json"},cache:"no-store",signal:AbortSignal.timeout(10_000),redirect:"error"});
+        const grantResponse=await fetcher(grantUrl.toString(),{headers:{apikey:config.anonKey,authorization:`Bearer ${accessToken}`,accept:"application/json"},cache:"no-store",signal:AbortSignal.timeout(10_000),redirect:"error"});
         if(!grantResponse.ok)throw new BusinessAccessError("Customer grant retrieval denied");
         const grantRows:unknown=await grantResponse.json();
         if(!Array.isArray(grantRows)||grantRows.some((g:unknown)=>!g||typeof g!=="object"||typeof (g as {territory_id?:unknown}).territory_id!=="string"))throw new BusinessAccessError("Invalid customer grants");

@@ -11,7 +11,7 @@ async function request(origin,path,{role='MR',method='GET',body,expected=200,ten
  if(role)headers.authorization='Bearer '+sessions[role].accessToken;
  const res=await fetch(origin+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(30000)});
  const data=res.status===204?null:await res.json();
- checks.push({path,method,role,status:res.status,elapsedMs:Math.round(performance.now()-start),requestId:res.headers.get('x-request-id')});
+ checks.push({path,method,role,status:res.status,elapsedMs:Math.round(performance.now()-start),serverTiming:res.headers.get('server-timing'),requestId:res.headers.get('x-request-id')});
  assert.ok((Array.isArray(expected)?expected:[expected]).includes(res.status),`${path}: unexpected status ${res.status}`);return data;
 }
 try{
@@ -44,8 +44,9 @@ try{
  await Promise.all(Array.from({length:budgets.concurrency},async()=>{while(next<budgets.requests){const i=next++;const start=performance.now();await request(api,paths[i%4],{role:i%4<2?'MANAGER':'MR'});samples.push(Math.round(performance.now()-start));}}));
  samples.sort((a,b)=>a-b);const percentile=p=>samples[Math.ceil(samples.length*p)-1];
  const measured={count:samples.length,p50Ms:percentile(.5),p95Ms:percentile(.95),p99Ms:percentile(.99),maxMs:samples.at(-1),elapsedMs:Math.round(performance.now()-wallStart),unexpectedErrors:0};
- assert.ok(measured.p95Ms<=budgets.p95Ms&&measured.p99Ms<=budgets.p99Ms,'Small-pilot engineering latency budget exceeded');
- await writeFile(evidencePath,JSON.stringify({projectRef:'eirlubfbjexjilvskqxq',runId:m.runId,synthetic:true,completedAt:new Date().toISOString(),budgets,measured,checks},null,2)+'\n');console.log(JSON.stringify({qualified:true,checks:checks.length,measured,evidencePath}));
+ const qualified=measured.p95Ms<=budgets.p95Ms&&measured.p99Ms<=budgets.p99Ms;
+ await writeFile(evidencePath,JSON.stringify({projectRef:'eirlubfbjexjilvskqxq',runId:m.runId,synthetic:true,completedAt:new Date().toISOString(),qualified,budgets,measured,checks},null,2)+'\n');console.log(JSON.stringify({qualified,checks:checks.length,measured,evidencePath}));
+ assert.ok(qualified,'Small-pilot engineering latency budget exceeded');
 }finally{
  for(const [role]of Object.entries(sessions)){await request(api,'/v1/auth/logout',{role,method:'POST',expected:204}).catch(()=>console.error('Session cleanup failed for '+role));}
 }

@@ -67,6 +67,7 @@ export function createVercelApiHandler(env: ApiEnv, log: (entry: ApiRequestLog) 
       const path = internalPath(url);
       const started = performance.now();
       const finish = (response: Response) => {
+        response.headers.set("server-timing",`app;dur=${Math.round(performance.now()-started)}`);
         const hardened = hardenApiResponse(response, requestId);
         try { log({event:"api_request",requestId,method:request.method,route:logRoute(path),status:response.status,elapsedMs:Math.round(performance.now()-started)}); }
         catch { /* Logging failure must not replay or fail a committed mutation. */ }
