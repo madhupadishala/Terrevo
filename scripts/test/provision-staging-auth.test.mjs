@@ -14,7 +14,9 @@ test('provisioning denies foreign/production project, expiry, wrong nonce and ba
 });
 test('supported Auth create uses only fixed identities and never returns credentials',async()=>{
  const response=await createAuthProvisioner(config,env,async(url,options)=>{
-  assert.equal(url,env.url+'/auth/v1/admin/users');assert.equal(options.redirect,'error');
+  assert.equal(options.redirect,'error');
+  if(!options.method){assert.ok(url.includes('/auth/v1/admin/users?page='));return Response.json({users:[]});}
+  assert.equal(url,env.url+'/auth/v1/admin/users');
   const body=JSON.parse(options.body);assert.equal(body.email,config.identities[0].email);assert.equal(body.email_confirm,true);
   return Response.json({id:'authorized-auth-id',access_token:'must-not-return'});
  },()=>0)(request());
@@ -32,6 +34,31 @@ test('password rotation requires fixed identity ownership and refuses unrelated 
   calls++;assert.equal(url,env.url+'/auth/v1/admin/users/fixed-id');
   assert.ok(init.signal);assert.equal(init.redirect,'error');
   if(calls===1)return Response.json({id:identity.id,email:identity.email,app_metadata:{qualification_run:'test',qualification_role:'MR'}});
-  assert.equal(init.method,'PUT');return Response.json({id:identity.id});
+  assert.equal(init.method,'PUT');const update=JSON.parse(init.body);assert.equal(update.password,'a-long-password-for-the-authorized-test');assert.deepEqual(update.app_metadata,{qualification_run:'test',qualification_role:'MR'});return Response.json({id:identity.id});
  },()=>0)(request());assert.equal(response.status,200);assert.equal(calls,2);
+});
+test('fresh handler reconciles an owned identity after response loss without duplicate creation',async()=>{
+ let stored=null,creates=0;
+ const fetcher=async(url,init)=>{
+  if(!init.method)return Response.json({users:stored?[stored]:[]});
+  const body=JSON.parse(init.body);
+  if(init.method==='POST'){creates++;stored={id:'durable-id',email:body.email,app_metadata:body.app_metadata};}
+  else assert.equal(init.method,'PUT');
+  return Response.json(stored);
+ };
+ for(let attempt=0;attempt<2;attempt++){const response=await createAuthProvisioner(config,env,fetcher,()=>0)(request());assert.equal(response.status,200);assert.equal((await response.json()).users[0].id,'durable-id');}
+ assert.equal(creates,1);
+});
+test('provider failures preserve partial created IDs and do not masquerade as ownership denial',async()=>{
+ const identities=[config.identities[0],{role:'MANAGER',email:'manager@example.invalid',id:'fixed-manager'}];
+ for(const failure of ['timeout','http']){
+  const response=await createAuthProvisioner({...config,identities},env,async(url,init)=>{
+   if(url.endsWith('/fixed-manager')){if(failure==='timeout')throw Error('private transport detail');return Response.json({error:'private detail'},{status:500});}
+   if(!init.method)return Response.json({users:[]});return Response.json({id:'first-created-id'});
+  },()=>0)(request());assert.equal(response.status,502);const body=await response.json();assert.equal(body.created[0].id,'first-created-id');assert.equal(JSON.stringify(body).includes('private'),false);
+ }
+});
+test('reconciliation cannot rotate an email belonging to a different run',async()=>{
+ let writes=0;
+ const response=await createAuthProvisioner(config,env,async(_url,init)=>{if(init.method)writes++;return Response.json({users:[{id:'foreign-id',email:config.identities[0].email,app_metadata:{qualification_run:'another-run',qualification_role:'MR'}}]});},()=>0)(request());assert.equal(response.status,403);assert.equal(writes,0);
 });

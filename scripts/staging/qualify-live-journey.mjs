@@ -1,4 +1,4 @@
-import {readFile,writeFile,stat} from 'node:fs/promises';
+import {readFile,writeFile,stat,rename} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import assert from 'node:assert/strict';
 
@@ -16,9 +16,10 @@ const origin='https://eirlubfbjexjilvskqxq.supabase.co/functions/v1/terrevo-stag
 let state;try{state=JSON.parse(await readFile(statePath,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;state={runId:identity.runId,steps:{},operations:{},checks:[]};}
 assert.equal(state.runId,identity.runId);
 const sessions={};const f=identity.fixture;
-const persist=async()=>writeFile(statePath,JSON.stringify(state),{mode:0o600});
+let checkpoint=Promise.resolve();const persist=()=>checkpoint=checkpoint.then(async()=>{const temporary=statePath+'.'+randomUUID()+'.tmp';await writeFile(temporary,JSON.stringify(state),{mode:0o600});await rename(temporary,statePath);});
 async function check(name,method,path,{role='MR',body,status=200,tenant=f.tenant,cache=true}={}){
   if(cache&&state.steps[name])return state.steps[name].body;
+  await persist();
   const start=performance.now();
   const headers={'content-type':'application/json','x-tenant-id':tenant};
   if(role)headers.authorization='Bearer '+sessions[role].accessToken;

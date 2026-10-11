@@ -1,28 +1,29 @@
-import {readFile,writeFile,stat}from 'node:fs/promises';import assert from 'node:assert/strict';import {randomUUID}from 'node:crypto';
+import {readFile,writeFile,stat,rename}from 'node:fs/promises';import assert from 'node:assert/strict';import {randomUUID}from 'node:crypto';
 const [manifestPath,statePath,evidencePath]=process.argv.slice(2);if(!manifestPath||!statePath||!evidencePath||(await stat(manifestPath)).mode&0o077)throw Error('Private identity manifest required');
 const m=JSON.parse(await readFile(manifestPath,'utf8'));const f=m.fixture;const origin='https://eirlubfbjexjilvskqxq.supabase.co/functions/v1/terrevo-staging-api';const sessions={};let state;try{state=JSON.parse(await readFile(statePath,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;state={runId:m.runId,steps:{},operations:{},checks:[]};}assert.equal(state.runId,m.runId);
-const persist=()=>writeFile(statePath,JSON.stringify(state),{mode:0o600});const op=name=>state.operations[name]??=randomUUID();
+let checkpoint=Promise.resolve();const persist=()=>checkpoint=checkpoint.then(async()=>{const temporary=statePath+'.'+randomUUID()+'.tmp';await writeFile(temporary,JSON.stringify(state),{mode:0o600});await rename(temporary,statePath);});const op=name=>state.operations[name]??=randomUUID();
 async function call(name,path,{role='MR',method='GET',body,status=200,cache=true}={}){
- if(cache&&state.steps[name])return state.steps[name];const start=performance.now();const res=await fetch(origin+path,{method,headers:{authorization:'Bearer '+(sessions[role]?.accessToken??''),'x-tenant-id':f.tenant,'x-region':'ap-northeast-1','content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(30000),redirect:'error'});
+ if(cache&&Object.hasOwn(state.steps,name))return state.steps[name];await persist();const start=performance.now();const res=await fetch(origin+path,{method,headers:{authorization:'Bearer '+(sessions[role]?.accessToken??''),'x-tenant-id':f.tenant,'x-region':'ap-northeast-1','content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(30000),redirect:'error'});
  const data=res.status===204?null:await res.json();const passed=(Array.isArray(status)?status:[status]).includes(res.status);state.checks.push({name,path,method,role,status:res.status,expected:status,passed,elapsedMs:Math.round(performance.now()-start),serverTiming:res.headers.get('server-timing'),requestId:res.headers.get('x-request-id'),at:new Date().toISOString()});await persist();console.log(JSON.stringify(state.checks.at(-1)));assert.ok(passed,`${name}: ${res.status} ${data?.error??''}`);if(cache){state.steps[name]=data;await persist();}return data;
 }
 try{
  for(const u of m.users){const login=await fetch(origin+'/v1/auth/login',{method:'POST',headers:{'content-type':'application/json','x-region':'ap-northeast-1'},body:JSON.stringify({email:u.email,password:m.password}),signal:AbortSignal.timeout(30000),redirect:'error'});assert.equal(login.status,200);sessions[u.role]=await login.json();assert.equal(sessions[u.role].user.id,u.id);}
  await call('missing-role-admin-denied','/v1/field-settings',{role:'UNSCOPED',method:'PUT',body:{geofenceRadiusMeters:100,maxGpsAccuracyMeters:50},status:403});
- const daily=(await call('daily-generated','/v1/timesheets/daily/own')).timesheets.find(r=>r.executionId==='3b8f915f-fc62-452a-b61d-18b9700f70e4');assert.ok(daily);
+ const daily=(await call('daily-generated','/v1/timesheets/daily/own')).timesheets.filter(r=>!m.fixture.executionId||r.executionId===m.fixture.executionId);assert.equal(daily.length,1,'Exactly one own run timesheet or fixture.executionId required');const selectedDaily=daily[0];
+ const dailyWeek=new Date(selectedDaily.workDate+'T00:00:00Z');dailyWeek.setUTCDate(dailyWeek.getUTCDate()-((dailyWeek.getUTCDay()+6)%7));
  const dailyBody={operationId:op('daily-review'),remarks:'Synthetic qualification review'};
- assert.equal((await call('daily-review',`/v1/timesheets/daily/${daily.id}/review`,{method:'POST',body:dailyBody})).timesheet.status,'REVIEWED');
- await call('daily-review-replay',`/v1/timesheets/daily/${daily.id}/review`,{method:'POST',body:dailyBody});
- const weekly=(await call('weekly-generate','/v1/timesheets/weekly/generate',{method:'POST',body:{weekStart:'2026-10-05'},status:201})).timesheet;assert.equal(weekly.dailyCount,1);
+ assert.equal((await call('daily-review',`/v1/timesheets/daily/${selectedDaily.id}/review`,{method:'POST',body:dailyBody})).timesheet.status,'REVIEWED');
+ await call('daily-review-replay',`/v1/timesheets/daily/${selectedDaily.id}/review`,{method:'POST',body:dailyBody});
+ const weekly=(await call('weekly-generate','/v1/timesheets/weekly/generate',{method:'POST',body:{weekStart:dailyWeek.toISOString().slice(0,10)},status:201})).timesheet;assert.equal(weekly.dailyCount,1);
  const weeklyBody={operationId:op('weekly-submit'),comment:'Synthetic qualification only'};
  await call('weekly-submit',`/v1/timesheets/weekly/${weekly.id}/submit`,{method:'POST',body:weeklyBody});
  await call('weekly-submit-replay',`/v1/timesheets/weekly/${weekly.id}/submit`,{method:'POST',body:weeklyBody});
  await call('weekly-self-approval-denied',`/v1/timesheet-approvals/${weekly.id}/decision`,{method:'POST',body:{decision:'APPROVE'},status:[400,403]});
  const pending=(await call('weekly-manager-pending','/v1/timesheet-approvals',{role:'MANAGER'})).timesheets;assert.ok(pending.some(r=>r.id===weekly.id));
  await call('weekly-manager-approve',`/v1/timesheet-approvals/${weekly.id}/decision`,{role:'MANAGER',method:'POST',body:{decision:'APPROVE'},status:204});
- assert.equal((await call('weekly-approved-read',`/v1/timesheets/weekly/${weekly.id}`)).timesheet.status,'APPROVED');
+ assert.equal((await call('weekly-approved-read',`/v1/timesheets/weekly/${weekly.id}`,{cache:false})).timesheet.status,'APPROVED');
  const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());state.workDate??=date;assert.equal(state.workDate,date);const monday=new Date(date+'T00:00:00Z');monday.setUTCDate(monday.getUTCDate()-((monday.getUTCDay()+6)%7));const loc={latitude:17.385,longitude:78.487,accuracyMeters:10};
- const joint=(await call('joint-schedule','/v1/joint-work',{role:'MANAGER',method:'POST',status:201,body:{operationId:op('joint-schedule'),targetEmployeeId:'b9c6b83d-ea6e-4d52-ab1a-ef850078becf',participantEmployeeId:f.managerEmployee,workDate:date}})).assignment;
+ const joint=(await call('joint-schedule','/v1/joint-work',{role:'MANAGER',method:'POST',status:201,body:{operationId:op('joint-schedule'),targetEmployeeId:f.mr2Employee,participantEmployeeId:f.managerEmployee,workDate:date}})).assignment;
  const plan=(await call('mr2-plan','/v1/tour-plans',{role:'MR2',method:'POST',status:201,body:{weekStart:monday.toISOString().slice(0,10),days:[{date,territoryId:f.territory,stops:[{sequence:1,type:'doctor',targetId:f.doctor}]}]}})).plan;
  await call('mr2-plan-submit',`/v1/tour-plans/${plan.id}/submit`,{role:'MR2',method:'POST',status:204});await call('mr2-plan-approve',`/v1/tour-approvals/${plan.id}/decision`,{role:'MANAGER',method:'POST',body:{decision:'APPROVE'},status:204});
  const option=(await call('mr2-start-options','/v1/tour-executions/start-options',{role:'MR2'})).options.find(r=>r.planId===plan.id);assert.ok(option);
@@ -38,5 +39,5 @@ try{
  assert.equal((await call('mr2-submit','/v1/tour-executions/submit',{role:'MR2',method:'POST',body:submit})).execution.status,'SUBMITTED');
  const analytics=(await call('manager-reconciliation','/v1/manager/analytics?days=7',{role:'MANAGER'})).analytics;assert.equal(analytics.tours.submitted,2);assert.equal(analytics.coverage.completedVisits,2);assert.equal(analytics.coverage.doctorCalls,2);
  await call('admin-audited-settings','/v1/field-settings',{role:'TENANT_ADMIN',method:'PUT',body:{geofenceRadiusMeters:100,maxGpsAccuracyMeters:50}});
- await writeFile(evidencePath,JSON.stringify({runId:m.runId,projectRef:'eirlubfbjexjilvskqxq',synthetic:true,qualified:true,checks:state.checks,records:{weekly:weekly.id,joint:joint.id,plan:plan.id,execution:execution.id,visit:visit.id},completedAt:new Date().toISOString()},null,2)+'\n');
+ await writeFile(evidencePath,JSON.stringify({runId:m.runId,projectRef:'eirlubfbjexjilvskqxq',synthetic:true,qualified:true,qualificationSemantics:"Completed checkpoints satisfy the final scenario; historical failed attempts remain in checks and are not counted as passes.",completedCheckpoints:Object.keys(state.steps),checks:state.checks,records:{weekly:weekly.id,joint:joint.id,plan:plan.id,execution:execution.id,visit:visit.id},completedAt:new Date().toISOString()},null,2)+'\n');
 }finally{for(const role of Object.keys(sessions))await call('logout-'+role,'/v1/auth/logout',{role,method:'POST',status:204,cache:false}).catch(()=>{});}
