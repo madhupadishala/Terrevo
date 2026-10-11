@@ -49,6 +49,14 @@ export async function auditStagingApi(env, fetcher = fetch) {
   }
   const failures = [];
   function check(cond, label) {if(!cond)failures.push(label);}
+  // Verify the backend's ACTUAL Supabase URL and server-owned deployment mode.
+  // The local environment variables alone cannot prove a preview isn't wired to production.
+  const target=await request("runtime staging identity","MR","/v1/qualification/target");
+  check(target.res.status===200 &&
+    target.payload?.environment==="staging" &&
+    target.payload?.projectRef===env.TERREVO_STAGING_PROJECT_REF &&
+    target.payload?.tenantId===cfg.tenantId,
+    "Remote API did not attest an isolated staging backend; refuse UAT against an unverified runtime.");
   // This verifies real authorization through the web backend, not a DB superuser.
   for (const role of names) {
     const a=await request("tenant membership",role,"/v1/tenants",null);
