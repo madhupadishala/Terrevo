@@ -2,6 +2,11 @@
  * Terrevo web transport: ALL business calls use the existing authenticated, tenant-scoped API.
  * No service-role key, synthetic business data or bypass is exposed to the browser.
  */
+export type UnplannedCall = {id:string;executionId:string;workDate:string;territoryId:string;
+  customerType:"doctor"|"chemist"|"stockist";customerId:string;reason:string;remarks:string;
+  durationMinutes:number;latitude:number;longitude:number;accuracyMeters:number;
+  status:"SUBMITTED"|"APPROVED"|"REJECTED";managerComment:string|null;
+  submittedAt:string;reviewedAt:string|null};
 export type NcaCategory = {code:string;label:string;active:boolean};
 export type NcaTown = {id:string;name:string;territoryId:string;active:boolean};
 export type NcaOptions = {categories:NcaCategory[];towns:NcaTown[]};
@@ -174,6 +179,20 @@ export class TerrevoWebApi {
   }
   async submitTour(shortDayReason: string | null) {
     return this.raw("/v1/tour-executions/submit", "POST", { operationId: crypto.randomUUID(), shortDayReason });
+  }
+  async ownUnplannedCalls():Promise<UnplannedCall[]>{
+    return (await this.raw("/v1/unplanned-calls/own") as {calls:UnplannedCall[]}).calls;
+  }
+  async pendingUnplannedCalls():Promise<UnplannedCall[]>{
+    return (await this.raw("/v1/unplanned-approvals") as {calls:UnplannedCall[]}).calls;
+  }
+  async submitUnplannedCall(input:{executionId:string;territoryId:string;customerType:"doctor"|"chemist"|"stockist";
+    customerId:string;reason:string;remarks:string;durationMinutes:number;
+    latitude:number;longitude:number;accuracyMeters:number;}):Promise<UnplannedCall>{
+    return (await this.raw("/v1/unplanned-calls","POST",{...input,operationId:crypto.randomUUID()}) as {call:UnplannedCall}).call;
+  }
+  async reviewUnplannedCall(id:string,decision:"APPROVE"|"REJECT",comment:string|null):Promise<UnplannedCall>{
+    return (await this.raw("/v1/unplanned-approvals/"+encodeURIComponent(id)+"/decision","POST",{decision,comment}) as {call:UnplannedCall}).call;
   }
   async ncaOptions():Promise<NcaOptions>{
     return (await this.raw("/v1/nca/options") as {options:NcaOptions}).options;
