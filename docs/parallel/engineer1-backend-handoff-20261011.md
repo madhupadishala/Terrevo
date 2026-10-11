@@ -39,7 +39,7 @@ For full request/response fields, consume the existing exported domain types and
 
 `operationId` identifies one command payload. Keep the same UUID and normalized payload when retrying a lost response. Starting an already active execution now returns the stored execution after current territory permission is rechecked. Changed plan/GPS/device evidence under that UUID is a conflict. The database also binds start/check-in operation IDs to their persisted payloads and locks their owner row before resolving concurrent retries.
 
-The database regression proves sequential replay, conflicting payload rejection and revoked permission rejection. Simultaneous database connections and real interrupted HTTP sessions remain unqualified. Location coordinates in test fixtures do not prove real device presence. Preserve `verification` and exception states; never replace them with a frontend success inference.
+The database regression proves sequential replay, conflicting payload rejection and revoked permission rejection. CI additionally passed 16 independently launched connections per start/check-in/conflict race with one unchanged persisted execution and visit. Real interrupted HTTP sessions and representative API/device load remain unqualified. Location coordinates in test fixtures do not prove real device presence. Preserve `verification` and exception states; never replace them with a frontend success inference.
 
 ## Existing metric meanings
 

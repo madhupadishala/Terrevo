@@ -30,6 +30,11 @@
     {
       "file": "database/ci/unplanned-call-integration-tests.sql",
       "passed": true
+    },
+    {
+      "file": "database/ci/planned-field-lifecycle-tests.sql",
+      "passed": true,
+      "tightened_error_and_invariance_assertions_passed_staging": true
     }
   ],
   "planned_regression_before": {
@@ -340,16 +345,20 @@
     "api": 111,
     "web": 29,
     "mobile": 12,
-    "release_safety": 16,
+    "release_safety": 17,
     "root_typecheck": "PASS",
     "web_typecheck": "PASS",
     "api_web_build": "PASS",
     "mobile_typecheck": "PASS",
     "mobile_android_bundle": "PASS",
-    "browser_e2e": "BLOCKED_MISSING_CHROMIUM_DOWNLOAD_FAILED",
-    "database_full_backup_restore": "NOT_EXECUTED",
+    "browser_e2e": "PASS_13_HOSTED_CI_SCENARIOS",
+    "database_full_backup_restore": "PASS_CI_POSTGRES_ONLY",
     "live_auth_http_write_uat": "NOT_EXECUTED",
-    "concurrent_database_load": "NOT_EXECUTED"
+    "concurrent_database_load": "PASS_16_CONNECTION_CRITICAL_WRITE_RACES",
+    "static_release_artifacts": 35,
+    "local_browser_e2e": "BLOCKED_MISSING_CHROMIUM_DOWNLOAD_FAILED",
+    "managed_project_recovery": "NOT_EXECUTED",
+    "representative_api_device_load": "NOT_EXECUTED"
   },
   "pr50": {
     "threads": 19,
@@ -359,13 +368,399 @@
   "sql_sha256": {
     "database/ci/unplanned-call-integration-tests.sql": "a207372f34349dff6a738f0d00ed4dbb34106cc1e0e2971f913e0e50b409d00a",
     "database/ci/supabase-bootstrap.sql": "df88d79bbc3091e4e0e3fa75564ff94404a40792f8ba611db514f3d3f3be1e27",
+    "database/ci/recovery-assertions.sql": "7328f94534721ed35cc0e7b4dfff9eb91d2c1aa877de483128787834e3c9e4bf",
     "database/ci/unplanned-call-policy-tests.sql": "c91a455353f6c0094645e1b44d2e3a7565f7d012a350475aa57856341893c568",
+    "database/ci/recovery-fixture.sql": "2393258004a3bdae75a869354e3aea85813b34eb1b82ff6f65791e01891cde92",
     "database/ci/public-definer-privileges-tests.sql": "d36e95d6f1738b5240f150d493cd869a3d2ffb4d1bbcbb14b04e0eab7b958678",
+    "database/ci/recovery-cleanup.sql": "28fc11f7a7ba36292e247f03bcccbd3aae02413d029e6d466204d5296349f3cc",
     "database/ci/platform-admin-policy-tests.sql": "4bcca50cfca9b0a35a1ba065c1ff8c82da6187b9a3c4c5dbf4bb616706fe07a7",
-    "database/ci/planned-field-lifecycle-tests.sql": "5ef4b528064a3a441cea985ce594fa6eacc0bdb3aae9276a182ccb9ad7813a7b",
+    "database/ci/planned-field-lifecycle-tests.sql": "e4a797d8d0c9da2526ecf34df8e97dd0191289b4b608698e5528fa7d79735ab8",
     "database/ci/nca-integration-tests.sql": "1aa0ef89772441b092143264735f2105eccf359dcf6d4416fa24190d2cb3c6e8",
     "database/ci/nca-policy-tests.sql": "5f7bcb55145b1b0a8266272581992ef0310d7a5670b7633f658a6b5bc25a5060",
-    "database/migrations/20261011065020_field_operation_replay_integrity.sql": "f1cf8541ecac291efbc3c210d1ceb29c9d918c5bd9a01e32db4f5bfd996ac0c4",
-    "database/migrations/20261011065020_field_operation_replay_integrity.down.sql": "5b6f7190a277d5a9489d5f2fabe39841d752d334ba93185a44e27d03cc34cbf2"
+    "database/ci/planned-field-concurrency-fixture.sql": "b242de419da966bf04d19e6ce04187387e146b84c0654cfffae7fae9aa8cca00",
+    "database/ci/planned-field-concurrency-tests.sh": "5dd2dd6f807951c71c056b5d3f547967f60c2ef4073f57974e64f4fb4527f2be",
+    "database/migrations/20261011065020_field_operation_replay_integrity.down.sql": "5b6f7190a277d5a9489d5f2fabe39841d752d334ba93185a44e27d03cc34cbf2",
+    "database/migrations/20261011065020_field_operation_replay_integrity.sql": "f1cf8541ecac291efbc3c210d1ceb29c9d918c5bd9a01e32db4f5bfd996ac0c4"
+  },
+  "engineering_code_sha": "f803166fc09d24f9bf075a031bf84c4d3a6fd8ea",
+  "engineering_tree": "8d16d4201e4e199a9b332c1194822ca6950ffca4",
+  "delivery_pr": {
+    "number": 65,
+    "url": "https://github.com/madhupadishala/Terrevo/pull/65",
+    "merged": false,
+    "review": "PENDING_RE_REVIEW",
+    "initial_findings": 3,
+    "targeted_fixes_sha": "3238c1032b95b18d7e958f1e1b92cac5b31d5b13",
+    "threads_resolved_by_implementer": 3,
+    "independent_acceptance": "PENDING"
+  },
+  "ci": {
+    "run_id": 38120982496,
+    "url": "https://github.com/madhupadishala/Terrevo/actions/runs/38120982496",
+    "sha": "f803166fc09d24f9bf075a031bf84c4d3a6fd8ea",
+    "database_job": 114415485671,
+    "verified_steps": [
+      "all forward migrations",
+      "seven policy/integration/lifecycle suites",
+      "16 connections each for identical start and check-in; 16 sessions each rejecting changed start and check-in payloads",
+      "synthetic PostgreSQL dump/restore; restored record and RLS checks; seven-suite rerun",
+      "all reverse migrations"
+    ],
+    "browser": "PASS_13_SCENARIOS",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "foundation",
+        "conclusion": "success"
+      },
+      {
+        "name": "mobile",
+        "conclusion": "success"
+      },
+      {
+        "name": "database-migrations",
+        "conclusion": "success"
+      },
+      {
+        "name": "scope-lock",
+        "conclusion": "success"
+      },
+      {
+        "name": "browser-smoke",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "concurrency_test_initial_failure": {
+    "sha": "d02a807b988acfdad2a68c2f5f7a36d72c8f5522",
+    "reason": "Test database schema-only copy omitted seeded role definitions; no field operation reached",
+    "correction": "Copy reference data as well as schema into guarded disposable database",
+    "fixed_sha": "f803166fc09d24f9bf075a031bf84c4d3a6fd8ea",
+    "fixed_database_job_passed": true
+  },
+  "dependency_audit": {
+    "root": {
+      "counts": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 0
+      },
+      "packages": []
+    },
+    "mobile": {
+      "counts": {
+        "info": 0,
+        "low": 0,
+        "moderate": 7,
+        "high": 15,
+        "critical": 0,
+        "total": 22
+      },
+      "packages": [
+        {
+          "name": "@expo/cli",
+          "severity": "high",
+          "direct": false,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "@expo/code-signing-certificates",
+          "severity": "high",
+          "direct": false,
+          "fix_available": true,
+          "advisories": []
+        },
+        {
+          "name": "@expo/config",
+          "severity": "moderate",
+          "direct": false,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "@expo/config-plugins",
+          "severity": "moderate",
+          "direct": false,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "@expo/inline-modules",
+          "severity": "moderate",
+          "direct": false,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "@expo/local-build-cache-provider",
+          "severity": "moderate",
+          "direct": false,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "@expo/metro",
+          "severity": "high",
+          "direct": false,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "@expo/metro-config",
+          "severity": "high",
+          "direct": false,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "@expo/prebuild-config",
+          "severity": "moderate",
+          "direct": false,
+          "fix_available": true,
+          "advisories": []
+        },
+        {
+          "name": "@react-native/community-cli-plugin",
+          "severity": "high",
+          "direct": false,
+          "fix_available": {
+            "name": "react-native",
+            "version": "0.72.17",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "@react-native/virtualized-lists",
+          "severity": "high",
+          "direct": false,
+          "fix_available": {
+            "name": "react-native",
+            "version": "0.72.17",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "braces",
+          "severity": "high",
+          "direct": false,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": [
+            {
+              "source": 1240992,
+              "name": "braces",
+              "dependency": "braces",
+              "title": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns",
+              "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+              "severity": "high",
+              "cwe": [
+                "CWE-674"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": "<=3.0.3"
+            }
+          ]
+        },
+        {
+          "name": "expo",
+          "severity": "high",
+          "direct": true,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "metro",
+          "severity": "high",
+          "direct": false,
+          "fix_available": {
+            "name": "react-native",
+            "version": "0.72.17",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "metro-config",
+          "severity": "high",
+          "direct": false,
+          "fix_available": {
+            "name": "react-native",
+            "version": "0.72.17",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "metro-file-map",
+          "severity": "high",
+          "direct": false,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "metro-transform-worker",
+          "severity": "high",
+          "direct": false,
+          "fix_available": true,
+          "advisories": []
+        },
+        {
+          "name": "micromatch",
+          "severity": "high",
+          "direct": false,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "node-forge",
+          "severity": "high",
+          "direct": false,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": [
+            {
+              "source": 1240912,
+              "name": "node-forge",
+              "dependency": "node-forge",
+              "title": "node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements",
+              "url": "https://github.com/advisories/GHSA-86w9-cpqp-85rv",
+              "severity": "high",
+              "cwe": [
+                "CWE-347"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"
+              },
+              "range": "<=1.4.0"
+            }
+          ]
+        },
+        {
+          "name": "react-native",
+          "severity": "high",
+          "direct": true,
+          "fix_available": {
+            "name": "react-native",
+            "version": "0.72.17",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        },
+        {
+          "name": "uuid",
+          "severity": "moderate",
+          "direct": false,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": [
+            {
+              "source": 1119441,
+              "name": "uuid",
+              "dependency": "uuid",
+              "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+              "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-787",
+                "CWE-1285"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"
+              },
+              "range": "<11.1.1"
+            }
+          ]
+        },
+        {
+          "name": "xcode",
+          "severity": "moderate",
+          "direct": false,
+          "fix_available": {
+            "name": "expo",
+            "version": "44.0.6",
+            "isSemVerMajor": true
+          },
+          "advisories": []
+        }
+      ]
+    }
+  },
+  "mobile_dependency_resolution": {
+    "node_forge_latest": "1.4.0",
+    "braces_latest": "3.0.3",
+    "xcode_latest": "3.0.1",
+    "safe_compatible_published_fixes_verified": false,
+    "forced_expo_downgrade_applied": false,
+    "decision": "OPEN: upstream compatible patched releases or explicitly reviewed remediation/acceptance required"
+  },
+  "credential_pattern_scan": {
+    "tracked_files": "no matches",
+    "patterns": [
+      "sb_secret token",
+      "GitHub token",
+      "private-key PEM header",
+      "JWT literal"
+    ],
+    "limitation": "Limited pattern check, not full secret attestation"
   }
 }
