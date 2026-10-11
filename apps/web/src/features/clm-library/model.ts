@@ -7,11 +7,9 @@ export type DetailingHandoff={tenantId:string;contextKey:string;assetId:string;a
 export type ClmLibraryProps={scope:CatalogScope;assets?:CatalogAsset[];sessions?:SessionSummary[];activeVisit?:ActiveVisit|null;loading?:boolean;error?:string|null;onRequestDetailing?:(intent:DetailingHandoff)=>void};
 export function allowedCatalog(s:CatalogScope,assets:CatalogAsset[]):CatalogAsset[]{
  if(!s.tenantId||s.tenantId!==s.authorizedForTenantId||!s.contextKey)return [];
- const counts=new Map<string,number>();for(const a of assets){const key=JSON.stringify([a.id,a.version]);counts.set(key,(counts.get(key)||0)+1);}
- return assets.filter(a=>{
-  if(a.tenantId!==s.tenantId||!s.allowedProductIds.includes(a.productId)||!s.allowedRegions.includes(a.regionCode)||!a.id||!a.version||!a.provenanceId)return false;
-  const key=JSON.stringify([a.id,a.version]);return counts.get(key)===1;
- });
+ const scoped=assets.filter(a=>a.tenantId===s.tenantId&&s.allowedProductIds.includes(a.productId)&&s.allowedRegions.includes(a.regionCode)&&!!a.id&&!!a.version&&!!a.provenanceId);
+ const counts=new Map<string,number>();for(const a of scoped){const key=JSON.stringify([a.id,a.version]);counts.set(key,(counts.get(key)||0)+1);}
+ return scoped.filter(a=>counts.get(JSON.stringify([a.id,a.version]))===1);
 }
 export function isEligible(s:CatalogScope,a:CatalogAsset):boolean{
  const civilDate=(d:string)=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&!Number.isNaN(Date.parse(`${d}T00:00:00Z`))&&new Date(`${d}T00:00:00Z`).toISOString().slice(0,10)===d;
