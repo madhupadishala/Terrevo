@@ -8,6 +8,10 @@ declare v_tenant uuid:='f0000000-0000-4000-8000-000000000001';
  v_other uuid:='f0000000-0000-4000-8000-000000000004';
  v_org uuid:='f0000000-0000-4000-8000-000000000005';
  v_terr uuid:='f0000000-0000-4000-8000-000000000006';
+ v_div uuid:='f0000000-0000-4000-8000-000000000018';
+ v_zone uuid:='f0000000-0000-4000-8000-000000000019';
+ v_region uuid:='f0000000-0000-4000-8000-000000000020';
+ v_area uuid:='f0000000-0000-4000-8000-000000000021';
  v_emp uuid:='f0000000-0000-4000-8000-000000000007';
  v_mgr_emp uuid:='f0000000-0000-4000-8000-000000000008';
  v_doctor uuid:='f0000000-0000-4000-8000-000000000009';
@@ -21,7 +25,12 @@ begin
  insert into public.tenants(id,name,slug)values(v_tenant,'CI Unplanned Activity','ci-unplanned-calls');
  insert into public.tenant_memberships(tenant_id,user_id)values(v_tenant,v_rep),(v_tenant,v_mgr);
  insert into public.organization_units(id,tenant_id,type,code,name)values(v_org,v_tenant,'company','CICOMPANY','CI Company');
- insert into public.organization_units(id,tenant_id,parent_id,type,code,name)values(v_terr,v_tenant,v_org,'territory','CITERRITORY','CI Territory');
+ insert into public.organization_units(id,tenant_id,parent_id,type,code,name)values
+ (v_div,v_tenant,v_org,'division','CIDIV','CI Division'),
+ (v_zone,v_tenant,v_div,'zone','CIZONE','CI Zone'),
+ (v_region,v_tenant,v_zone,'region','CIREG','CI Region'),
+ (v_area,v_tenant,v_region,'area','CIAREA','CI Area'),
+ (v_terr,v_tenant,v_area,'territory','CITERRITORY','CI Territory');
  insert into public.user_role_assignments(tenant_id,user_id,role_key,scope_org_unit_id)
  values(v_tenant,v_rep,'MR',v_terr),(v_tenant,v_mgr,'MANAGER',v_terr);
  insert into public.employees(id,tenant_id,user_id,code,name,designation,org_unit_id)
