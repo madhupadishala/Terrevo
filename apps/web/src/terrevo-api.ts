@@ -2,7 +2,7 @@
  * Terrevo web transport: ALL business calls use the existing authenticated, tenant-scoped API.
  * No service-role key, synthetic business data or bypass is exposed to the browser.
  */
-export type UnplannedCall = {id:string;executionId:string;workDate:string;territoryId:string;
+export type UnplannedCall = {id:string;actorUserId:string;executionId:string;workDate:string;territoryId:string;
   customerType:"doctor"|"chemist"|"stockist";customerId:string;reason:string;remarks:string;
   durationMinutes:number;latitude:number;longitude:number;accuracyMeters:number;
   status:"SUBMITTED"|"APPROVED"|"REJECTED";managerComment:string|null;
