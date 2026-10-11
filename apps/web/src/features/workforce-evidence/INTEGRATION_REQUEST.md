@@ -1,0 +1,6 @@
+# S13 Chat 1 workforce evidence integration request
+No verified receipt storage/upload/binary/OCR/signed-link contract. No routes consumed.
+Parent props: scope={tenantId,authorizedForTenantId,contextKey,viewerUserId,role,permittedUserIds}, and source-attested typed Claim[], ReceiptManifest[], TravelEvidence[], AttendanceEvidence[], PolicyLimit[], loading/error.
+Required read contracts: permitted own/team expense claim ID+owner+workDate+currency+serverTotalMinor+status+lines+provenance/asOf; receipt line-to-document manifest ACL with status and safe metadata; verified source travel distances; source-backed attendance/day closure; approved currency-specific dated limits/version. Server must reconcile amounts, tax, travel, leave, policy and approval authority, and audit every permission decision.
+Optional onRequestReceiptReview({tenantId,contextKey,claimId,receiptId}) is only an intent; backend reauthorizes and audits actual receipt content access, protects PII, issues short-lived ACL-bound binary grants. No upload/OCR/approval/persistence, no misleading success UI. Parent must discard stale async completions and rotate contextKey.
+UAT: mixed-tenant users and receipts, invalid minor amounts, pending/revoked manifests, policy date/currency mismatch, unverified distance, day-open vs day-closed, narrow screen/keyboard.
