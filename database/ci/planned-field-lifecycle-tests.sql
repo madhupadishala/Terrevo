@@ -60,7 +60,12 @@ begin
  begin
   perform public.admin_start_tour(v_tenant,v_rep,v_start_op,v_day,null,18.385,78.487,10,null,null,null);
   raise exception 'Changed start retry accepted' using errcode='P0004';
- exception when unique_violation then null;end;
+ exception when unique_violation then
+  if sqlerrm<>'idempotency key reused with different start payload' then raise;end if;
+ end;
+ if (select count(*) from public.tour_executions where tenant_id=v_tenant)<>1
+   or (select start_latitude from public.tour_executions where id=v_exec) is distinct from 17.385::double precision then
+  raise exception 'Rejected start retry changed persisted execution';end if;
  select public.admin_checkin_visit(v_tenant,v_rep,v_checkin_op,v_stop,17.385,78.487,10,null) into v_visit;
  select public.admin_checkin_visit(v_tenant,v_rep,v_checkin_op,v_stop,17.385,78.487,10,null) into v_repeat;
  if v_repeat<>v_visit or (select count(*) from public.field_visits where tenant_id=v_tenant)<>1 then
@@ -68,7 +73,12 @@ begin
  begin
   perform public.admin_checkin_visit(v_tenant,v_rep,v_checkin_op,v_stop,17.385,78.487,20,null);
   raise exception 'Changed check-in retry accepted' using errcode='P0004';
- exception when unique_violation then null;end;
+ exception when unique_violation then
+  if sqlerrm<>'idempotency key reused with different check-in payload' then raise;end if;
+ end;
+ if (select count(*) from public.field_visits where tenant_id=v_tenant)<>1
+   or (select checkin_accuracy_meters from public.field_visits where id=v_visit) is distinct from 10::double precision then
+  raise exception 'Rejected check-in retry changed persisted visit';end if;
  -- Revoked permissions cannot be recovered through an operation replay.
  update public.user_role_assignments set status='inactive' where tenant_id=v_tenant and user_id=v_rep;
  begin

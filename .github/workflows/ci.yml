@@ -104,6 +104,19 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/ci/unplanned-call-policy-tests.sql
       - name: Unplanned call PostgreSQL persistence and manager-review integration tests
         run: psql -v ON_ERROR_STOP=1 -f database/ci/unplanned-call-integration-tests.sql
+      - name: Back up and restore isolated CI database with synthetic data
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f database/ci/recovery-fixture.sql
+          pg_dump --format=custom --file="$RUNNER_TEMP/terrevo-recovery.dump"
+          createdb terrevo_restore_ci
+          pg_restore --exit-on-error --no-owner --dbname=terrevo_restore_ci "$RUNNER_TEMP/terrevo-recovery.dump"
+          PGDATABASE=terrevo_restore_ci psql -v ON_ERROR_STOP=1 -f database/ci/recovery-assertions.sql
+          for file in database/ci/*policy-tests.sql database/ci/public-definer-privileges-tests.sql database/ci/*integration-tests.sql database/ci/planned-field-lifecycle-tests.sql; do
+            PGDATABASE=terrevo_restore_ci psql -v ON_ERROR_STOP=1 -f "$file"
+          done
+          dropdb terrevo_restore_ci
+          psql -v ON_ERROR_STOP=1 -f database/ci/recovery-cleanup.sql
       - name: Apply all rollback migrations in reverse
         run: |
           set -euo pipefail
@@ -119,6 +132,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -126,6 +140,11 @@ jobs:
         env:
           TERREVO_DIFF_BASE: ${{ github.event.pull_request.base.sha }}
           TERREVO_HEAD_BRANCH: ${{ github.head_ref }}
+          TERREVO_OWNER: ${{ contains(fromJSON('["feature/terrevo-s09-customer-relations-ui","feature/terrevo-s11-clm-library-ui","feature/terrevo-s13-workforce-evidence-ui","feature/terrevo-s14-manager-reporting-ui"]'), github.head_ref) && 'engineer2' || 'engineer1' }}
+          TERREVO_ASSIGNED_AUTHOR: ${{ github.repository_owner }}
+          TERREVO_PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          TERREVO_REPOSITORY: ${{ github.repository }}
+          TERREVO_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
         run: node scripts/r01-ownership.mjs
       - name: Require PR scope declaration
         env:

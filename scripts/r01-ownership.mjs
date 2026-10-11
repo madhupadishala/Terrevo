@@ -49,12 +49,24 @@ export function parseNameStatusZ(text) {
   }
   return paths;
 }
-export function ownerForBranch(branch) {
-  return /^feature\/terrevo-s(09-customer-relations|11-clm-library|13-workforce-evidence|14-manager-reporting)-ui$/.test(branch)
-    ? 'engineer2' : 'engineer1';
+export function ownerForBranch(branch, assignment) {
+  const registeredOwner = /^feature\/terrevo-s(09-customer-relations|11-clm-library|13-workforce-evidence|14-manager-reporting)-ui$/.test(branch)
+    ? 'engineer2'
+    : ['chore/r01-repository-consolidation', 'feature/ui-live-role-workspaces'].includes(branch) ? 'engineer1' : null;
+  if (!registeredOwner) throw new Error('Unregistered engineer branch');
+  if (assignment !== registeredOwner) throw new Error('Branch/engineer assignment mismatch');
+  return registeredOwner;
+}
+export function validateAssignment({author, assignedAuthor, headRepository, repository}) {
+  if (!author || !assignedAuthor || !repository || !headRepository
+      || author !== assignedAuthor || headRepository !== repository) {
+    throw new Error('Missing or untrusted engineer assignment');
+  }
 }
 function main() {
-  const owner = process.env.TERREVO_OWNER ?? ownerForBranch(process.env.TERREVO_HEAD_BRANCH ?? '');
+  validateAssignment({author: process.env.TERREVO_PR_AUTHOR, assignedAuthor: process.env.TERREVO_ASSIGNED_AUTHOR,
+    headRepository: process.env.TERREVO_HEAD_REPOSITORY, repository: process.env.TERREVO_REPOSITORY});
+  const owner = ownerForBranch(process.env.TERREVO_HEAD_BRANCH, process.env.TERREVO_OWNER);
   const base = process.env.TERREVO_DIFF_BASE;
   if (!base || !/^[a-zA-Z0-9._\/-]+$/.test(base) || base.startsWith('-')) {
     throw new Error('TERREVO_DIFF_BASE must be an explicit trusted git ref');
