@@ -1,0 +1,7 @@
+S13 issue #57 exclusively owned paths, no shared edits.
+apps/web/src/features/workforce-evidence/model.ts
+apps/web/src/features/workforce-evidence/WorkforceEvidenceView.tsx
+apps/web/test/workforce-evidence.model.test.ts
+apps/web/src/features/workforce-evidence/README.md
+apps/web/src/features/workforce-evidence/INTEGRATION_REQUEST.md
+apps/web/src/features/workforce-evidence/FILE_MANIFEST.txt
