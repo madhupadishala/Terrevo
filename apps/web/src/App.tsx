@@ -406,11 +406,11 @@ export default function App() {
               const gps=await freshPosition();
               await api.submitUnplannedCall({executionId:progress.executionId,territoryId:draft.territoryId,
                 customerType:draft.customerType!,customerId:draft.customerId!,reason:draft.reason,
-                remarks:draft.remarks,durationMinutes:draft.durationMinutes,...gps});
+                remarks:draft.remarks,durationMinutes:draft.durationMinutes,operationId:draft.operationId,...gps});
             }else{
               await api.saveNcaDraft({phase:draft.ncaPhase==="PLAN"?"PLAN":"REPORT",
                 workDate:draft.workDate,territoryId:draft.territoryId,categoryCode:draft.ncaSubtype??"",
-                townId:draft.townId??null,reason:draft.reason,remarks:draft.remarks,durationMinutes:draft.durationMinutes});
+                townId:draft.townId??null,reason:draft.reason,remarks:draft.remarks,durationMinutes:draft.durationMinutes,operationId:draft.operationId});
             }
             await refresh(access);
           }}
