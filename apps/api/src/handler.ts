@@ -33,6 +33,8 @@ export type ApiEnv = {
   SUPABASE_SECRET_KEY?: string;
   SUPABASE_ANON_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
+  TERREVO_ENVIRONMENT?: string;
+  VERCEL_ENV?: string;
 };
 
 type Deps = {
@@ -176,6 +178,21 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
 
       if (request.method === "GET" && path === "/v1/me") {
         return json(200, { user: await identity.authenticate(request.headers.get("authorization")) });
+      }
+
+      // Authenticated runtime proof for staging qualification. Never accept a
+      // client-supplied environment or project reference as evidence of safety.
+      if (request.method === "GET" && path === "/v1/qualification/target") {
+        const {context}=await resolveTenantRequest(request);
+        const ref=/^https:\/\/([a-z0-9]{20})\.supabase\.co\/?$/.exec(env.SUPABASE_URL??"")?.[1]??null;
+        const isStaging=env.TERREVO_ENVIRONMENT==="staging" &&
+          env.VERCEL_ENV!=="production" && ref!==null &&
+          ref!=="dfqsnkmmumvjwmvtnlcs";
+        return json(200,{
+          environment:isStaging?"staging":"unverified",
+          projectRef:ref,
+          tenantId:context.tenantId,
+        });
       }
 
       // Platform administration is strictly separate from tenant RBAC.
