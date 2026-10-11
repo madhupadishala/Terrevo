@@ -1,0 +1,6 @@
+apps/web/src/features/activities/model.ts | discriminated activity contracts and validators
+apps/web/src/features/activities/ActivitiesView.tsx | Carbon activity draft/review UI
+apps/web/test/activities.model.test.ts | conditional validation tests
+apps/web/src/features/activities/README.md | feature usage/status
+apps/web/src/features/activities/INTEGRATION_REQUEST.md | pending API and parent wiring
+apps/web/src/features/activities/FILE_MANIFEST.txt | owned file manifest

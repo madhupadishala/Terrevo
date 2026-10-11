@@ -17,11 +17,14 @@ import { createTradeCallService, TradeCallConflictError, TradeCallInputError, Tr
 import { createRcpaService, RcpaConflictError, RcpaInputError, RcpaNotFoundError } from "../../../modules/rcpa/src/index.ts";
 import { createOrderService, OrderConflictError, OrderInputError, OrderNotFoundError } from "../../../modules/orders/src/index.ts";
 import { createAttendanceLeaveService, LeaveConflictError, LeaveInputError, LeaveNotFoundError } from "../../../modules/attendance-leave/src/index.ts";
+import { createNcaService, NcaInputError, NcaConflictError, NcaNotFoundError } from "../../../modules/nca/src/index.ts";
+import {createUnplannedCallService,UnplannedInputError,UnplannedConflictError,UnplannedNotFoundError} from "../../../modules/unplanned-calls/src/index.ts";
 import { createExpenseService, ExpenseConflictError, ExpenseInputError, ExpenseNotFoundError } from "../../../modules/expenses/src/index.ts";
 import { createJointWorkService, JointWorkConflictError, JointWorkInputError, JointWorkNotFoundError } from "../../../modules/joint-work/src/index.ts";
 import { createManagerCommandService } from "../../../modules/manager-command/src/index.ts";
 import { AnalyticsInputError, createAnalyticsService } from "../../../modules/analytics/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
+import { createPlatformAdminService, PlatformForbiddenError, PlatformValidationError, PlatformNotFoundError } from "./platform-admin.ts";
 import { readBoundedJsonObject, RequestBodyError } from "../../../modules/security/src/index.ts";
 
 export type ApiEnv = {
@@ -30,6 +33,8 @@ export type ApiEnv = {
   SUPABASE_SECRET_KEY?: string;
   SUPABASE_ANON_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
+  TERREVO_ENVIRONMENT?: string;
+  VERCEL_ENV?: string;
 };
 
 type Deps = {
@@ -72,6 +77,15 @@ function requireConfig(env: ApiEnv): SupabaseConfig {
   };
 }
 
+/** Deployment identity is derived from server-owned runtime configuration, never a query/header. */
+export function runtimeQualificationProof(env: ApiEnv, tenantId: string) {
+  const ref=/^https:\/\/([a-z0-9]{20})\.supabase\.co\/?$/.exec(env.SUPABASE_URL??"")?.[1]??null;
+  const isStaging=env.TERREVO_ENVIRONMENT==="staging" &&
+    env.VERCEL_ENV!=="production" && ref!==null &&
+    ref!=="dfqsnkmmumvjwmvtnlcs";
+  return { environment:isStaging?"staging":"unverified", projectRef:ref, tenantId };
+}
+
 /** Maps domain and provider failures to stable public API responses. */
 function mapError(error: unknown): Response {
   if (error instanceof ApiError || error instanceof RequestBodyError) return json(error.status, { error: error.message });
@@ -83,12 +97,14 @@ function mapError(error: unknown): Response {
     const status = error.message.includes("access denied") ? 403 : 400;
     return json(status, { error: error.message });
   }
-  if (error instanceof AuthorizationError) return json(403, { error: "Permission denied" });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError || error instanceof ExpenseInputError || error instanceof JointWorkInputError || error instanceof AnalyticsInputError) {
+  if (error instanceof AuthorizationError || error instanceof PlatformForbiddenError) return json(403, { error: "Permission denied" });
+  if (error instanceof PlatformValidationError) return json(400, { error: error.message });
+  if (error instanceof PlatformNotFoundError) return json(404, { error: error.message });
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError || error instanceof NcaInputError || error instanceof UnplannedInputError || error instanceof ExpenseInputError || error instanceof JointWorkInputError || error instanceof AnalyticsInputError) {
     return json(400, { error: error.message });
   }
-  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError || error instanceof TradeCallNotFoundError || error instanceof RcpaNotFoundError || error instanceof OrderNotFoundError || error instanceof LeaveNotFoundError || error instanceof ExpenseNotFoundError || error instanceof JointWorkNotFoundError) return json(404, { error: error.message });
-  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError || error instanceof LeaveConflictError || error instanceof ExpenseConflictError || error instanceof JointWorkConflictError) return json(409, { error: error.message });
+  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError || error instanceof TradeCallNotFoundError || error instanceof RcpaNotFoundError || error instanceof OrderNotFoundError || error instanceof LeaveNotFoundError || error instanceof NcaNotFoundError || error instanceof UnplannedNotFoundError || error instanceof ExpenseNotFoundError || error instanceof JointWorkNotFoundError) return json(404, { error: error.message });
+  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError || error instanceof LeaveConflictError || error instanceof NcaConflictError || error instanceof UnplannedConflictError || error instanceof ExpenseConflictError || error instanceof JointWorkConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
     if (error.status === 400) return json(400, { error: "Provider rejected request" });
@@ -121,10 +137,13 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const rcpa = createRcpaService(adapter.rcpa);
   const orders = createOrderService(adapter.orders);
   const attendanceLeave = createAttendanceLeaveService(adapter.attendanceLeave, rbac);
+  const nca = createNcaService(adapter.nca,rbac);
+  const unplanned = createUnplannedCallService(adapter.unplanned,rbac,adapter.masters);
   const expenses = createExpenseService(adapter.expenses, rbac);
   const jointWork = createJointWorkService(adapter.jointWork, rbac);
   const managerCommand = createManagerCommandService(adapter.managerCommand);
   const analytics = createAnalyticsService(adapter.analytics);
+  const platform = createPlatformAdminService(requireConfig(env), deps.fetcher);
 
   /** Authenticates the caller and resolves the active tenant context for a tenant-scoped request. */
   async function resolveTenantRequest(request: Request) {
@@ -168,6 +187,39 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
 
       if (request.method === "GET" && path === "/v1/me") {
         return json(200, { user: await identity.authenticate(request.headers.get("authorization")) });
+      }
+
+      // Authenticated runtime proof for staging qualification. Never accept a
+      // client-supplied environment or project reference as evidence of safety.
+      if (request.method === "GET" && path === "/v1/qualification/target") {
+        const {context}=await resolveTenantRequest(request);
+        return json(200,runtimeQualificationProof(env,context.tenantId));
+      }
+
+      // Platform administration is strictly separate from tenant RBAC.
+      // All platform requests first validate the caller's Supabase-issued bearer token.
+      if (path === "/v1/platform/context" && request.method === "GET") {
+        const user = await identity.authenticate(request.headers.get("authorization"));
+        return json(200, { isSuperAdmin: await platform.isPlatformAdmin(user.id) });
+      }
+      if (path === "/v1/platform/tenants" && request.method === "GET") {
+        const user = await identity.authenticate(request.headers.get("authorization"));
+        const offset = Number(new URL(request.url).searchParams.get("offset") ?? "0");
+        return json(200, { tenants: await platform.listTenants(user.id, offset) });
+      }
+      if (path === "/v1/platform/tenants" && request.method === "POST") {
+        const user = await identity.authenticate(request.headers.get("authorization"));
+        return json(201, { tenant: await platform.createTenant(user.id, await readJsonObject(request)) });
+      }
+      const platformStatus = /^\/v1\/platform\/tenants\/([^/]+)\/status$/.exec(path);
+      if (platformStatus && request.method === "PATCH") {
+        const user = await identity.authenticate(request.headers.get("authorization"));
+        return json(200, { tenant: await platform.setTenantStatus(user.id, platformStatus[1], await readJsonObject(request)) });
+      }
+      if (path === "/v1/platform/audit" && request.method === "GET") {
+        const user = await identity.authenticate(request.headers.get("authorization"));
+        const offset = Number(new URL(request.url).searchParams.get("offset") ?? "0");
+        return json(200, { events: await platform.audit(user.id, offset) });
       }
 
       if (request.method === "GET" && path === "/v1/tenants") {
@@ -218,6 +270,54 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
       const expenseSubmit=/^\/v1\/expenses\/([^/]+)\/submit$/.exec(path);if(request.method==="POST"&&expenseSubmit){const {accessToken,user,context}=await resolveTenantRequest(request);return json(200,{claim:await expenses.submit(context.tenantId,user.id,accessToken,expenseSubmit[1],await readJsonObject(request))});}
       const expenseDecision=/^\/v1\/expense-approvals\/([^/]+)\/decision$/.exec(path);if(request.method==="POST"&&expenseDecision){const {accessToken,user,context}=await resolveTenantRequest(request);await expenses.decide(context.tenantId,user.id,accessToken,expenseDecision[1],await readJsonObject(request));return new Response(null,{status:204});}
       if(request.method==="GET"&&path==="/v1/attendance"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{attendance:await attendanceLeave.listAttendance(context.tenantId,accessToken)});}
+
+      // Planned calls remain on approved tour stops with GPS visit/DCR workflow.
+      // Unplanned calls are separate GPS-evidenced transactions awaiting manager review.
+      if(request.method==="GET"&&path==="/v1/unplanned-calls/own"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(200,{calls:await unplanned.own(context.tenantId,user.id,accessToken)});
+      }
+      if(request.method==="POST"&&path==="/v1/unplanned-calls"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(201,{call:await unplanned.submit(context.tenantId,user.id,accessToken,await readJsonObject(request))});
+      }
+      if(request.method==="GET"&&path==="/v1/unplanned-approvals"){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{calls:await unplanned.pending(context.tenantId,accessToken)});
+      }
+      const unplannedDecision=/^\/v1\/unplanned-approvals\/([^/]+)\/decision$/.exec(path);
+      if(request.method==="POST"&&unplannedDecision){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(200,{call:await unplanned.decide(context.tenantId,user.id,accessToken,unplannedDecision[1],await readJsonObject(request))});
+      }
+
+      // NCA is a distinct governed field-activity contract, never a doctor call.
+      if(request.method==="GET"&&path==="/v1/nca/options"){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{options:await nca.options(context.tenantId,accessToken)});
+      }
+      if(request.method==="GET"&&path==="/v1/nca/own"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(200,{records:await nca.listOwn(context.tenantId,user.id,accessToken)});
+      }
+      if(request.method==="POST"&&path==="/v1/nca"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(201,{record:await nca.save(context.tenantId,user.id,accessToken,await readJsonObject(request))});
+      }
+            const ncaSubmit=/^\/v1\/nca\/([^/]+)\/submit$/.exec(path);
+      if(request.method==="POST"&&ncaSubmit){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(200,{record:await nca.submit(context.tenantId,user.id,accessToken,ncaSubmit[1])});
+      }
+      if(request.method==="POST"&&path==="/v1/nca/categories"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(201,{category:await nca.configureCategory(context.tenantId,user.id,accessToken,await readJsonObject(request))});
+      }
+      if(request.method==="POST"&&path==="/v1/nca/towns"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(201,{town:await nca.configureTown(context.tenantId,user.id,accessToken,await readJsonObject(request))});
+      }
+
       if(request.method==="GET"&&path==="/v1/leaves/own"){const {accessToken,user,context}=await resolveTenantRequest(request);return json(200,{leaves:await attendanceLeave.listOwnLeaves(context.tenantId,user.id,accessToken)});}if(request.method==="GET"&&path==="/v1/leaves"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{leaves:await attendanceLeave.listLeaves(context.tenantId,accessToken)});}
       if(request.method==="POST"&&path==="/v1/leaves"){const {accessToken,user,context}=await resolveTenantRequest(request);return json(201,{leave:await attendanceLeave.submit(context.tenantId,user.id,accessToken,await readJsonObject(request))});}
       if(request.method==="GET"&&path==="/v1/leave-approvals"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{leaves:await attendanceLeave.listPending(context.tenantId,accessToken)});}

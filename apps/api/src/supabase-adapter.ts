@@ -20,6 +20,8 @@ import type { ExpenseClaim, ExpenseRepository } from "../../../modules/expenses/
 import type { JointWork, JointWorkRepository } from "../../../modules/joint-work/src/index.ts";
 import type { ManagerCommandCenter, ManagerCommandRepository } from "../../../modules/manager-command/src/index.ts";
 import type { AnalyticsRepository, ManagerAnalytics } from "../../../modules/analytics/src/index.ts";
+import type { NcaRepository, NcaRecord } from "../../../modules/nca/src/index.ts";
+import type {UnplannedRepository,UnplannedCall} from "../../../modules/unplanned-calls/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -151,6 +153,8 @@ export function createSupabaseAdapter(
   jointWork: JointWorkRepository;
   managerCommand: ManagerCommandRepository;
   analytics: AnalyticsRepository;
+  nca: NcaRepository;
+  unplanned: UnplannedRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -1021,5 +1025,106 @@ export function createSupabaseAdapter(
       return await r.json() as ManagerAnalytics;
     }
   };
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders, attendanceLeave, expenses, jointWork, managerCommand, analytics };
+  const mapNca = (row:Record<string,unknown>):NcaRecord => ({
+    id:String(row.id),workDate:String(row.work_date),territoryId:String(row.territory_id),
+    phase:row.phase as NcaRecord["phase"],categoryCode:String(row.category_code),
+    townId:row.town_id===null?null:String(row.town_id),reason:String(row.reason),remarks:String(row.remarks??""),
+    durationMinutes:Number(row.duration_minutes),status:row.status as NcaRecord["status"],
+    createdAt:String(row.created_at),
+  });
+  const nca:NcaRepository={
+    async options(t,token){
+      const cats=new URLSearchParams({select:"code,label,active",tenant_id:"eq."+t,order:"code.asc"});
+      const towns=new URLSearchParams({select:"id,name,territory_id,active",tenant_id:"eq."+t,order:"name.asc"});
+      const [c,town]=await Promise.all([
+        expectOk(await fetcher(`${base}/rest/v1/nca_categories?${cats}`,{headers:authHeaders(config,token)})),
+        expectOk(await fetcher(`${base}/rest/v1/nca_towns?${towns}`,{headers:authHeaders(config,token)})),
+      ]);
+      const categories=(await c.json() as Array<{code:string;label:string;active:boolean}>);
+      const rows=(await town.json() as Array<{id:string;name:string;territory_id:string;active:boolean}>);
+      return {categories,towns:rows.map(x=>({id:x.id,name:x.name,territoryId:x.territory_id,active:x.active}))};
+    },
+    async listOwn(t,u,token){
+      const q=new URLSearchParams({select:"*",tenant_id:"eq."+t,created_by:"eq."+u,order:"work_date.desc",limit:"200"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/nca_records?${q}`,{headers:authHeaders(config,token)}));
+      return (await r.json() as Array<Record<string,unknown>>).map(mapNca);
+    },
+    async getOwn(t,u,id,token){
+      const q=new URLSearchParams({select:"*",tenant_id:"eq."+t,created_by:"eq."+u,id:"eq."+id,limit:"1"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/nca_records?${q}`,{headers:authHeaders(config,token)}));
+      const row=(await r.json() as Array<Record<string,unknown>>)[0];
+      return row?mapNca(row):null;
+    },
+    async create(t,u,v){
+      const r=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_create_nca`,{
+        method:"POST",headers:adminHeaders(config),
+        body:JSON.stringify({p_tenant_id:t,p_actor:u,p_operation_id:v.operationId,p_work_date:v.workDate,
+          p_territory_id:v.territoryId,p_phase:v.phase,p_category_code:v.categoryCode,
+          p_town_id:v.townId,p_reason:v.reason,p_remarks:v.remarks,p_duration_minutes:v.durationMinutes}),
+      }));
+      return await r.json() as string;
+    },
+    async submit(t,u,id){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_submit_nca`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_actor:u,p_id:id}),
+      }));
+    },
+    async createCategory(t,a,code,label){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_configure_nca_category`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_actor:a,p_code:code,p_label:label}),
+      }));
+    },
+    async createTown(t,a,territoryId,name){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_configure_nca_town`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_actor:a,p_territory_id:territoryId,p_name:name}),
+      }));
+    },
+  };
+
+  const mapUnplanned=(row:Record<string,unknown>):UnplannedCall=>({
+    id:String(row.id),actorUserId:String(row.actor_user_id),executionId:String(row.execution_id),workDate:String(row.work_date),
+    territoryId:String(row.territory_id),customerType:row.customer_type as UnplannedCall["customerType"],
+    customerId:String(row.customer_id),reason:String(row.reason),remarks:String(row.remarks),
+    durationMinutes:Number(row.duration_minutes),latitude:Number(row.latitude),longitude:Number(row.longitude),
+    accuracyMeters:Number(row.accuracy_meters),status:row.status as UnplannedCall["status"],
+    managerComment:row.manager_comment==null?null:String(row.manager_comment),
+    submittedAt:String(row.submitted_at),reviewedAt:row.reviewed_at==null?null:String(row.reviewed_at),
+  });
+  const unplanned:UnplannedRepository={
+    async submit(t,u,v){
+      const response=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_submit_unplanned_call`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:t,p_user_id:u,p_operation_id:v.operationId,p_execution_id:v.executionId,
+          p_territory_id:v.territoryId,p_customer_type:v.customerType,p_customer_id:v.customerId,
+          p_reason:v.reason,p_remarks:v.remarks,p_duration:v.durationMinutes,
+          p_latitude:v.latitude,p_longitude:v.longitude,p_accuracy:v.accuracyMeters,
+        }),
+      }));
+      return await response.json() as string;
+    },
+    async own(t,u,token){
+      const q=new URLSearchParams({select:"*",tenant_id:"eq."+t,actor_user_id:"eq."+u,order:"submitted_at.desc",limit:"200"});
+      const response=await expectOk(await fetcher(`${base}/rest/v1/unplanned_calls?${q}`,{headers:authHeaders(config,token)}));
+      return (await response.json() as Array<Record<string,unknown>>).map(mapUnplanned);
+    },
+    async pending(t,token){
+      const q=new URLSearchParams({select:"*",tenant_id:"eq."+t,status:"eq.SUBMITTED",order:"submitted_at.asc",limit:"200"});
+      const response=await expectOk(await fetcher(`${base}/rest/v1/unplanned_calls?${q}`,{headers:authHeaders(config,token)}));
+      return (await response.json() as Array<Record<string,unknown>>).map(mapUnplanned);
+    },
+    async byId(t,id,token){
+      const q=new URLSearchParams({select:"*",tenant_id:"eq."+t,id:"eq."+id,limit:"1"});
+      const response=await expectOk(await fetcher(`${base}/rest/v1/unplanned_calls?${q}`,{headers:authHeaders(config,token)}));
+      const row=(await response.json() as Array<Record<string,unknown>>)[0];
+      return row?mapUnplanned(row):null;
+    },
+    async decide(t,actor,id,decision,comment){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_decide_unplanned_call`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:t,p_actor:actor,p_call_id:id,p_decision:decision,p_comment:comment,
+        }),
+      }));
+    },
+  };
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders, attendanceLeave, expenses, jointWork, managerCommand, analytics, nca, unplanned };
 }

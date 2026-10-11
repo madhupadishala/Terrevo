@@ -16,6 +16,8 @@ jobs:
           node-version: "22"
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run verify:foundation
+      - run: npm run verify:release
+      - run: npm run test:release-safety
       - run: npm run typecheck
       - run: npm test
       - run: npm run test:web
@@ -88,6 +90,18 @@ jobs:
             echo "Applying $file"
             psql -v ON_ERROR_STOP=1 -f "$file"
           done
+      - name: Platform administrator isolation and audit tests
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/platform-admin-policy-tests.sql
+      - name: Public security definer and administrative RPC privilege isolation
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/public-definer-privileges-tests.sql
+      - name: NCA tenant isolation and denied-write policy tests
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/nca-policy-tests.sql
+      - name: Real PostgreSQL NCA persistence, idempotency and tenant-isolation tests
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/nca-integration-tests.sql
+      - name: Unplanned call persistence-security policy checks
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/unplanned-call-policy-tests.sql
+      - name: Unplanned call PostgreSQL persistence and manager-review integration tests
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/unplanned-call-integration-tests.sql
       - name: Apply all rollback migrations in reverse
         run: |
           set -euo pipefail
