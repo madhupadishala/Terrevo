@@ -3,7 +3,7 @@ import type {MastersRepository} from "../../masters/src/index.ts";
 
 export type CustomerKind="doctor"|"chemist"|"stockist";
 export type UnplannedCall={
- id:string;executionId:string;workDate:string;territoryId:string;customerType:CustomerKind;
+ id:string;actorUserId:string;executionId:string;workDate:string;territoryId:string;customerType:CustomerKind;
  customerId:string;reason:string;remarks:string;durationMinutes:number;
  latitude:number;longitude:number;accuracyMeters:number;status:"SUBMITTED"|"APPROVED"|"REJECTED";
  managerComment:string|null;submittedAt:string;reviewedAt:string|null;
@@ -77,6 +77,7 @@ export function createUnplannedCallService(repo:UnplannedRepository,rbac:RbacSer
    const row=await repo.byId(tenantId,recordId,token);
    if(!row)throw new UnplannedNotFoundError("Unplanned call not found or not visible");
    if(row.status!=="SUBMITTED")throw new UnplannedConflictError("Only submitted calls can be reviewed");
+   if(row.actorUserId===actor)throw new UnplannedConflictError("A representative cannot review their own call");
    await rbac.authorize(tenantId,"TOUR_APPROVE",row.territoryId,token);
    await repo.decide(tenantId,actor,recordId,raw.decision,comment||null);
    const after=await repo.byId(tenantId,recordId,token);
