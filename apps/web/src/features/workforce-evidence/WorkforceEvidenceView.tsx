@@ -1,4 +1,4 @@
-import {useId,useMemo,useState} from "react";
+import {useId,useMemo,useRef,useState} from "react";
 import {Button,Tag,TextInput} from "@carbon/react";
 import {allowedOwner,reviewClaims,type EvidenceViewProps} from "./model";
 export type {EvidenceViewProps,EvidenceScope,Claim,ReceiptManifest,TravelEvidence,AttendanceEvidence,PolicyLimit,ClaimReview} from "./model";
@@ -10,13 +10,13 @@ export function WorkforceEvidenceView(props:EvidenceViewProps){
  return <WorkforceEvidenceContent key={stamp} {...props} stamp={stamp}/>;
 }
 function WorkforceEvidenceContent({scope,claims=[],receipts=[],travel=[],attendance=[],policies=[],loading=false,error,onRequestReceiptReview,stamp}:EvidenceViewProps & {stamp:string}){
- const [query,setQuery]=useState("");const [selected,setSelected]=useState("");const id=useId();
+ const [query,setQuery]=useState("");const [selected,setSelected]=useState("");const requestedReceipts=useRef(new Set<string>());const id=useId();
 
  const authorized=Boolean(scope.tenantId&&scope.tenantId===scope.authorizedForTenantId&&scope.contextKey&&scope.viewerUserId&&(scope.role==="FIELD"||(scope.role==="MANAGER"||scope.role==="ADMIN")&&Array.isArray(scope.permittedUserIds)));
  const reviews=useMemo(()=>reviewClaims(scope,claims,receipts,travel,attendance,policies),[scope,claims,receipts,travel,attendance,policies]);
  const filtered=reviews.filter(r=>[r.claim.id,r.claim.workDate,r.claim.ownerUserId].some(v=>v.toLowerCase().includes(query.toLowerCase())));
  const current=selected.startsWith(`${stamp}:`)?reviews.find(x=>`${stamp}:${x.claim.id}`===selected):undefined;
- function requestReceipt(receiptId:string){if(!current||!allowedOwner(scope,current.claim.ownerUserId)||!onRequestReceiptReview)return;const row=current.receiptStates.find(r=>r.id===receiptId);if(row)onRequestReceiptReview({tenantId:scope.tenantId,contextKey:scope.contextKey,claimId:current.claim.id,receiptId:row.id});}
+ function requestReceipt(receiptId:string){if(!current||!allowedOwner(scope,current.claim.ownerUserId)||!onRequestReceiptReview)return;const row=current.receiptStates.find(r=>r.id===receiptId);if(row){const key=JSON.stringify([current.claim.id,row.id]);if(requestedReceipts.current.has(key))return;requestedReceipts.current.add(key);try{onRequestReceiptReview({tenantId:scope.tenantId,contextKey:scope.contextKey,claimId:current.claim.id,receiptId:row.id});}catch(e){requestedReceipts.current.delete(key);throw e;}}}
  return <div className="tr-grid-wide"><section className="tr-panel"><h2>Expense and attendance evidence</h2><p className="tr-detail">Read-only verified source records; no upload, OCR, signed download or accounting settlement.</p>
  {!authorized&&<p role="status">Not authorized to view workforce evidence.</p>}{loading&&<p role="status">Loading authorized evidence…</p>}{error&&<p role="alert">{error}</p>}
  {authorized&&!loading&&!error&&<><TextInput id={`${id}-filter`} labelText="Filter claims by date, claim ID or employee" value={query} onChange={e=>setQuery(e.target.value)}/>
@@ -26,7 +26,7 @@ function WorkforceEvidenceContent({scope,claims=[],receipts=[],travel=[],attenda
  {!current?<p role="status">Select a permitted claim to inspect line receipts, travel and day closure.</p>:<><h3>Claim {current.claim.id}</h3>
  <p>Submitted amount: {money(current.claim.serverTotalMinor,current.claim.currency)}. Recomputed line total: {money(current.computedMinor,current.claim.currency)}.</p>
  {current.discrepancy&&<p role="alert">Mismatch or invalid value: verify with authoritative expense service before approval.</p>}
- <h4>Line items and receipt manifest</h4>{current.claim.lines.map(l=><div className="tr-history-row" key={l.id}><div><strong>{l.category} · {money(l.amountMinor,current.claim.currency)}</strong><p>Line {l.id}</p><p>Receipt: {current.receiptStates.find(r=>r.lineId===l.id)?.status??"NO VERIFIED MANIFEST"}</p>{current.overLimitLines.includes(l.id)&&<p>Policy threshold exceeded</p>}</div><Button size="sm" kind="ghost" disabled={!onRequestReceiptReview||!current.receiptStates.some(r=>r.lineId===l.id)} onClick={()=>{const r=current.receiptStates.find(r=>r.lineId===l.id);if(r)requestReceipt(r.id);}}>Request receipt review</Button></div>)}
+ <h4>Line items and receipt manifest</h4>{current.claim.lines.map(l=><div className="tr-history-row" key={l.id}><div><strong>{l.category} · {money(l.amountMinor,current.claim.currency)}</strong><p>Line {l.id}</p><p>Receipt: {(current.receiptStates.filter(r=>r.lineId===l.id).length>1?"CONFLICTING MANIFESTS":current.receiptStates.find(r=>r.lineId===l.id)?.status)??"NO VERIFIED MANIFEST"}</p>{current.overLimitLines.includes(l.id)&&<p>Policy threshold exceeded</p>}</div><Button size="sm" kind="ghost" disabled={!onRequestReceiptReview||!current.receiptStates.some(r=>r.lineId===l.id)||requestedReceipts.current.has(JSON.stringify([current.claim.id,current.receiptStates.find(r=>r.lineId===l.id)?.id]))} onClick={()=>{const r=current.receiptStates.find(r=>r.lineId===l.id);if(r)requestReceipt(r.id);}}>Request receipt review</Button></div>)}
  <h4>Travel provenance</h4>{current.travel.length?current.travel.map(t=><p key={`${t.ownerUserId}:${t.workDate}:${t.sourceId}`}>{t.method} · {t.distanceMeters} metres · source {t.sourceId}</p>):<p>No verified travel source supplied.</p>}
  <h4>Attendance/day closure</h4>{current.attendance?<p>{current.attendance.state} · {current.attendance.dayClosed?"Closed":"Not closed"} · source {current.attendance.sourceId}</p>:<p>No verified attendance evidence supplied.</p>}
  <Button kind="secondary" onClick={()=>setSelected("")}>Close evidence</Button><p className="tr-detail">No record changes or storage operations occur in this component.</p></>}
