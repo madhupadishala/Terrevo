@@ -1,6 +1,6 @@
 # Engineer 1 backend handoff — 2026-10-11
 
-Source: `chore/r01-repository-consolidation`, continuing from `9cec0cd8be76f364b93872fc0693c4547e67efaf`. All routes below exist in `apps/api/src/handler.ts`; browser transport adds `/api`. Bearer authentication and the authorized `x-tenant-id` are mandatory. Server identity and permission checks remain authoritative. This contract index is backed by the live synthetic traces and limits in the consolidated Engineer 1 execution report. Engineering source `987eae68be97a17c7afecbe740250f5345ac0010` passes all five CI jobs.
+Source: `chore/r01-repository-consolidation`, continuing from `9cec0cd8be76f364b93872fc0693c4547e67efaf`. All routes below exist in `apps/api/src/handler.ts`; browser transport adds `/api`. Bearer authentication and the authorized `x-tenant-id` are mandatory. Server identity and permission checks remain authoritative. This contract index is backed by the live synthetic traces and limits in the consolidated Engineer 1 execution report. Engineering source `475e6810cf7c061c9f804b74d917ef6cc4595bd6` passes all five CI jobs.
 
 ## Canonical boundaries and ownership
 
@@ -78,10 +78,10 @@ All shared web requests discard completions after an account/tenant transition, 
 
 ## Reproducible qualification order
 
-Provision fixed, isolated identities through the supported Auth helper, save the private manifest with mode 0600, and disable the helper immediately. Generate the synthetic fixture once; subsequent generation preserves the same IDs. Optional MR2 and UNSCOPED identities produce the corresponding scoped employee/member fixture. Apply only to the attested existing staging project.
+Provision fixed, isolated identities through the supported Auth helper, save the private manifest with mode 0600, and disable the helper immediately. Generate the synthetic fixture once; subsequent generation preserves the same IDs. Optional MR2 and UNSCOPED identities produce the corresponding scoped employee/member fixture. Before any grant, the generated SQL verifies every referenced Auth ID, qualification run, role and canonical email in the same transaction. Apply only to the attested existing staging project.
 
 Run `qualify-live-journey.mjs manifest private-state evidence`, then `qualify-manager-services.mjs manifest private-state evidence`. The manifest may carry `fixture.executionId` to identify the first journey; otherwise exactly one own daily timesheet is required. The manager runner derives the week from that record and uses `fixture.mr2Employee`, not fixed run IDs. Private operation IDs are atomically checkpointed before dispatch, and completed 204 steps are cached by presence.
 
 `qualify-security-load.mjs manifest evidence` preserves failures against the declared latency/error budgets. Optional `manifest.region` pins the known provider region; inspect returned region/timing and retain earlier measurements. `qualify-curl-load.mjs manifest evidence` independently measures the same four-client/60-read budget with native curl and private header files.
 
-Platform qualification needs a bounded temporary grant on the isolated UNSCOPED test identity, followed by `qualify-platform-governance.mjs manifest private-state evidence`, immediate grant revocation and a fresh-session denial check. The actual delivered run completed these steps; the governance test tenant is inactive. This procedure must not grant a customer or production account platform authority.
+Platform qualification needs a bounded temporary grant on the isolated UNSCOPED test identity, followed by `qualify-platform-governance.mjs manifest private-state evidence`, immediate grant revocation and a fresh-session denial check. The actual delivered run completed these steps; the governance test tenant is inactive. The qualifier first scans fresh paginated tenants by the run-scoped slug, so retry after a lost create response reuses the committed tenant. A bounded incomplete scan fails before creation. This procedure must not grant a customer or production account platform authority.

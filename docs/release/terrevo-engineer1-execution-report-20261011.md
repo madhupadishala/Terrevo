@@ -4,8 +4,8 @@
 
 ## Source and verification
 
-- Engineering code: `987eae68be97a17c7afecbe740250f5345ac0010`; tree `a822188035089ffde196b44153af04c8ee187f1f`.
-- [All five CI jobs passed, run 38142059168](https://github.com/madhupadishala/Terrevo/actions/runs/38142059168): foundation, mobile, database migrations, browser smoke and ownership.
+- Engineering code: `475e6810cf7c061c9f804b74d917ef6cc4595bd6`; tree `b5e6b329ec32502ef5957cce9001856a64f8593c`.
+- [All five CI jobs passed, run 38143712459](https://github.com/madhupadishala/Terrevo/actions/runs/38143712459): foundation, mobile, database migrations, browser smoke and ownership.
 - Delivery: [PR #65](https://github.com/madhupadishala/Terrevo/pull/65), against `feature/ui-live-role-workspaces`, base `473e74b549eead71226f6c4204c945e22f4d6bd7`.
 - Deployed staging API: exact runtime source `d3d0e085e186579d722e19ddde0474982d6a2372`, Edge version 4, bundle SHA-256 `ad807880a792b5c5373894cc97a0cdbf16e4f6585339e0b96c3ea5ab8215bfaf`. Subsequent engineering changes affect qualification tools and the mobile UUID override.
 - This report is a documentation revision after that engineering source. Its containing commit and PR checks identify that revision; the earlier CI run is not attributed to a later commit.
@@ -15,7 +15,7 @@
 |---|---|
 | API/domain tests | 125 passed |
 | Shared/delegated web tests | 41 passed |
-| Release-safety tests | 24 passed |
+| Release-safety tests | 27 passed |
 | Mobile queue/model tests | 12 passed |
 | Browser scenarios | 13 passed in hosted CI |
 | TypeScript, frozen installs, web/API build, Android export | Passed in exact-source CI |
@@ -44,7 +44,9 @@ Closure order remains R01 → R03 → R04-A → R05 → R06-A → R10-A → R11-
 
 Only existing `Terrevo-Staging`, ref `eirlubfbjexjilvskqxq`, was changed. Production ref `dfqsnkmmumvjwmvtnlcs`, main and production deployment remain unchanged. No paid project, branch or subscription was created. The staging endpoint uses the existing API/domain/provider stack with server credentials confined to the provider runtime.
 
-Supported Auth provisioning uses the GoTrue Admin API, fixed identities, a hashed nonce, an expiry, strict staging guard and bounded requests. Replay reconciles only an exact email with matching qualification run/role metadata; unrelated accounts cannot be taken over. Transport/provider failures retain partial created IDs without exposing credentials. The provisioner is disabled (410) after use. Existing legacy SQL-fabricated Auth fixtures were preserved and are not presented as supported sign-ins.
+Supported Auth provisioning uses the GoTrue Admin API, fixed identities, a hashed nonce, an expiry, strict staging guard and bounded requests. Replay reconciles only an exact email with matching qualification run/role metadata; unrelated accounts cannot be taken over. Transport/provider failures retain partial created IDs without exposing credentials. Unfiltered discovery first returned two controlled provider failures. Supported exact-email filtered discovery then passed twice, returning the same six owned IDs without new identities. Both failures remain in `engineer1-auth-replay-20261011.json`. The provisioner is disabled (version 8) and a subsequent authenticated invocation returned 410. Existing legacy SQL-fabricated Auth fixtures were preserved and are not presented as supported sign-ins.
+
+Fixture grants now check every required and optional identity against exact Auth ID, canonical email, qualification run and role before any insert. The generated guard passed against six supported identities and rejected 18 swapped-ID/wrong-role/wrong-email variants in a rollback transaction without business writes. `engineer1-identity-guard-20261011.json` records this check. A fresh paginated governance scan recovers an already committed tenant after a lost create response, with no duplicate creation; incomplete scans fail before creation. No temporary platform grant was reactivated for this correction.
 
 The isolated synthetic run `eng1-3809150601dc` contains MR, manager, tenant admin, foreign MR, second MR and an unscoped member. Its current persisted results are:
 
@@ -86,7 +88,7 @@ The mobile xcode→uuid dependency is overridden to patched 11.1.1. Xcode genera
 
 Current staging security advisors retain ten INFO entries for intentionally client-inaccessible audit/operation tables and one WARN for disabled leaked-password protection. The former fourteen authenticated SECURITY DEFINER warnings are cleared. [Supabase documents leaked-password protection as Pro-plan-and-above](https://supabase.com/docs/guides/auth/password-security); the zero-cost requirement is preserved.
 
-Actual CodeRabbit findings have received targeted fixes and evidence replies, including synchronized races, counterpart access, safe rollbacks, runtime logging, bounded pagination, Auth replay and atomic private recovery checkpoints. Current code passes all five CI jobs. Independent final re-review and baseline acceptance remain separate; historical CHANGES_REQUESTED reviews are not dismissed. The local CodeRabbit CLI is unavailable.
+Actual CodeRabbit findings have received targeted fixes and evidence replies, including synchronized races, counterpart access, safe rollbacks, runtime logging, bounded pagination, Auth replay and atomic private recovery checkpoints. All inline review threads are resolved, including the three final findings on tenant recovery, fixture identity grants and simulated Auth response loss. The corrected response-loss regression now stores the created user and throws, requires 502, then reconciles from a fresh handler with one creation. Current code passes all five CI jobs. Independent final re-review and baseline acceptance remain separate; historical CHANGES_REQUESTED reviews are not dismissed. The local CodeRabbit CLI is unavailable.
 
 The PostgreSQL CI restore is real, guarded and separate from staging. It does not restore managed Auth, Storage or provider configuration. Staging SQL tests are rollback-isolated; some later full-suite reruns were interrupted by connector `Invalid or expired requestState`, not a database assertion. Exact-source hosted migration/policy/recovery CI passed. The connector subsequently installed the audit migrations and completed actual read-only reconciliation and privilege checks.
 
@@ -99,3 +101,15 @@ Retained failed attempts are individually marked: the initial checkout expectati
 Karpathy/Ponytail review: existing stack and canonical boundaries reused; changes trace to the eight packages; no approved UI redesign or direct Expo/React Native upgrade. WARPATH is GO for the bounded verified staging corrections and **HOLD for integration/release**. Final blockers are independent baseline/release acceptance, physical-device UAT, the retained latency failure, unresolved upstream security exposure and acceptance of remaining approved service/metric/adapter contracts. They cannot be replaced by self-authored approvals or synthetic device evidence.
 
 Rollback uses reviewed code reverts and the corresponding additive down migrations, preserving business rows and security floors. Automatic production deployment remains disabled. Production deployment requires its own authorization and qualified release gate.
+
+## External dependencies and exact resolution
+
+| Unfinished gate | Owner | Specific resolution |
+|---|---|---|
+| Independent baseline and release acceptance | Authorized repository reviewer / founder | Review PR #65 at its final head and record the acceptance decision; historical CHANGES_REQUESTED reviews have not been dismissed. |
+| Representative device/GPS/offline UAT required by R00 | Field UAT owner with access to physical devices | Execute permission denial, inaccurate/unavailable GPS, app interruption, network loss, persisted retry and resumed-day scenarios; provide dated device evidence. |
+| End-to-end latency budget failure | Infrastructure/network diagnostic owner | Identify the delay outside the measured handler and qualify the same declared p95/p99 budgets from representative clients; the three failed runs remain evidence. |
+| node-forge and braces high advisories | Upstream maintainers and authorized security reviewer | Supply compatible patched releases or an explicit reviewed risk disposition with exposure evidence; no self-authored waiver or unsafe framework downgrade. |
+| Exact remaining service/metric/adapter acceptance | Product/clinical/data owners and Engineer 2 integration reviewer | Confirm the approved service/metric register and provide authorized history, asset approval, receipt/policy and snapshot/export source contracts before those Wave 2 views are mounted. |
+
+PostgreSQL backup/restore is verified. Broader managed Auth/Storage/configuration recovery remains outside that demonstrated result and requires its own approved recovery scope if expected. Production deployment remains a separate authorized action.

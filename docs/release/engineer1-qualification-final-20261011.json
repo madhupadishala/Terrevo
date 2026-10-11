@@ -1,7 +1,7 @@
 {
   "date": "2026-10-11",
-  "engineeringCodeSha": "987eae68be97a17c7afecbe740250f5345ac0010",
-  "engineeringTree": "a822188035089ffde196b44153af04c8ee187f1f",
+  "engineeringCodeSha": "475e6810cf7c061c9f804b74d917ef6cc4595bd6",
+  "engineeringTree": "b5e6b329ec32502ef5957cce9001856a64f8593c",
   "deployedApiSourceSha": "d3d0e085e186579d722e19ddde0474982d6a2372",
   "stagingApi": {
     "projectRef": "eirlubfbjexjilvskqxq",
@@ -13,32 +13,32 @@
   "productionModified": false,
   "paidResourcesCreated": false,
   "ci": {
-    "runId": 38142059168,
-    "headSha": "987eae68be97a17c7afecbe740250f5345ac0010",
+    "runId": 38143712459,
+    "headSha": "475e6810cf7c061c9f804b74d917ef6cc4595bd6",
     "conclusion": "success",
     "jobs": [
       {
-        "id": 114477760545,
+        "id": 114482601431,
         "name": "scope-lock",
         "conclusion": "success"
       },
       {
-        "id": 114477760761,
-        "name": "foundation",
-        "conclusion": "success"
-      },
-      {
-        "id": 114477760773,
+        "id": 114482601496,
         "name": "database-migrations",
         "conclusion": "success"
       },
       {
-        "id": 114477760885,
+        "id": 114482601550,
+        "name": "foundation",
+        "conclusion": "success"
+      },
+      {
+        "id": 114482601568,
         "name": "mobile",
         "conclusion": "success"
       },
       {
-        "id": 114477890701,
+        "id": 114482751628,
         "name": "browser-smoke",
         "conclusion": "success"
       }
@@ -47,7 +47,7 @@
   "tests": {
     "apiDomain": 125,
     "web": 41,
-    "releaseSafety": 24,
+    "releaseSafety": 27,
     "mobile": 12,
     "browser": 13
   },
@@ -423,10 +423,12 @@
     "engineer1-platform-governance-20261011.json",
     "engineer1-security-load-initial-20261011.json",
     "engineer1-security-load-regional-20261011.json",
-    "engineer1-curl-load-diagnostic-20261011.json"
+    "engineer1-curl-load-diagnostic-20261011.json",
+    "engineer1-auth-replay-20261011.json",
+    "engineer1-identity-guard-20261011.json"
   ],
   "review": {
-    "implementerResponses": "All actionable findings through d3d0e085 addressed with targeted fixes and regressions. Independent final re-review remains separate.",
+    "implementerResponses": "All actionable findings through 475e6810 addressed with targeted fixes and regressions. All inline threads resolved; independent approval remains separate.",
     "supersededFixtureQualifier": "PR64 core 300f36cc5aa922a27f36bbeb3f778ebbe21af4cd integrated; later 71fd8a295a54749c0c39af513416f95a64dbb09b adds a separate fixed-legacy-fixture qualifier, not selected over the supported identity canonical qualification runners."
   },
   "dependencyAudit": {
@@ -527,6 +529,26 @@
     "engineer1-platform-governance-20261011.json": "5658c99ba8010e5394d1b3706f1b4aa063f34d6db43e1150fdc4eb76bd6d7d48",
     "engineer1-security-load-initial-20261011.json": "afef95aebefdcb36c017007cea59b9330b1479c13f7c5b8703fcb53a9093e208",
     "engineer1-security-load-regional-20261011.json": "fdae44aa74fcaf68b0cdcbabc745e6d3701d14536d65eebee78d8d24d898f406",
-    "engineer1-curl-load-diagnostic-20261011.json": "c81e40af0f13d9f0847fef3361a0cd12e44398bf0cba73ca07fbc8f030588608"
+    "engineer1-curl-load-diagnostic-20261011.json": "c81e40af0f13d9f0847fef3361a0cd12e44398bf0cba73ca07fbc8f030588608",
+    "engineer1-auth-replay-20261011.json": "5cedebf9ef5fd12096b7d6debf899c0876b7706c38f3d90ad53e293dc5bd587d",
+    "engineer1-identity-guard-20261011.json": "7d0ccfd022710d3862f72aa1bd8b7a17067c8e511bab2901dd427bf915eb0a02"
+  },
+  "authProvisionerDisabledVersion": 8,
+  "authProvisionerDisabledHttpStatus": 410,
+  "authReplay": {
+    "attemptStatuses": [
+      502,
+      502,
+      200,
+      200
+    ],
+    "sameOwnedIdentities": 6,
+    "newIdentitiesCreated": 0,
+    "qualified": true
+  },
+  "identityGrantGuard": {
+    "validOwnedIdentities": 6,
+    "rejectedIdentityVariants": 18,
+    "businessWritesPerformed": false
   }
 }
