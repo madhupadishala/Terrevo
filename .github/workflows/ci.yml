@@ -96,6 +96,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/ci/public-definer-privileges-tests.sql
       - name: NCA tenant isolation and denied-write policy tests
         run: psql -v ON_ERROR_STOP=1 -f database/ci/nca-policy-tests.sql
+      - name: Real PostgreSQL NCA persistence, idempotency and tenant-isolation tests
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/nca-integration-tests.sql
       - name: Unplanned call persistence-security policy checks
         run: psql -v ON_ERROR_STOP=1 -f database/ci/unplanned-call-policy-tests.sql
       - name: Unplanned call PostgreSQL persistence and manager-review integration tests
