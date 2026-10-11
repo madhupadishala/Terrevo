@@ -100,6 +100,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/ci/nca-integration-tests.sql
       - name: Planned field lifecycle, conflicting retries and manager metric reconciliation
         run: psql -v ON_ERROR_STOP=1 -f database/ci/planned-field-lifecycle-tests.sql
+      - name: Planned start/check-in races across independent PostgreSQL connections
+        run: bash database/ci/planned-field-concurrency-tests.sh
       - name: Unplanned call persistence-security policy checks
         run: psql -v ON_ERROR_STOP=1 -f database/ci/unplanned-call-policy-tests.sql
       - name: Unplanned call PostgreSQL persistence and manager-review integration tests

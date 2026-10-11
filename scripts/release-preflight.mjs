@@ -23,6 +23,8 @@ const requiredFiles = [
   "database/ci/platform-admin-policy-tests.sql",
   "database/ci/planned-field-lifecycle-tests.sql",
   "database/ci/recovery-fixture.sql",
+  "database/ci/planned-field-concurrency-fixture.sql",
+  "database/ci/planned-field-concurrency-tests.sh",
   "database/ci/recovery-assertions.sql",
   "database/ci/recovery-cleanup.sql",
   "database/ci/unplanned-call-integration-tests.sql",
