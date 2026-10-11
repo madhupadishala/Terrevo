@@ -64,7 +64,7 @@ test("delegated screens render authorized records; empty NCA/CLM/AI contracts do
 
   await page.getByRole("button",{name:"NCA & activities"}).click();
   await expect(page.getByRole("heading",{name:"Planned, unplanned and non-call activity"})).toBeVisible();
-  await expect(page.getByText("NCA server drafts; planned and unplanned calls are not saved here").first()).toBeVisible();
+  await expect(page.getByText("Approved planned stops and server-recorded unplanned calls").first()).toBeVisible();
   await expect(page.getByRole("button",{name:"Review activity draft"})).toBeDisabled();
 
   await page.getByRole("button",{name:"E-detailing / CLM"}).click();
