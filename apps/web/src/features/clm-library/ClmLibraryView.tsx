@@ -1,12 +1,16 @@
-import {useEffect,useId,useMemo,useState} from "react";
+import {useId,useMemo,useState} from "react";
 import {Button,Tag,TextInput} from "@carbon/react";
 import {allowedCatalog,canDetail,detailingIntent,isEligible,recordedSessions,type ClmLibraryProps} from "./model";
 export type {ClmLibraryProps,CatalogScope,CatalogAsset,SessionSummary,ActiveVisit,DetailingHandoff} from "./model";
 export {allowedCatalog,canDetail,detailingIntent,isEligible,recordedSessions} from "./model";
-export function ClmLibraryView({scope,assets=[],sessions=[],activeVisit,loading=false,error,onRequestDetailing}:ClmLibraryProps){
+export function ClmLibraryView(props:ClmLibraryProps){
+ const {scope}=props;
+ const stamp=JSON.stringify([scope.tenantId,scope.authorizedForTenantId,scope.contextKey,scope.allowedRegions,scope.allowedProductIds,scope.roleCanDetail,scope.today]);
+ return <ClmLibraryContent key={stamp} {...props} stamp={stamp}/>;
+}
+function ClmLibraryContent({scope,assets=[],sessions=[],activeVisit,loading=false,error,onRequestDetailing,stamp}:ClmLibraryProps & {stamp:string}){
  const [search,setSearch]=useState("");const [product,setProduct]=useState("");const [region,setRegion]=useState("");const [selected,setSelected]=useState("");const id=useId();
- const stamp=`${scope.tenantId}:${scope.authorizedForTenantId}:${scope.contextKey}:${scope.allowedRegions.join(",")}:${scope.allowedProductIds.join(",")}`;
- useEffect(()=>{setSearch("");setProduct("");setRegion("");setSelected("");},[stamp]);
+
  const catalog=useMemo(()=>allowedCatalog(scope,assets),[scope,assets]);
  const filtered=catalog.filter(a=>(!search||a.title.toLowerCase().includes(search.toLowerCase()))&&(!product||product===a.productId)&&(!region||region===a.regionCode));
  const eligible=filtered.filter(a=>isEligible(scope,a));const withdrawn=filtered.filter(a=>!isEligible(scope,a));
