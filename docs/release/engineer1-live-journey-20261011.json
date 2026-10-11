@@ -1,0 +1,655 @@
+{
+  "runId": "eng1-3809150601dc",
+  "projectRef": "eirlubfbjexjilvskqxq",
+  "synthetic": true,
+  "workDate": "2026-10-11",
+  "checks": [
+    {
+      "name": "login-MR",
+      "method": "POST",
+      "path": "/v1/auth/login",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 10891,
+      "requestId": "3549fa33-d497-4295-af99-aa8d726dc97e",
+      "executedAt": "2026-10-11T07:57:41.043Z"
+    },
+    {
+      "name": "login-MANAGER",
+      "method": "POST",
+      "path": "/v1/auth/login",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 534,
+      "requestId": "046cbe97-5b5a-405e-9ae1-da7d5cdf3d01",
+      "executedAt": "2026-10-11T07:57:41.579Z"
+    },
+    {
+      "name": "login-TENANT_ADMIN",
+      "method": "POST",
+      "path": "/v1/auth/login",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 608,
+      "requestId": "3c159c9c-ead1-4176-893a-5068cf36467c",
+      "executedAt": "2026-10-11T07:57:42.188Z"
+    },
+    {
+      "name": "login-FOREIGN_MR",
+      "method": "POST",
+      "path": "/v1/auth/login",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 535,
+      "requestId": "a821d08e-c0d7-487f-9dd3-6c4f8697c32f",
+      "executedAt": "2026-10-11T07:57:42.723Z"
+    },
+    {
+      "name": "anonymous-denied",
+      "method": "GET",
+      "path": "/v1/me",
+      "status": 401,
+      "expected": 401,
+      "elapsedMs": 204,
+      "requestId": "86d873b9-d8fd-4301-95dd-839e7e196ace",
+      "executedAt": "2026-10-11T07:57:42.928Z"
+    },
+    {
+      "name": "trusted-staging-target",
+      "method": "GET",
+      "path": "/v1/qualification/target",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1294,
+      "requestId": "cf944cc0-6859-4643-948f-1251145b81f8",
+      "executedAt": "2026-10-11T07:57:44.223Z"
+    },
+    {
+      "name": "foreign-tenant-denied",
+      "method": "GET",
+      "path": "/v1/tour-plans",
+      "status": 403,
+      "expected": 403,
+      "elapsedMs": 1011,
+      "requestId": "e5a3ba61-a223-44dd-be7d-8c06d7a0d0a0",
+      "executedAt": "2026-10-11T07:57:45.235Z"
+    },
+    {
+      "name": "mr-admin-denied",
+      "method": "PUT",
+      "path": "/v1/field-settings",
+      "status": 403,
+      "expected": 403,
+      "elapsedMs": 1455,
+      "requestId": "606900d4-5e60-48ab-afb9-813f5aeae240",
+      "executedAt": "2026-10-11T07:57:46.691Z"
+    },
+    {
+      "name": "admin-field-settings",
+      "method": "PUT",
+      "path": "/v1/field-settings",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1639,
+      "requestId": "2e7dbc9e-bcf8-4a0d-86fa-56a95a6b867b",
+      "executedAt": "2026-10-11T07:57:48.331Z"
+    },
+    {
+      "name": "tenant-admin-platform-denied",
+      "method": "GET",
+      "path": "/v1/platform/tenants",
+      "status": 403,
+      "expected": 403,
+      "elapsedMs": 899,
+      "requestId": "59c9cb66-2ff3-4eb9-a0a3-380743f642f5",
+      "executedAt": "2026-10-11T07:57:49.231Z"
+    },
+    {
+      "name": "plan-create",
+      "method": "POST",
+      "path": "/v1/tour-plans",
+      "status": 201,
+      "expected": 201,
+      "elapsedMs": 2837,
+      "requestId": "ccab4e35-4f73-4684-9605-b2ac1ab0247e",
+      "executedAt": "2026-10-11T07:57:52.083Z"
+    },
+    {
+      "name": "plan-submit",
+      "method": "POST",
+      "path": "/v1/tour-plans/60b11b5f-25fb-4aa3-b983-280a2e25e782/submit",
+      "status": 204,
+      "expected": 204,
+      "elapsedMs": 2187,
+      "requestId": "cfc3cf70-27f6-4be3-a3a5-9d6a4541f634",
+      "executedAt": "2026-10-11T07:57:54.271Z"
+    },
+    {
+      "name": "plan-approve",
+      "method": "POST",
+      "path": "/v1/tour-approvals/60b11b5f-25fb-4aa3-b983-280a2e25e782/decision",
+      "status": 204,
+      "expected": 204,
+      "elapsedMs": 2501,
+      "requestId": "688701f1-d9c2-46c2-846d-b1853e277ed0",
+      "executedAt": "2026-10-11T07:57:56.773Z"
+    },
+    {
+      "name": "approved-start-options",
+      "method": "GET",
+      "path": "/v1/tour-executions/start-options",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1172,
+      "requestId": "a4a61ccc-948a-463b-a91b-c84668269403",
+      "executedAt": "2026-10-11T07:57:57.946Z"
+    },
+    {
+      "name": "tour-start",
+      "method": "POST",
+      "path": "/v1/tour-executions/start",
+      "status": 201,
+      "expected": 201,
+      "elapsedMs": 2136,
+      "requestId": "e5349315-59c7-4af3-9ab9-0358d2c63a54",
+      "executedAt": "2026-10-11T07:58:00.083Z"
+    },
+    {
+      "name": "tour-start-retry",
+      "method": "POST",
+      "path": "/v1/tour-executions/start",
+      "status": 201,
+      "expected": 201,
+      "elapsedMs": 1603,
+      "requestId": "9a56f982-ad76-444f-b6b1-cea6205885d7",
+      "executedAt": "2026-10-11T07:58:01.687Z"
+    },
+    {
+      "name": "tour-start-conflicting-retry",
+      "method": "POST",
+      "path": "/v1/tour-executions/start",
+      "status": 409,
+      "expected": 409,
+      "elapsedMs": 1675,
+      "requestId": "6f476231-7af1-409f-a3ed-0eed0b318ddb",
+      "executedAt": "2026-10-11T07:58:03.363Z"
+    },
+    {
+      "name": "persisted-progress",
+      "method": "GET",
+      "path": "/v1/tour-executions/progress",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1103,
+      "requestId": "c1e93da5-8192-483b-b8ee-fa17f65ae92c",
+      "executedAt": "2026-10-11T07:58:04.467Z"
+    },
+    {
+      "name": "poor-gps-denied",
+      "method": "POST",
+      "path": "/v1/visits/check-in",
+      "status": 400,
+      "expected": [
+        400,
+        409
+      ],
+      "elapsedMs": 831,
+      "requestId": "dc896188-68b2-429b-bc97-d68510b128bd",
+      "executedAt": "2026-10-11T07:58:05.299Z"
+    },
+    {
+      "name": "visit-checkin",
+      "method": "POST",
+      "path": "/v1/visits/check-in",
+      "status": 201,
+      "expected": 201,
+      "elapsedMs": 1975,
+      "requestId": "dfe735a5-fd98-481b-ba12-9d0a0aa02907",
+      "executedAt": "2026-10-11T07:58:07.275Z"
+    },
+    {
+      "name": "visit-checkin-retry",
+      "method": "POST",
+      "path": "/v1/visits/check-in",
+      "status": 201,
+      "expected": 201,
+      "elapsedMs": 1330,
+      "requestId": "ba802912-937f-4e14-863f-520547123081",
+      "executedAt": "2026-10-11T07:58:08.607Z"
+    },
+    {
+      "name": "premature-checkout-denied",
+      "method": "POST",
+      "path": "/v1/visits/b9e70964-e445-474a-bbfc-4d6d36dcf94f/check-out",
+      "status": 400,
+      "expected": 409,
+      "elapsedMs": 1391,
+      "requestId": "bce56b65-5a47-4c43-b18b-2c7f45375cef",
+      "executedAt": "2026-10-11T07:58:09.999Z"
+    },
+    {
+      "name": "login-MR",
+      "method": "POST",
+      "path": "/v1/auth/login",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 6864,
+      "requestId": "db4af8a2-5e55-4eb4-8a28-415085291eb4",
+      "executedAt": "2026-10-11T07:58:39.412Z"
+    },
+    {
+      "name": "login-MANAGER",
+      "method": "POST",
+      "path": "/v1/auth/login",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 562,
+      "requestId": "7446dd4b-a871-4d13-95c7-2fc28269a4ac",
+      "executedAt": "2026-10-11T07:58:39.976Z"
+    },
+    {
+      "name": "login-TENANT_ADMIN",
+      "method": "POST",
+      "path": "/v1/auth/login",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 531,
+      "requestId": "fd428cd9-3059-49a3-961b-8caf46ae9a01",
+      "executedAt": "2026-10-11T07:58:40.507Z"
+    },
+    {
+      "name": "login-FOREIGN_MR",
+      "method": "POST",
+      "path": "/v1/auth/login",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 447,
+      "requestId": "8520d898-41f1-40f4-8b77-731220fb8cc5",
+      "executedAt": "2026-10-11T07:58:40.955Z"
+    },
+    {
+      "name": "premature-checkout-denied",
+      "method": "POST",
+      "path": "/v1/visits/b9e70964-e445-474a-bbfc-4d6d36dcf94f/check-out",
+      "status": 400,
+      "expected": 400,
+      "elapsedMs": 1697,
+      "requestId": "c10ef30a-92a6-4715-8fb0-ebf42a476355",
+      "executedAt": "2026-10-11T07:58:42.667Z"
+    },
+    {
+      "name": "doctorcall-save",
+      "method": "PUT",
+      "path": "/v1/visits/b9e70964-e445-474a-bbfc-4d6d36dcf94f/doctor-call",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 2150,
+      "requestId": "44cb1c7c-7ac2-48e8-a35e-263be293120d",
+      "executedAt": "2026-10-11T07:58:44.819Z"
+    },
+    {
+      "name": "doctorcall-retry",
+      "method": "PUT",
+      "path": "/v1/visits/b9e70964-e445-474a-bbfc-4d6d36dcf94f/doctor-call",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1879,
+      "requestId": "ab2e880b-feb8-43a0-932c-ad365b3e0cd6",
+      "executedAt": "2026-10-11T07:58:46.699Z"
+    },
+    {
+      "name": "visit-checkout",
+      "method": "POST",
+      "path": "/v1/visits/b9e70964-e445-474a-bbfc-4d6d36dcf94f/check-out",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1254,
+      "requestId": "e25f8302-5a15-441c-b3ca-0dcd0e1d1bce",
+      "executedAt": "2026-10-11T07:58:47.955Z"
+    },
+    {
+      "name": "visit-checkout-retry",
+      "method": "POST",
+      "path": "/v1/visits/b9e70964-e445-474a-bbfc-4d6d36dcf94f/check-out",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1583,
+      "requestId": "2668de2d-4d64-4973-bf4e-f35c0c9ef0bc",
+      "executedAt": "2026-10-11T07:58:49.539Z"
+    },
+    {
+      "name": "unplanned-create",
+      "method": "POST",
+      "path": "/v1/unplanned-calls",
+      "status": 201,
+      "expected": 201,
+      "elapsedMs": 1807,
+      "requestId": "625e7596-bacc-4dbe-b832-d54ec912a9e4",
+      "executedAt": "2026-10-11T07:58:51.347Z"
+    },
+    {
+      "name": "unplanned-retry",
+      "method": "POST",
+      "path": "/v1/unplanned-calls",
+      "status": 201,
+      "expected": 201,
+      "elapsedMs": 1415,
+      "requestId": "13aa2ecb-f0a7-4098-beec-3fede0eed7dc",
+      "executedAt": "2026-10-11T07:58:52.763Z"
+    },
+    {
+      "name": "unplanned-self-review-denied",
+      "method": "POST",
+      "path": "/v1/unplanned-approvals/c87033f4-9bf6-400d-a126-05addb0503c1/decision",
+      "status": 409,
+      "expected": [
+        403,
+        409
+      ],
+      "elapsedMs": 794,
+      "requestId": "f0a7f70c-1915-49c6-ab6c-4192177b4fe5",
+      "executedAt": "2026-10-11T07:58:53.559Z"
+    },
+    {
+      "name": "unplanned-manager-review",
+      "method": "POST",
+      "path": "/v1/unplanned-approvals/c87033f4-9bf6-400d-a126-05addb0503c1/decision",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1375,
+      "requestId": "ec0fd428-7555-4c67-a8b4-62185cd89eae",
+      "executedAt": "2026-10-11T07:58:54.935Z"
+    },
+    {
+      "name": "nca-category-admin",
+      "method": "POST",
+      "path": "/v1/nca/categories",
+      "status": 201,
+      "expected": 201,
+      "elapsedMs": 1022,
+      "requestId": "b7e09349-b5b1-4a21-a970-21a176c25bf5",
+      "executedAt": "2026-10-11T07:58:55.959Z"
+    },
+    {
+      "name": "nca-report",
+      "method": "POST",
+      "path": "/v1/nca",
+      "status": 201,
+      "expected": 201,
+      "elapsedMs": 2143,
+      "requestId": "552e1298-5b2c-4214-8dcd-0d22282f80f2",
+      "executedAt": "2026-10-11T07:58:58.103Z"
+    },
+    {
+      "name": "nca-submit",
+      "method": "POST",
+      "path": "/v1/nca/854a25b2-798d-4b87-9fd1-02223d6b8cd7/submit",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 3311,
+      "requestId": "584d9e9a-71dc-4524-9520-789b13a1849a",
+      "executedAt": "2026-10-11T07:59:01.415Z"
+    },
+    {
+      "name": "tour-submit",
+      "method": "POST",
+      "path": "/v1/tour-executions/submit",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1387,
+      "requestId": "9b31baf9-2368-400c-b032-74037fb5b99d",
+      "executedAt": "2026-10-11T07:59:02.803Z"
+    },
+    {
+      "name": "tour-submit-retry",
+      "method": "POST",
+      "path": "/v1/tour-executions/submit",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1006,
+      "requestId": "459fe3a8-62f1-4791-b003-5436e71bf66b",
+      "executedAt": "2026-10-11T07:59:03.811Z"
+    },
+    {
+      "name": "expense-save",
+      "method": "PUT",
+      "path": "/v1/executions/3b8f915f-fc62-452a-b61d-18b9700f70e4/expense",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1507,
+      "requestId": "0f21df30-6b76-4411-a551-66c0e5866ba0",
+      "executedAt": "2026-10-11T07:59:05.319Z"
+    },
+    {
+      "name": "expense-submit",
+      "method": "POST",
+      "path": "/v1/expenses/d51029ba-7c59-47f9-b6a1-a0875821acf5/submit",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1191,
+      "requestId": "1616f9d1-a0df-4b7c-a425-dcf2695da739",
+      "executedAt": "2026-10-11T07:59:06.511Z"
+    },
+    {
+      "name": "expense-approve",
+      "method": "POST",
+      "path": "/v1/expense-approvals/d51029ba-7c59-47f9-b6a1-a0875821acf5/decision",
+      "status": 204,
+      "expected": 204,
+      "elapsedMs": 1667,
+      "requestId": "ec0d99fb-b615-462b-a49f-086b0f969984",
+      "executedAt": "2026-10-11T07:59:08.179Z"
+    },
+    {
+      "name": "leave-request",
+      "method": "POST",
+      "path": "/v1/leaves",
+      "status": 201,
+      "expected": 201,
+      "elapsedMs": 1346,
+      "requestId": "bfdb07e2-62cb-4c99-ab8d-3cbb9fcc258b",
+      "executedAt": "2026-10-11T07:59:09.527Z"
+    },
+    {
+      "name": "leave-approve",
+      "method": "POST",
+      "path": "/v1/leave-approvals/eea42334-4fcd-4055-9afd-8e6ba1cff32b/decision",
+      "status": 204,
+      "expected": 204,
+      "elapsedMs": 1285,
+      "requestId": "1296231e-62af-423f-80e3-57f75619b642",
+      "executedAt": "2026-10-11T07:59:10.814Z"
+    },
+    {
+      "name": "manager-command",
+      "method": "GET",
+      "path": "/v1/manager/command-center",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1615,
+      "requestId": "d956a1ad-211a-48b8-b79e-8eb21354386c",
+      "executedAt": "2026-10-11T07:59:12.431Z"
+    },
+    {
+      "name": "manager-analytics",
+      "method": "GET",
+      "path": "/v1/manager/analytics?days=7",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 831,
+      "requestId": "ef32abe0-7b96-4b2f-b3d7-892943ee0c09",
+      "executedAt": "2026-10-11T07:59:13.263Z"
+    },
+    {
+      "name": "foreign-report-denied",
+      "method": "GET",
+      "path": "/v1/manager/analytics?days=7",
+      "status": 403,
+      "expected": 403,
+      "elapsedMs": 670,
+      "requestId": "97f796f7-0969-4033-9ced-257a27086943",
+      "executedAt": "2026-10-11T07:59:13.934Z"
+    },
+    {
+      "name": "foreign-dcr-denied",
+      "method": "GET",
+      "path": "/v1/dcrs",
+      "status": 403,
+      "expected": 403,
+      "elapsedMs": 707,
+      "requestId": "44b7ad90-931d-4cef-86b8-3b5164afa0ca",
+      "executedAt": "2026-10-11T07:59:14.643Z"
+    },
+    {
+      "name": "authorized-customer-links",
+      "method": "GET",
+      "path": "/v1/business/customer-links/fa72468c-813f-49f2-9088-d4e38bdc9b32",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1063,
+      "requestId": "a4c84967-5872-49aa-9f48-d066f1090e6b",
+      "executedAt": "2026-10-11T07:59:15.707Z"
+    },
+    {
+      "name": "refresh-session",
+      "method": "POST",
+      "path": "/v1/auth/refresh",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 447,
+      "requestId": "d2bc8853-d28b-4797-8ce0-e6066e17c7d3",
+      "executedAt": "2026-10-11T07:59:16.155Z"
+    },
+    {
+      "name": "durable-unplanned-after-refresh",
+      "method": "GET",
+      "path": "/v1/unplanned-calls/own",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1207,
+      "requestId": "167a2067-b927-4125-bc2c-26b9567fd1ea",
+      "executedAt": "2026-10-11T07:59:17.363Z"
+    },
+    {
+      "name": "durable-dcr-after-refresh",
+      "method": "GET",
+      "path": "/v1/dcrs",
+      "status": 200,
+      "expected": 200,
+      "elapsedMs": 1107,
+      "requestId": "3f488540-88c5-439f-b061-475d937046b9",
+      "executedAt": "2026-10-11T07:59:18.470Z"
+    },
+    {
+      "name": "logout-MR",
+      "method": "POST",
+      "path": "/v1/auth/logout",
+      "status": 204,
+      "expected": 204,
+      "elapsedMs": 409,
+      "requestId": "8d8dcc41-6f33-4152-afa1-c5cd22774eec",
+      "executedAt": "2026-10-11T07:59:18.880Z"
+    },
+    {
+      "name": "logout-MANAGER",
+      "method": "POST",
+      "path": "/v1/auth/logout",
+      "status": 204,
+      "expected": 204,
+      "elapsedMs": 411,
+      "requestId": "0a0d9185-2180-443a-a014-2761bbcb3435",
+      "executedAt": "2026-10-11T07:59:19.292Z"
+    },
+    {
+      "name": "logout-TENANT_ADMIN",
+      "method": "POST",
+      "path": "/v1/auth/logout",
+      "status": 204,
+      "expected": 204,
+      "elapsedMs": 360,
+      "requestId": "347ae41b-e6a6-4ab9-a7d0-4fe35d901b4f",
+      "executedAt": "2026-10-11T07:59:19.653Z"
+    },
+    {
+      "name": "logout-FOREIGN_MR",
+      "method": "POST",
+      "path": "/v1/auth/logout",
+      "status": 204,
+      "expected": 204,
+      "elapsedMs": 412,
+      "requestId": "e6ae9b02-1a28-46b0-9ae3-d58cf6fb3739",
+      "executedAt": "2026-10-11T07:59:20.066Z"
+    },
+    {
+      "name": "revoked-refresh-denied",
+      "method": "POST",
+      "path": "/v1/auth/refresh",
+      "status": 401,
+      "expected": 401,
+      "elapsedMs": 447,
+      "requestId": "c0aa326e-59ae-425e-b8b8-3f8c3b48dac7",
+      "executedAt": "2026-10-11T07:59:20.514Z"
+    }
+  ],
+  "records": {
+    "tenantId": "f1da9282-4a5d-4616-a6b2-303767c55425",
+    "planId": "60b11b5f-25fb-4aa3-b983-280a2e25e782",
+    "executionId": "3b8f915f-fc62-452a-b61d-18b9700f70e4",
+    "visitId": "b9e70964-e445-474a-bbfc-4d6d36dcf94f",
+    "doctorCallId": "b72a1040-2d3b-44c9-8981-eb7b95dd8ee0",
+    "unplannedId": "c87033f4-9bf6-400d-a126-05addb0503c1",
+    "ncaId": "854a25b2-798d-4b87-9fd1-02223d6b8cd7",
+    "expenseId": "d51029ba-7c59-47f9-b6a1-a0875821acf5",
+    "leaveId": "eea42334-4fcd-4055-9afd-8e6ba1cff32b"
+  },
+  "reconciledAnalytics": {
+    "rcpa": {
+      "reports": 0,
+      "salesQuantity": 0,
+      "stockQuantity": 0,
+      "prescriptionCount": 0
+    },
+    "tours": {
+      "shortDays": 1,
+      "submitted": 1,
+      "totalWorkedMinutes": 1,
+      "averageWorkedMinutes": 1
+    },
+    "orders": {
+      "count": 0,
+      "units": 0
+    },
+    "period": {
+      "days": 7,
+      "endDate": "2026-10-11",
+      "startDate": "2026-10-05"
+    },
+    "coverage": {
+      "doctorCalls": 1,
+      "chemistCalls": 0,
+      "plannedStops": 1,
+      "stockistCalls": 0,
+      "completedVisits": 1,
+      "coveragePercent": 100,
+      "uniqueDoctorsCovered": 1,
+      "callsPerSubmittedTour": 1
+    },
+    "expenses": [
+      {
+        "claimCount": 1,
+        "totalAmount": 1,
+        "currencyCode": "INR"
+      }
+    ],
+    "localDate": "2026-10-11",
+    "attendance": {
+      "shortDays": 1,
+      "presentDays": 0,
+      "approvedFullDayLeaveDays": 0,
+      "approvedHalfDayLeaveDays": 0
+    },
+    "generatedAt": "2026-10-11T07:59:13.061661+00:00",
+    "teamMembers": 2
+  },
+  "completedAt": "2026-10-11T07:59:20.515Z"
+}

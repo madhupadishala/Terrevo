@@ -11,6 +11,22 @@ export type VercelRuntimeHealth = {
   };
 };
 
+export type ApiRequestLog = {
+  event: "api_request";
+  requestId: string;
+  method: string;
+  route: string;
+  status: number;
+  elapsedMs: number;
+};
+
+// Omit query strings, arbitrary paths, record identifiers and all payloads.
+function logRoute(path: string): string {
+  if (path === "/health") return path;
+  const group = /^\/v1\/(auth|me|tenants|qualification|access-context|organization|masters|platform|manager|tour-plans|tour-approvals|tour-executions|visits|field-settings|visit-exceptions|dcrs|inventory|joint-work|expenses|expense-approvals|executions|unplanned-calls|unplanned-approvals|nca|leaves|leave-approvals|attendance|timesheets|timesheet-approvals|business)(?:\/|$)/.exec(path);
+  return group ? `/v1/${group[1]}` : "unknown";
+}
+
 function health(env: ApiEnv): VercelRuntimeHealth {
   const publishableKey = env.SUPABASE_PUBLISHABLE_KEY ?? env.SUPABASE_ANON_KEY;
   const secretKey = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
@@ -43,27 +59,34 @@ function internalRequest(request: Request): Request {
   return new Request(url, request);
 }
 
-export function createVercelApiHandler(env: ApiEnv) {
+export function createVercelApiHandler(env: ApiEnv, log: (entry: ApiRequestLog) => void = (entry) => console.info(JSON.stringify(entry))) {
   return {
     async fetch(request: Request): Promise<Response> {
       const requestId = resolveRequestId(request.headers.get("x-request-id"));
       const url = new URL(request.url);
       const path = internalPath(url);
+      const started = performance.now();
+      const finish = (response: Response) => {
+        const hardened = hardenApiResponse(response, requestId);
+        try { log({event:"api_request",requestId,method:request.method,route:logRoute(path),status:response.status,elapsedMs:Math.round(performance.now()-started)}); }
+        catch { /* Logging failure must not replay or fail a committed mutation. */ }
+        return hardened;
+      };
 
       if (request.method === "GET" && path === "/health") {
-        return hardenApiResponse(Response.json(health(env), {
+        return finish(Response.json(health(env), {
           headers: { "cache-control": "no-store" },
-        }), requestId);
+        }));
       }
 
       if (!env.SUPABASE_URL || !(env.SUPABASE_PUBLISHABLE_KEY ?? env.SUPABASE_ANON_KEY)) {
-        return hardenApiResponse(Response.json(
+        return finish(Response.json(
           { error: "API provider configuration is missing" },
           { status: 503, headers: { "cache-control": "no-store" } },
-        ), requestId);
+        ));
       }
 
-      return hardenApiResponse(await createHandler(env)(internalRequest(request)), requestId);
+      return finish(await createHandler(env)(internalRequest(request)));
     },
   };
 }

@@ -6,7 +6,7 @@ const app=createHandler({SUPABASE_URL:"https://staging.example.invalid",SUPABASE
  fetcher:(async(input,init)=>{const url=new URL(String(input));const headers=new Headers(init?.headers);
  if(url.pathname==="/auth/v1/user")return headers.get("authorization")==="Bearer valid"?Response.json({id:owner,email:"test@example.invalid"}):Response.json({msg:"Bad token"},{status:401});
  if(url.pathname==="/rest/v1/tenants")return Response.json([{id:tenant}]);
- if(url.pathname==="/rest/v1/business_customer_link_grants"){assert.equal(headers.get("authorization"),"Bearer valid");return Response.json([{territory_id:"north"}]);}
+ if(url.pathname==="/rest/v1/business_customer_link_grants"){assert.equal(headers.get("authorization"),"Bearer valid");assert.equal(url.searchParams.get("tenant_id"),"eq."+tenant);assert.equal(url.searchParams.get("user_id"),"eq."+owner);assert.ok(init?.signal);assert.equal(init?.redirect,"error");return Response.json([{territory_id:"north"}]);}
  if(url.pathname==="/rest/v1/business_customer_links"){assert.equal(headers.get("authorization"),"Bearer valid");assert.equal(url.searchParams.get("tenant_id"),"eq."+tenant);return Response.json([{id:"30000000-0000-4000-8000-000000000301",tenant_id:tenant,source_id:source,target_id:"50000000-0000-4000-8000-000000000501",territory_id:"north",relation:"associated",approval:"APPROVED",evidence_id:"proof",verified_at:"2026-10-11T07:00:00Z"}]);}
  return Response.json({error:"Unhandled "+url.pathname},{status:404});
  }) as typeof fetch

@@ -21,13 +21,37 @@ psql -X -v ON_ERROR_STOP=1 -f database/ci/planned-field-concurrency-fixture.sql
 race() {
   local name=$1 query=$2 failed=0
   local -a pids=()
+  # One holder blocks all workers on a shared advisory lock in their RPC session.
+  # Release only after all sixteen connections are waiting; fail on timeout.
+  psql -X -At -v ON_ERROR_STOP=1 >"$concurrency_logs/$name-barrier" 2>&1 <<'SQL' &
+select pg_advisory_lock(900101);
+do $$declare ready integer;deadline timestamptz:=clock_timestamp()+interval '30 seconds';begin
+ loop
+  select count(*) into ready from pg_locks where locktype='advisory'
+   and database=(select oid from pg_database where datname=current_database())
+   and classid=0 and objid=900101 and objsubid=1 and not granted;
+  exit when ready=16;
+  if clock_timestamp()>deadline then raise exception 'Concurrency barrier timed out with % workers',ready;end if;
+  perform pg_sleep(0.01);
+ end loop;
+end;$$;
+select pg_advisory_unlock(900101);
+SQL
+  local barrier_pid=$!
+  local ready=0
+  for attempt in {1..100}; do
+    if [[ $(psql -X -At -v ON_ERROR_STOP=1 -c "select count(*) from pg_locks where locktype='advisory' and classid=0 and objid=900101 and objsubid=1 and granted and database=(select oid from pg_database where datname=current_database())") == 1 ]]; then ready=1;break;fi
+    sleep 0.05
+  done
+  if [[ "$ready" != 1 ]]; then wait "$barrier_pid" || true;cat "$concurrency_logs/$name-barrier";return 1;fi
   for attempt in {1..16}; do
-    psql -X -At -v ON_ERROR_STOP=1 -c "$query" >"$concurrency_logs/$name-$attempt" 2>&1 &
+    psql -X -At -v ON_ERROR_STOP=1 -c "do \$\$begin perform pg_advisory_lock_shared(900101);end;\$\$; $query" >"$concurrency_logs/$name-$attempt" 2>&1 &
     pids+=("$!")
   done
+  wait "$barrier_pid" || failed=1
   for pid in "${pids[@]}"; do wait "$pid" || failed=1; done
   if [[ "$failed" == 1 ]]; then cat "$concurrency_logs/$name-"*; return 1; fi
-  if [[ $(cat "$concurrency_logs/$name-"* | sort -u | wc -l) != 1 ]]; then
+  if [[ $(sha256sum "$concurrency_logs/$name-"{1..16} | cut -d ' ' -f 1 | sort -u | wc -l) != 1 ]]; then
     cat "$concurrency_logs/$name-"*; echo "$name returned differing results" >&2; return 1
   fi
   echo "$name: 16 independent connections returned one operation result"

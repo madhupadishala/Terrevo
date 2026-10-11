@@ -8,9 +8,10 @@ const api=url==='https://eirlubfbjexjilvskqxq.supabase.co' ? createVercelApiHand
 Deno.serve(async(request:Request)=>{
  if(!api)return Response.json({error:'Isolated staging configuration required'},{status:503});
  const target=new URL(request.url);
- const marker='/terrevo-staging-api';const index=target.pathname.indexOf(marker);
- if(index<0)return new Response(null,{status:404});
- target.pathname=target.pathname.slice(index+marker.length)||'/health';
+ // The gateway forwards the function prefix at the start of this pathname.
+ const marker='/terrevo-staging-api';
+ if(target.pathname!==marker&&!target.pathname.startsWith(marker+'/'))return new Response(null,{status:404});
+ target.pathname=target.pathname.slice(marker.length)||'/health';
  target.searchParams.delete('__terrevo_path');
  return api.fetch(new Request(target,request));
 });

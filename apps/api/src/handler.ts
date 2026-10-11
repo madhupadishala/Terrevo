@@ -235,7 +235,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         grantUrl.searchParams.set("tenant_id",`eq.${context.tenantId}`);
         grantUrl.searchParams.set("user_id",`eq.${user.id}`);
         grantUrl.searchParams.set("limit","1000");
-        const grantResponse=await (deps.fetcher??fetch)(grantUrl.toString(),{headers:{apikey:config.anonKey,authorization:`Bearer ${accessToken}`,accept:"application/json"},cache:"no-store"});
+        const grantResponse=await (deps.fetcher??fetch)(grantUrl.toString(),{headers:{apikey:config.anonKey,authorization:`Bearer ${accessToken}`,accept:"application/json"},cache:"no-store",signal:AbortSignal.timeout(10_000),redirect:"error"});
         if(!grantResponse.ok)throw new BusinessAccessError("Customer grant retrieval denied");
         const grantRows:unknown=await grantResponse.json();
         if(!Array.isArray(grantRows)||grantRows.some((g:unknown)=>!g||typeof g!=="object"||typeof (g as {territory_id?:unknown}).territory_id!=="string"))throw new BusinessAccessError("Invalid customer grants");

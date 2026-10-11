@@ -2,6 +2,28 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createVercelApiHandler } from "../src/vercel-runtime.ts";
 
+test("request logs correlate responses without credentials, identifiers or location", async () => {
+  const logs: unknown[] = [];
+  const response = await createVercelApiHandler({}, entry=>logs.push(entry)).fetch(new Request(
+    "https://terrevo.example/api/v1/visits/00000000-0000-4000-8000-000000000001?access_token=secret-query",
+    {method:"POST",headers:{authorization:"Bearer secret-token","x-request-id":"qualification-request"},body:JSON.stringify({password:"secret-password",latitude:17.385})},
+  ));
+  assert.equal(response.status,503);
+  const serialized=JSON.stringify(logs);
+  for(const sensitive of ["secret-query","secret-token","secret-password","17.385","00000000-0000"])assert.equal(serialized.includes(sensitive),false);
+  const entry=logs[0] as {requestId:string;route:string;elapsedMs:number;status:number};
+  assert.equal(entry.requestId,response.headers.get("x-request-id"));
+  assert.equal(entry.route,"/v1/visits");assert.equal(entry.status,503);assert.ok(entry.elapsedMs>=0);
+  const unknown:unknown[]=[];
+  await createVercelApiHandler({},entry=>unknown.push(entry)).fetch(new Request("https://terrevo.example/api/v1/private-credential"));
+  assert.equal((unknown[0] as {route:string}).route,"unknown");
+});
+
+test("logging failures preserve API response and cannot trigger business retries", async () => {
+  const response=await createVercelApiHandler({},()=>{throw new Error("logger unavailable");}).fetch(new Request("https://terrevo.example/api/health"));
+  assert.equal(response.status,200);assert.ok(response.headers.get("x-request-id"));
+});
+
 test("TRV-DEPLOY-001 health is reachable without provider secrets", async () => {
   const response = await createVercelApiHandler({}).fetch(
     new Request("https://terrevo.example/api/health"),

@@ -19,7 +19,7 @@ export function createCustomerLinksPostgrest(baseUrl:string,anonKey:string,fetch
   const url=new URL("/rest/v1/business_customer_links",baseUrl);url.searchParams.set("select","id,tenant_id,source_id,target_id,territory_id,relation,approval,evidence_id,verified_at");url.searchParams.set("tenant_id",`eq.${tenantId}`);url.searchParams.set("source_id",`eq.${sourceId}`);url.searchParams.set("order","id.asc");
   const all:CustomerLink[]=[];const pageSize=200;
   for(let offset=0;;offset+=pageSize){
-   const res=await fetcher(url.toString(),{headers:{apikey:anonKey,authorization:`Bearer ${accessToken}`,accept:"application/json",range:`${offset}-${offset+pageSize-1}`,"range-unit":"items"},cache:"no-store"});
+   const res=await fetcher(url.toString(),{headers:{apikey:anonKey,authorization:`Bearer ${accessToken}`,accept:"application/json",range:`${offset}-${offset+pageSize-1}`,"range-unit":"items"},cache:"no-store",signal:AbortSignal.timeout(10_000),redirect:"error"});
    if(res.status===416 && offset>0)return all;
    if(!res.ok)throw new Error("Customer link provider request failed");
    const rows:unknown=await res.json();if(!Array.isArray(rows))throw new Error("Invalid customer link provider response");
