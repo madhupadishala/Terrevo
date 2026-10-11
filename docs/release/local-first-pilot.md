@@ -59,6 +59,8 @@ export TERREVO_ADMIN_ACCESS_TOKEN=<short-lived-test-tenant-admin-token>
 npm run qualify:staging-api
 ```
 
+The API preview or local server must itself run with `TERREVO_ENVIRONMENT=staging` and its actual server-side `SUPABASE_URL` must point to the independently provisioned staging project; production Vercel runtimes can never attest staging. The authenticated `GET /api/v1/qualification/target` endpoint returns a **server-derived** project reference, tenant and staging/unverified state. The qualifier fails closed if that identity is missing or mismatched, even when a preview URL and local shell variables appear correct. Keep the provider service key and user access tokens in the approved secret manager; never commit them.
+
 The command uses **GET requests only** and tests MR/Manager/Tenant Admin membership, role-specific permission presence, NCA read contract, unplanned-call manager queue, denial of platform tenant enumeration, anonymous read denial and cross-tenant rejection. It refuses the primary production Supabase reference, the production Vercel URL and a missing distinct foreign tenant. It prints only route/status evidence and never prints tokens or response data. The tool does not connect directly to Supabase with privileged credentials and cannot change production records.
 
 **CI:** `npm run test:release-safety` exercises this verifier with isolated mocks to prove forbidden cases cause failure. Such mocks are **not** actual staging-user qualification.
