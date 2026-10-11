@@ -5,14 +5,14 @@ export type {ActivitiesViewProps,ActivityDraft,ActivityEvidence,NcaSubtype,Plann
 export {validateActivityDraft,emptyActivityDraft} from "./model";
 export function ActivitiesView({tenantId,authorizedForTenantId,contextKey,territories,customers={},plannedCalls=[],ncaSubtypes=[],towns=[],onSaveDraft,onOpenPlannedCall,defaultWorkDate="",saveMode="HANDOFF",loading=false}:ActivitiesViewProps){
  const [state,setState]=useState<{tenantId:string;contextKey:string;draft:ActivityDraft}>({tenantId,contextKey,draft:emptyActivityDraft(tenantId,defaultWorkDate)});
- const [review,setReview]=useState(false),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
- useEffect(()=>{setState({tenantId,contextKey,draft:emptyActivityDraft(tenantId,"")});setReview(false);setMessage("");},[tenantId,contextKey]);
+ const [review,setReview]=useState(false),[message,setMessage]=useState(""),[busy,setBusy]=useState(false),[saved,setSaved]=useState(false);
+ useEffect(()=>{setState({tenantId,contextKey,draft:emptyActivityDraft(tenantId,defaultWorkDate)});setReview(false);setMessage("");setSaved(false);},[tenantId,contextKey]);
  const authorized=Boolean(tenantId&&contextKey&&authorizedForTenantId===tenantId);
  const draft=state.tenantId===tenantId&&state.contextKey===contextKey?state.draft:emptyActivityDraft(tenantId,"");
  const context=useMemo(()=>({territories,customers,plannedCalls,ncaSubtypes,towns}),[territories,customers,plannedCalls,ncaSubtypes,towns]);
  const errors=validateActivityDraft(draft,context);
- const canSave=Boolean(onSaveDraft&&(saveMode==="HANDOFF"||draft.kind==="NON_CALL_ACTIVITY"||saveMode==="SERVER_FIELD"&&draft.kind==="UNPLANNED_CALL"));
- function patch(changes:Partial<ActivityDraft>){setState({tenantId,contextKey,draft:{...draft,...changes}});setReview(false);setMessage("");}
+ const canSave=Boolean(!saved&&onSaveDraft&&(saveMode==="HANDOFF"||draft.kind==="NON_CALL_ACTIVITY"||saveMode==="SERVER_FIELD"&&draft.kind==="UNPLANNED_CALL"));
+ function patch(changes:Partial<ActivityDraft>){setState({tenantId,contextKey,draft:{...draft,...changes,operationId:saved?crypto.randomUUID():draft.operationId}});setSaved(false);setReview(false);setMessage("");}
  function setKind(kind:ActivityKind){patch({kind,plannedStopId:undefined,customerType:undefined,customerId:undefined,ncaSubtype:undefined,ncaPhase:kind==="NON_CALL_ACTIVITY"?"REPORT":undefined,townId:undefined});}
  function setCustomerKind(kind:ActivityCustomerKind){patch({customerType:kind,customerId:undefined});}
  const group=draft.customerType==="doctor"?"doctors":draft.customerType==="chemist"?"chemists":"stockists";
@@ -20,7 +20,7 @@ export function ActivitiesView({tenantId,authorizedForTenantId,contextKey,territ
  async function save(){
   if(!authorized||errors.length||!review||!onSaveDraft||!canSave||busy)return;
   setBusy(true);setMessage("");
-  try{await onSaveDraft({...draft});setMessage(saveMode==="SERVER_FIELD"&&draft.kind==="UNPLANNED_CALL"?"Unplanned call submitted to the manager review queue.":saveMode==="SERVER_NCA"||saveMode==="SERVER_FIELD"?"NCA draft saved by the Terrevo API. Submit it separately below.":"Draft handed to the integration callback. Server persistence is not verified.");setReview(false);}
+  try{await onSaveDraft({...draft});setMessage(saveMode==="SERVER_FIELD"&&draft.kind==="UNPLANNED_CALL"?"Unplanned call submitted to the manager review queue.":saveMode==="SERVER_NCA"||saveMode==="SERVER_FIELD"?"NCA draft saved by the Terrevo API. Submit it separately below.":"Draft handed to the integration callback. Server persistence is not verified.");setReview(false);setSaved(true);}
   catch(e){setMessage(e instanceof Error?e.message:"Draft handoff failed.");}
   finally{setBusy(false);}
  }
@@ -66,5 +66,6 @@ export function ActivitiesView({tenantId,authorizedForTenantId,contextKey,territ
  <Button kind="secondary" disabled={busy} onClick={()=>setReview(false)}>Edit</Button>
  <Button disabled={!canSave||busy||errors.length>0} onClick={()=>void save()}>{saveMode==="SERVER_FIELD"&&draft.kind==="UNPLANNED_CALL"?"Submit unplanned call for review":saveMode==="SERVER_NCA"||saveMode==="SERVER_FIELD"?"Save NCA draft":"Hand off draft"}</Button>
  {!canSave&&<p role="status">No server save contract is available for this activity type. Nothing will be submitted.</p>}</div>}
- {message&&<p role="status">{message}</p>}</section>;
+ {message&&<p role="status">{message}</p>}
+ {saved&&<Button kind="ghost" size="sm" disabled={busy} onClick={()=>{setState({tenantId,contextKey,draft:emptyActivityDraft(tenantId,defaultWorkDate)});setReview(false);setSaved(false);setMessage("");}}>Start another activity</Button>}</section>;
 }
