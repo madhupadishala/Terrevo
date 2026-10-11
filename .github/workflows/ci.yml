@@ -92,6 +92,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/ci/platform-admin-policy-tests.sql
       - name: NCA tenant isolation and denied-write policy tests
         run: psql -v ON_ERROR_STOP=1 -f database/ci/nca-policy-tests.sql
+      - name: Unplanned call persistence-security policy checks
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/unplanned-call-policy-tests.sql
       - name: Apply all rollback migrations in reverse
         run: |
           set -euo pipefail
