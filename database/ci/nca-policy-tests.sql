@@ -26,7 +26,10 @@ begin
       raise exception 'NCA RPC authorization violated for %',v_signature;
     end if;
   end loop;
-  if exists(select 1 from public.nca_categories) or exists(select 1 from public.nca_towns)
+  -- Fresh CI migration databases must contain no seeded taxonomy. A staging
+  -- tenant may legitimately contain catalogs configured through the admin API.
+  if current_database() in('terrevo_ci','terrevo_restore_ci') and
+   (exists(select 1 from public.nca_categories) or exists(select 1 from public.nca_towns))
   then raise exception 'No unapproved NCA taxonomy may be seeded';end if;
 end;$$;
 rollback;

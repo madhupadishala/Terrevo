@@ -42,7 +42,7 @@ export async function auditStagingApi(env, fetcher = fetch) {
   async function request(label, role, endpoint, tenant=cfg.tenantId, authenticated=true) {
     const headers = { "accept": "application/json", ...(tenant ? { "x-tenant-id": tenant } : {}) };
     if (authenticated) headers.authorization = "Bearer " + cfg.tokens[role];
-    const res = await fetcher(cfg.origin + "/api" + endpoint, { method:"GET", headers, cache:"no-store", signal:AbortSignal.timeout(15000) });
+    const res = await fetcher(cfg.origin + "/api" + endpoint, { method:"GET", headers, cache:"no-store", redirect:"error", signal:AbortSignal.timeout(15000) });
     const payload = await res.json().catch(() => null);
     evidence.push({ check:label, role, status:res.status, ok:res.ok });
     return {res,payload};
@@ -57,6 +57,8 @@ export async function auditStagingApi(env, fetcher = fetch) {
     target.payload?.projectRef===env.TERREVO_STAGING_PROJECT_REF &&
     target.payload?.tenantId===cfg.tenantId,
     "Remote API did not attest an isolated staging backend; refuse UAT against an unverified runtime.");
+  if (failures.length) return {passed:false, checks:evidence, failures, missingEvidence:[],
+    note:"Stopped after runtime attestation failed; no additional role credentials or requests were sent."};
   // This verifies real authorization through the web backend, not a DB superuser.
   for (const role of names) {
     const a=await request("tenant membership",role,"/v1/tenants",null);

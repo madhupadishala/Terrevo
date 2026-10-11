@@ -2,6 +2,30 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createVercelApiHandler } from "../src/vercel-runtime.ts";
 
+test("request logs correlate responses without credentials, identifiers or location", async () => {
+  const logs: unknown[] = [];
+  const response = await createVercelApiHandler({}, entry=>logs.push(entry)).fetch(new Request(
+    "https://terrevo.example/api/v1/visits/00000000-0000-4000-8000-000000000001?access_token=secret-query",
+    {method:"POST",headers:{authorization:"Bearer secret-token","x-request-id":"qualification-request"},body:JSON.stringify({password:"secret-password",latitude:17.385})},
+  ));
+  assert.equal(response.status,503);
+  const serialized=JSON.stringify(logs);
+  for(const sensitive of ["secret-query","secret-token","secret-password","17.385","00000000-0000"])assert.equal(serialized.includes(sensitive),false);
+  const entry=logs[0] as {requestId:string;route:string;elapsedMs:number;status:number};
+  assert.equal(entry.requestId,response.headers.get("x-request-id"));
+  assert.match(response.headers.get("server-timing")??"",/^app;dur=\d+$/);
+  assert.equal(entry.route,"/v1/visits");assert.equal(entry.status,503);assert.ok(entry.elapsedMs>=0);
+  const unknown:unknown[]=[];
+  await createVercelApiHandler({},entry=>unknown.push(entry)).fetch(new Request("https://terrevo.example/api/v1/private-credential"));
+  assert.equal((unknown[0] as {route:string}).route,"unknown");
+});
+
+test("logging failures preserve API response and cannot trigger business retries", async () => {
+  let calls=0;
+  const response=await createVercelApiHandler({},()=>{calls++;throw new Error("logger unavailable");}).fetch(new Request("https://terrevo.example/api/health"));
+  assert.equal(response.status,200);assert.ok(response.headers.get("x-request-id"));assert.equal(calls,1);
+});
+
 test("TRV-DEPLOY-001 health is reachable without provider secrets", async () => {
   const response = await createVercelApiHandler({}).fetch(
     new Request("https://terrevo.example/api/health"),
@@ -56,4 +80,20 @@ test("TRV-DEPLOY-005 legacy Supabase key names remain temporary fallback", async
   }).fetch(new Request("https://terrevo.example/api/health"));
   assert.equal(response.status, 200);
   assert.equal((await response.json()).status, "ok");
+});
+
+
+test("route allowlist rejects near misses and strips rewritten record identifiers",async()=>{
+ for(const [url,route] of [["https://terrevo.example/api/v1/visits-extra","unknown"],["https://terrevo.example/api?__terrevo_path=v1/visits/secret-record&token=secret-token","/v1/visits"]]){
+  const logs:unknown[]=[];const response=await createVercelApiHandler({},entry=>logs.push(entry)).fetch(new Request(url));
+  assert.equal(response.status,503);assert.equal((logs[0] as {route:string}).route,route);assert.equal(JSON.stringify(logs).includes('secret'),false);
+  assert.equal(response.headers.get('server-timing'),`app;dur=${(logs[0] as {elapsedMs:number}).elapsedMs}`);
+ }
+});
+
+test("unexpected synchronous runtime failure returns a generic logged hardened response",async()=>{
+ let reads=0;const logs:unknown[]=[];
+ const env={get SUPABASE_URL(){if(++reads>1)throw Error('private-detail');return 'https://example.supabase.co';},SUPABASE_ANON_KEY:'public-test'};
+ const response=await createVercelApiHandler(env,e=>logs.push(e)).fetch(new Request('https://terrevo.example/api/v1/me'));
+ assert.equal(response.status,500);assert.equal(logs.length,1);assert.ok(response.headers.get('x-request-id'));assert.equal((await response.text()).includes('private-detail'),false);
 });

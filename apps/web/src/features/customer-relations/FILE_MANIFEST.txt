@@ -1,0 +1,7 @@
+Exclusive changes, issue #55; no Chat 1-owned files.
+apps/web/src/features/customer-relations/model.ts
+apps/web/src/features/customer-relations/CustomerRelationsView.tsx
+apps/web/test/customer-relations.model.test.ts
+apps/web/src/features/customer-relations/README.md
+apps/web/src/features/customer-relations/INTEGRATION_REQUEST.md
+apps/web/src/features/customer-relations/FILE_MANIFEST.txt

@@ -1,0 +1,45 @@
+{
+  "projectRef": "eirlubfbjexjilvskqxq",
+  "runId": "eng1-3809150601dc",
+  "synthetic": true,
+  "qualified": true,
+  "checks": [
+    {
+      "attempt": 1,
+      "status": 502,
+      "expected": 200,
+      "passed": false
+    },
+    {
+      "attempt": 2,
+      "status": 502,
+      "expected": 200,
+      "passed": false,
+      "completedIdentities": 4
+    },
+    {
+      "attempt": 3,
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "matchedExistingIdentities": 6,
+      "completedIdentities": null
+    },
+    {
+      "attempt": 4,
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "matchedExistingIdentities": 6,
+      "completedIdentities": null
+    }
+  ],
+  "initialFailure": "Unfiltered Auth admin discovery returned a controlled provider failure after four owned-identity rotations. Exact-email filtered discovery then passed twice, returning the same six owned IDs; no legacy Auth fixture was changed.",
+  "newIdentitiesCreated": 0,
+  "completedAt": "2026-10-11T13:27:04.164Z",
+  "provisionerDisabled": {
+    "version": 8,
+    "status": 410,
+    "verifiedAt": "2026-10-11T13:32:40.865Z"
+  }
+}
