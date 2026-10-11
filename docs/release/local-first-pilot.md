@@ -20,14 +20,14 @@ npm run test:e2e
 `verify:release` is **static only**: checks required APIs, migration/test paths, Vercel auto-deploy disablement and CI gates. It never contacts cloud providers. A green result is **not** proof of business acceptance, database persistence or readiness to deploy.
 
 ## Staging safety — do not reuse production database
-Live production Supabase project ref: `dfqsnkmmumvjwmvtnlcs`. No safe staging project has yet been provisioned/verified. Create or authorize a **separate** staging environment only after cost acknowledgement and confirmation.
+Live production Supabase project ref: `dfqsnkmmumvjwmvtnlcs`. **Separate staging project created and verified**: `Terrevo-Staging`, ref `eirlubfbjexjilvskqxq`, under the same ClinixAI Free-plan organization in `ap-northeast-1`. Supabase quoted $0/month for the additional project; its paid development branch was rejected. All 29 repo migrations and live PostgreSQL rollback-based policy/call/NCA tests passed in staging. There are no permanent tenant/user fixtures yet, so browser/API identity UAT is still pending. Do not direct preview APIs to the production project.
 
 Set these **only in an isolated local shell or approved secret manager**, never in Git or frontend code:
 
 ```bash
 export TERREVO_ENVIRONMENT=staging
-export TERREVO_STAGING_PROJECT_REF=<independent-20-character-staging-ref>
-export SUPABASE_URL=https://<independent-20-character-staging-ref>.supabase.co
+export TERREVO_STAGING_PROJECT_REF=eirlubfbjexjilvskqxq
+export SUPABASE_URL=https://eirlubfbjexjilvskqxq.supabase.co
 npm run verify:staging-target
 ```
 
@@ -86,7 +86,7 @@ The command uses **GET requests only** and tests MR/Manager/Tenant Admin members
 | GitHub integrated source | PR #50 open; CI passing before release-preflight additions |
 | Static release preflight | Added to CI; check latest run |
 | Production Supabase baseline/migration safety | Database active and prior rollback-based tests passed |
-| Isolated staging project | **Not confirmed** |
+| Isolated staging project | **Provisioned; 29 migrations + rollback SQL checks passed. No persistent UAT users or second tenant** |
 | Real-device / real-session multi-role UAT | **Not completed** |
 | Exact-SHA Vercel production promotion | **Not completed** |
 | Formal release signoff | **Not completed** |
