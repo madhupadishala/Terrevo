@@ -17,7 +17,9 @@
     "test:web": "node --experimental-strip-types --test apps/web/test/*.test.ts",
     "preview:web": "vite preview --config apps/web/vite.config.ts",
     "test:e2e": "playwright test --config playwright.config.ts",
-    "verify:release": "node scripts/release-preflight.mjs"
+    "verify:release": "node scripts/release-preflight.mjs",
+    "verify:staging-target": "node scripts/verify-staging-target.mjs",
+    "test:release-safety": "node --test scripts/test/*.test.mjs"
   },
   "engines": {
     "node": ">=22"
