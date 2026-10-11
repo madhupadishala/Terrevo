@@ -32,7 +32,7 @@ begin
  (area,t,region,'area','NCA_AREA','NCA Area'),
  (territory,t,area,'territory','NCA_TERRITORY','NCA Territory');
  insert into public.user_role_assignments(tenant_id,user_id,role_key,scope_org_unit_id)
- values(t,mr,'MR',territory),(t,admin_id,'TENANT_ADMIN',company);
+ values(t,mr,'MR',territory),(t,admin_id,'TENANT_ADMIN',null);
  insert into public.employees(id,tenant_id,user_id,code,name,designation,org_unit_id)
  values('e1000000-0000-4000-8000-000000000012',t,mr,'NCA_MR','CI Representative','MR',territory),
        ('e1000000-0000-4000-8000-000000000013',t,admin_id,'NCA_ADMIN','CI Administrator','Tenant Admin',company);
