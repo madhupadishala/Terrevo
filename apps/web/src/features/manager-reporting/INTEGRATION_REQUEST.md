@@ -1,0 +1,6 @@
+# S14 Chat 1 manager reporting contract
+**No verified row-level audit projection or authorized CSV endpoint consumed.** Existing aggregated analytics may not expose these facts; no invented KPI source.
+Parent scope={tenantId,authorizedForTenantId,contextKey,role,permittedTerritoryIds,permittedTeamUserIds,asOf}; records with id,tenantId,territoryId,ownerUserId,workDate,kind,status,sourceId,sourceType,observedAt; loading/error.
+Read contract required: trusted unified, consistent as-of snapshot of approved tour planned stops, planned completion events, unplanned call statuses, NCA reported, DCR submissions with stable dedup keys, verified local work-day, immutable evidence provenance and permission-filtered rows. Server must define event status vs current status semantics and count denominator.
+Optional onRequestCsv({tenantId,contextKey,filter,sourceIds}) is an intent ONLY: backend reauthorizes manager role/team/scope, pages/limits exports, redacts personal data, ensures CSV formula escaping, audits export and handles safe delivery. No browser write, file download, analytics DB mutation or false data confirmation here.
+Parent must drop stale async responses, rotate context key, and validate cross-territory joins; UAT CSV injections, no planned stops, approval pending distinct from approved, narrow-screen keyboard and audit lineage.
