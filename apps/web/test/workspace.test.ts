@@ -120,3 +120,24 @@ test("successful token refresh followed by business 404 preserves the active ses
     assert.equal(calls,2);
   } finally { globalThis.fetch=prior; }
 });
+
+test("unplanned call retries preserve caller operation identity and tenant scope",async()=>{
+ const previous=globalThis.fetch,seen:string[]=[];
+ globalThis.fetch=(async(path:RequestInfo|URL,init?:RequestInit)=>{
+  assert.equal(String(path),"/api/v1/unplanned-calls");
+  assert.equal(new Headers(init?.headers).get("x-tenant-id"),TENANT);
+  assert.equal(new Headers(init?.headers).get("authorization"),"Bearer "+SESSION.accessToken);
+  const body=JSON.parse(String(init?.body));seen.push(body.operationId);
+  return Response.json({call:{id:"call",status:"SUBMITTED"}});
+ }) as typeof fetch;
+ try{
+  const api=new TerrevoWebApi();api.setSession(SESSION);api.setTenant(TENANT);
+  const op="77777777-7777-4777-8777-777777777777";
+  const input={operationId:op,executionId:"66666666-6666-4666-8666-666666666666",
+   territoryId:"44444444-4444-4444-8444-444444444444",customerType:"doctor" as const,
+   customerId:"55555555-5555-4555-8555-555555555555",reason:"Urgent visit",
+   remarks:"Spoke to doctor",durationMinutes:25,latitude:17.38,longitude:78.48,accuracyMeters:12};
+  await api.submitUnplannedCall(input);await api.submitUnplannedCall(input);
+  assert.deepEqual(seen,[op,op]);
+ }finally{globalThis.fetch=previous;}
+});
