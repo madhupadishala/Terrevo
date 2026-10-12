@@ -2,6 +2,8 @@ import type {AgentId,EvidenceRef} from "./index.ts";
 
 export type AgentSnapshots={
   startOptions?:Array<Record<string,unknown>>;
+  doctors?:Array<Record<string,unknown>>;
+  doctorCall?:Record<string,unknown>|null;
   dcrs?:Array<Record<string,unknown>>;
   analytics?:Record<string,unknown>|null;
   rcpa?:Record<string,unknown>|null;
@@ -21,6 +23,17 @@ export function buildDeterministicAgentInput(id:AgentId,s:AgentSnapshots):Record
    const options=rows(s.startOptions);
    const ev=options.flatMap(o=>{const source=text(o.planDayId);return source?[evidence("approved_tour_day",source,["workDate","territoryId"])]:[]});
    return {evidence:ev,priorities:options.flatMap(o=>{const task_id=text(o.planDayId),date=text(o.workDate);return task_id&&date?[{task_id,reason:"Approved tour day is available for execution.",due_at:date+"T23:59:59+05:30",urgency:"normal",evidence_ids:[task_id]}]:[]}),missed_commitments:[],summary:options.length?String(options.length)+" approved tour day(s) available.":""};
+  }
+  case "AI-02":{
+   const options=rows(s.startOptions),doctors=rows(s.doctors);
+   const optionByTerritory=new Map(options.flatMap(o=>{const territory=text(o.territoryId),id=text(o.planDayId),date=text(o.workDate);return territory&&id&&date?[[territory,{id,date}]]:[]}));
+   const proposed_visits=doctors.flatMap(d=>{const id=text(d.id),territory=text(d.territoryId),frequency=num(d.visitFrequency)??1,day=territory?optionByTerritory.get(territory):undefined;if(!id||!territory||!day)return[];return [{customer_id:id,customer_type:"doctor",territory_id:territory,proposed_work_date:day.date,visit_frequency:frequency,reason:"Controlled doctor master matches an approved tour-day territory.",evidence_ids:[id,day.id]}];});
+   const ev=[...options.flatMap(o=>{const id=text(o.planDayId);return id?[evidence("approved_tour_day",id,["workDate","territoryId"])]:[]}),...doctors.flatMap(d=>{const id=text(d.id);return id?[evidence("doctor_master",id,["territoryId","visitFrequency"])]:[]})];
+   return {evidence:ev,proposed_visits,constraint_violations:[],feasibility:proposed_visits.length?"requires_human_review":"unknown"};
+  }
+  case "AI-13":{
+   const call=s.doctorCall&&typeof s.doctorCall==="object"?s.doctorCall:null;const id=call?text(call.id):null;const action=call?text(call.nextAction):null;
+   return {evidence:id?[evidence("doctor_call",id,["nextAction","callOutcome","updatedAt"])]:[],draft_actions:id&&action?[{title:action,source_call_id:id,evidence_ids:[id]}]:[],ambiguous_items:id&&!action?["No explicit next action was recorded in the doctor call."]:[]};
   }
   case "AI-04":{
    const dcrs=rows(s.dcrs);
