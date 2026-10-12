@@ -9,6 +9,8 @@ import { ActivitiesView } from "./features/activities/ActivitiesView";
 import { EDetailingView } from "./features/edetailing/EDetailingView";
 import { TodayIntelligenceView } from "./features/intelligence/TodayIntelligenceView";
 import { localDate } from "./plan-calendar";
+import { customerRelationships } from "./customer-links-adapter";
+import type { CustomerActivity, CustomerRelationship } from "./features/customer360/model";
 import { allowedWorkspaceIds } from "./role-navigation";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
@@ -109,6 +111,10 @@ export default function App() {
   const [ncaCategoryLabel,setNcaCategoryLabel] = useState("");
   const [ncaTownName,setNcaTownName] = useState("");
   const [ncaTownTerritory,setNcaTownTerritory] = useState("");
+  const [customerRelations,setCustomerRelations] = useState<CustomerRelationship[]>([]);
+  const [customerActivities,setCustomerActivities] = useState<CustomerActivity[]>([]);
+  const [customerProfileLoading,setCustomerProfileLoading] = useState(false);
+  const [customerProfileError,setCustomerProfileError] = useState<string|null>(null);
 
   function resetTenantState() {
     setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
@@ -116,7 +122,7 @@ export default function App() {
     setSelectedOption(""); setStopId(""); setGpsReason(""); setCallOutcome("");
     setCallRemarks(""); setShortDayReason("");
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
-    setFocusedCustomer(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
+    setFocusedCustomer(null); setCustomerRelations([]); setCustomerActivities([]); setCustomerProfileError(null); setCustomerProfileLoading(false); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
     setOwnUnplanned([]);setPendingUnplanned([]);setUnplannedReviewComment("");
   }
 
@@ -187,6 +193,32 @@ export default function App() {
       if (generation === tenantGeneration.current) setLoading(false);
     }
   },[api]);
+
+  async function loadCustomerProfile(customerType:"doctor"|"chemist"|"stockist",customerId:string) {
+    if (!connected) return;
+    const generation=tenantGeneration.current;
+    const groups={doctors:masters.doctors??[],chemists:masters.chemists??[],stockists:masters.stockists??[]};
+    const group=groups[customerType==="doctor"?"doctors":customerType==="chemist"?"chemists":"stockists"];
+    const record=group.find(x=>x.id===customerId&&x.status==="active"&&typeof x.territoryId==="string");
+    if(!record)return;
+    setFocusedCustomer({kind:customerType,id:record.id,territoryId:String(record.territoryId),name:record.name});
+    setCustomerRelations([]);setCustomerActivities([]);setCustomerProfileError(null);setCustomerProfileLoading(true);
+    try {
+      const [linksResult,dcrResult]=await Promise.allSettled([
+        api.customerLinks(customerId),
+        customerType==="doctor"?api.dcrs():Promise.resolve([]),
+      ]);
+      if(generation!==tenantGeneration.current)return;
+      if(linksResult.status==="fulfilled")setCustomerRelations(customerRelationships(tenantId,customerId,groups,linksResult.value));
+      else setCustomerProfileError(errText(linksResult.reason));
+      if(dcrResult.status==="fulfilled"&&customerType==="doctor"){
+        setCustomerActivities(dcrResult.value.filter(x=>x.doctorId===customerId).map(x=>({
+          tenantId,customerKind:"doctor" as const,customerId,id:x.id,occurredAt:x.submittedAt,
+          activityType:"DCR",summary:x.callOutcome,
+        })));
+      }
+    } finally { if(generation===tenantGeneration.current)setCustomerProfileLoading(false); }
+  }
 
   async function action(fn: () => Promise<unknown>, title: string, shouldRefresh = true) {
     setBusy(true); setNotice(null);
@@ -372,7 +404,9 @@ export default function App() {
         {view==="customers" && <Customer360View
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
           contextKey={contextKey} masters={{doctors:masters.doctors??[],chemists:masters.chemists??[],stockists:masters.stockists??[]}}
-          loading={loading}
+          relationships={customerRelations} history={customerActivities}
+          loading={loading||customerProfileLoading} error={customerProfileError}
+          onSelectCustomer={request=>void loadCustomerProfile(request.customerType,request.customerId)}
           onOpenWorkflow={request=>{
             if(!connected)return;
             const group=masters[request.customerType==="doctor"?"doctors":request.customerType==="chemist"?"chemists":"stockists"]??[];
