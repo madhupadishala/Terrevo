@@ -4,6 +4,8 @@ export type AgentSnapshots={
   startOptions?:Array<Record<string,unknown>>;
   doctors?:Array<Record<string,unknown>>;
   doctorCall?:Record<string,unknown>|null;
+  expenseClaims?:Array<Record<string,unknown>>;
+  expensePolicies?:Array<Record<string,unknown>>;
   dcrs?:Array<Record<string,unknown>>;
   analytics?:Record<string,unknown>|null;
   rcpa?:Record<string,unknown>|null;
@@ -60,6 +62,19 @@ export function buildDeterministicAgentInput(id:AgentId,s:AgentSnapshots):Record
    const ev=approved.flatMap(a=>{const id=text(a.id);return id?[evidence("approved_clm_asset",id,["version","productIds","regionCodes"])]:[]});
    const suggestions=approved.flatMap(a=>{const id=text(a.id),version=text(a.version);if(!id||!version)return[];const products=Array.isArray(a.productIds)?a.productIds.filter(x=>typeof x==="string") as string[]:[];const regions=Array.isArray(a.regionCodes)?a.regionCodes.filter(x=>typeof x==="string") as string[]:["GLOBAL"];return products.flatMap(product_id=>regions.map(region=>({asset_id:id,asset_version:version,product_id,region,reason:"Currently approved server-visible CLM asset.",evidence_ids:[id]})));});
    return {evidence:ev,suggestions,excluded_asset_reasons:[]};
+  }
+  case "AI-10":{
+   const claims=rows(s.expenseClaims),policies=rows(s.expensePolicies);
+   const ev:EvidenceRef[]=[];const flags:Array<Record<string,unknown>>=[];const possible_duplicates:Array<Record<string,unknown>>=[];const reviewer_questions:Array<Record<string,unknown>>=[];
+   const policyFor=(category:string,currency:string,day:string)=>policies.find(p=>text(p.category)===category&&text(p.currency)===currency&&text(p.effectiveFrom)!<=day&&text(p.expiresAt)!>=day);
+   const seen=new Map<string,string>();
+   for(const claim of claims){const claimId=text(claim.id),owner=text(claim.ownerUserId),day=text(claim.workDate),currency=text(claim.currencyCode);if(!claimId||!owner||!day||!currency)continue;ev.push(evidence("expense_claim",claimId,["workDate","currencyCode","lines","status"]));
+    for(const line of rows(claim.lines)){const category=text(line.category),amount=num(line.amount),sequence=num(line.sequence);if(!category||amount===null||sequence===null)continue;const policy=policyFor(category,currency,day);if(policy){const maxMinor=num(policy.maxMinor),policyId=text(policy.policyId);if(policyId)ev.push(evidence("expense_policy",policyId,["category","maxMinor","currency","effectiveFrom","expiresAt"]));if(maxMinor!==null&&Math.round(amount*100)>maxMinor)flags.push({claim_id:claimId,line_sequence:sequence,rule_id:"POLICY_LIMIT_EXCEEDED",observed_minor:Math.round(amount*100),limit_minor:maxMinor,evidence_ids:[claimId,...(policyId?[policyId]:[])]});}
+      const key=[owner,day,currency,category,Math.round(amount*100)].join("|");const prior=seen.get(key);if(prior&&prior!==claimId)possible_duplicates.push({claim_ids:[prior,claimId],reason:"Same employee/date/category/amount",evidence_ids:[prior,claimId]});else seen.set(key,claimId);
+    }
+   }
+   if(flags.length||possible_duplicates.length)reviewer_questions.push({question:"Review the flagged claims against receipts and travel evidence before deciding.",evidence_ids:[...new Set([...flags.flatMap(x=>x.evidence_ids as string[]),...possible_duplicates.flatMap(x=>x.evidence_ids as string[])])]});
+   return {evidence:ev,flags,possible_duplicates,reviewer_questions};
   }
   case "AI-11":{
    const balances=rows(s.inventory);const ev=balances.flatMap(b=>{const id=text(b.id);return id?[evidence("inventory_balance",id,["itemType","itemId","quantity"])]:[]});
