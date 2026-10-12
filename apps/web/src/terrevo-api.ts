@@ -67,6 +67,7 @@ export type ManagerAnalytics = {
   coverage: { plannedStops: number; completedVisits: number; doctorCalls: number; chemistCalls: number; stockistCalls: number };
 };
 export type Coordinates = { latitude: number; longitude: number; accuracyMeters: number };
+export type FieldSettings = { geofenceRadiusMeters:50|100|200; maxGpsAccuracyMeters:number };
 export type ClmAsset = {id:string;tenantId:string;title:string;category:string;version:string;status:"APPROVED"|"DRAFT"|"WITHDRAWN"|"EXPIRED";productIds:string[];regionCodes:string[];contentType:string;objectPath:string|null;slides:Array<{id:string;title:string;body:string}>;effectiveFrom?:string;expiresAt?:string;provenanceId:string;approvedBy:string;approvedAt:string};
 export type ClmSessionDraft = {tenantId:string;assetId:string;productIds:string[];startedAt:string;endedAt:string;slideVisits:Array<{slideId:string;durationMs:number}>;linkedVisitId?:string};
 export type { CustomerLink } from "../../../modules/business-customer-links/src/index.ts";
@@ -184,6 +185,12 @@ export class TerrevoWebApi {
   }
   async tenants(): Promise<Tenant[]> { return (await this.raw("/v1/tenants", "GET", undefined, false) as { tenants: Tenant[] }).tenants; }
   async access(): Promise<AccessContext> { return (await this.raw("/v1/access-context") as { context: AccessContext }).context; }
+  async fieldSettings():Promise<FieldSettings> {
+    return (await this.raw("/v1/field-settings") as {settings:FieldSettings}).settings;
+  }
+  async updateFieldSettings(settings:FieldSettings):Promise<FieldSettings> {
+    return (await this.raw("/v1/field-settings","PUT",settings) as {settings:FieldSettings}).settings;
+  }
   async aiAgents():Promise<AgentCatalogEntry[]> {
     return (await this.raw("/v1/ai/agents") as {agents:AgentCatalogEntry[]}).agents;
   }
