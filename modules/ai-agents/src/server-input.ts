@@ -43,7 +43,7 @@ export function buildDeterministicAgentInput(id:AgentId,s:AgentSnapshots):Record
   }
   case "AI-09":{
    const assets=rows(s.clmAssets);const today=new Date().toISOString().slice(0,10);
-   const approved=assets.filter(a=>a.status==="APPROVED"&&(!text(a.effectiveFrom)||text(a.effectiveFrom)!>today)&&(!text(a.expiresAt)||text(a.expiresAt)!<today));
+   const approved=assets.filter(a=>{const effective=text(a.effectiveFrom),expires=text(a.expiresAt);return a.status==="APPROVED"&&(!effective||effective<=today)&&(!expires||expires>=today);});
    const ev=approved.flatMap(a=>{const id=text(a.id);return id?[evidence("approved_clm_asset",id,["version","productIds","regionCodes"])]:[]});
    const suggestions=approved.flatMap(a=>{const id=text(a.id),version=text(a.version);if(!id||!version)return[];const products=Array.isArray(a.productIds)?a.productIds.filter(x=>typeof x==="string") as string[]:[];const regions=Array.isArray(a.regionCodes)?a.regionCodes.filter(x=>typeof x==="string") as string[]:["GLOBAL"];return products.flatMap(product_id=>regions.map(region=>({asset_id:id,asset_version:version,product_id,region,reason:"Currently approved server-visible CLM asset.",evidence_ids:[id]})));});
    return {evidence:ev,suggestions,excluded_asset_reasons:[]};
