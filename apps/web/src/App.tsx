@@ -491,8 +491,8 @@ export default function App() {
           focusCustomer={focusedCustomer} perform={(fn,title)=>action(fn,title)} />}
 
         {(["trade","inventory","workforce","approvals","reports"] as Area[]).includes(view) &&
-          <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} busy={busy}
-            visit={visit} progress={progress} masters={masters} perform={(fn,title)=>action(fn,title)} />}
+          <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} admin={admin}
+            tenantId={tenantId} contextKey={contextKey} busy={busy} visit={visit} progress={progress} masters={masters} perform={(fn,title)=>action(fn,title)} />}
 
         {view==="manager"&&manager&&<Panel eyebrow="MANAGER DECISIONS" title="Unplanned customer-call review">
           {pendingUnplanned.length?pendingUnplanned.map(row=><div className="tr-history-row" key={row.id}>
