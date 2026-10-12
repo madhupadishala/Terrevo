@@ -7,7 +7,8 @@ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 const mainRoles=['MR','MANAGER','TENANT_ADMIN',...['MR2','UNSCOPED'].filter(role=>manifest.users.some(u=>u.role===role))];
 const identityRoles=[...mainRoles,'FOREIGN_MR'];
 for(const role of identityRoles)if(manifest.users.filter(u=>u.role===role).length!==1||!uuid.test(manifest.users.find(u=>u.role===role)?.id??''))throw Error('Supported Auth identity missing or ambiguous');
-const ids=manifest.fixture??Object.fromEntries(['tenant','foreignTenant','company','division','zone','region','area','territory','foreignCompany','foreignDivision','foreignZone','foreignRegion','foreignArea','foreignTerritory','mrEmployee','managerEmployee','doctor','unplannedDoctor','chemist','product'].map(k=>[k,randomUUID()]));
+const coreKeys=['tenant','foreignTenant','company','division','zone','region','area','territory','foreignCompany','foreignDivision','foreignZone','foreignRegion','foreignArea','foreignTerritory','mrEmployee','managerEmployee','doctor','unplannedDoctor','chemist','product'];
+const ids={...Object.fromEntries(coreKeys.map(k=>[k,randomUUID()])),...(manifest.fixture??{})};
 const extendedIds=['stockist','sample','gift','foreignEmployee','foreignDoctor','foreignChemist','foreignStockist','foreignProduct','clmAsset','expensePolicy'];
 if(manifest.users.some(u=>u.role==='MR2'))extendedIds.push('mr2Employee');
 let updated=false;
