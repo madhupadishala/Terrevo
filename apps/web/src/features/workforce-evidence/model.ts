@@ -1,6 +1,6 @@
 export type EvidenceScope={tenantId:string;authorizedForTenantId:string;contextKey:string;viewerUserId:string;role:"FIELD"|"MANAGER"|"ADMIN";permittedUserIds:string[]};
 export type ExpenseLine={id:string;category:string;amountMinor:number;receiptRequired:boolean};
-export type Claim={id:string;tenantId:string;ownerUserId:string;workDate:string;currency:string;serverTotalMinor:number;status:"DRAFT"|"SUBMITTED"|"APPROVED"|"REJECTED";lines:ExpenseLine[];sourceId:string;asOf:string};
+export type Claim={id:string;tenantId:string;ownerUserId:string;workDate:string;currency:string;serverTotalMinor:number;status:"DRAFT"|"SUBMITTED"|"APPROVED"|"REJECTED"|"RETURNED";lines:ExpenseLine[];sourceId:string;asOf:string};
 export type ReceiptManifest={id:string;tenantId:string;claimId:string;lineId:string;status:"VERIFIED"|"PENDING"|"MISSING"|"REVOKED";documentRef:string;verifiedAt?:string};
 export type TravelEvidence={tenantId:string;ownerUserId:string;workDate:string;sourceId:string;distanceMeters:number;method:"SERVER_GPS"|"SERVER_ROUTE"|"UNVERIFIED"};
 export type AttendanceEvidence={id:string;tenantId:string;ownerUserId:string;workDate:string;state:"PRESENT"|"LEAVE"|"ABSENT"|"PENDING";dayClosed:boolean;sourceId:string;asOf:string};
