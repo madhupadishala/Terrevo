@@ -8,9 +8,12 @@ const mainRoles=['MR','MANAGER','TENANT_ADMIN',...['MR2','UNSCOPED'].filter(role
 const identityRoles=[...mainRoles,'FOREIGN_MR'];
 for(const role of identityRoles)if(manifest.users.filter(u=>u.role===role).length!==1||!uuid.test(manifest.users.find(u=>u.role===role)?.id??''))throw Error('Supported Auth identity missing or ambiguous');
 const ids=manifest.fixture??Object.fromEntries(['tenant','foreignTenant','company','division','zone','region','area','territory','foreignCompany','foreignDivision','foreignZone','foreignRegion','foreignArea','foreignTerritory','mrEmployee','managerEmployee','doctor','unplannedDoctor','chemist','product'].map(k=>[k,randomUUID()]));
-if(manifest.users.some(u=>u.role==='MR2')&&!ids.mr2Employee){ids.mr2Employee=randomUUID();manifest.fixture=ids;fs.writeFileSync(path,JSON.stringify(manifest),{mode:0o600});}
+const extendedIds=['stockist','sample','gift','foreignEmployee','foreignDoctor','foreignChemist','foreignStockist','foreignProduct'];
+if(manifest.users.some(u=>u.role==='MR2'))extendedIds.push('mr2Employee');
+let updated=false;
+for(const key of extendedIds)if(!ids[key]){ids[key]=randomUUID();updated=true;}
 if(Object.values(ids).some(id=>!uuid.test(id)))throw Error("Invalid stored fixture IDs");
-if(!manifest.fixture){manifest.fixture=ids;fs.writeFileSync(path,JSON.stringify(manifest),{mode:0o600});}
+if(!manifest.fixture||updated){manifest.fixture=ids;fs.writeFileSync(path,JSON.stringify(manifest),{mode:0o600});}
 const user=role=>manifest.users.find(u=>u.role===role).id;
 const q=value=>"'"+value.replaceAll("'","''")+"'";
 const sql=['begin;'];
@@ -37,6 +40,13 @@ sql.push(`update public.employees set reporting_manager_employee_id=${q(ids.mana
 sql.push(`insert into public.doctors(id,tenant_id,code,name,specialty,territory_id,latitude,longitude) values (${q(ids.doctor)},${q(ids.tenant)},'QUALDOCTOR','Synthetic Planned Qualification Doctor','Test',${q(ids.territory)},17.385,78.487),(${q(ids.unplannedDoctor)},${q(ids.tenant)},'QUALUNPLANNED','Synthetic Unplanned Qualification Doctor','Test',${q(ids.territory)},17.385,78.487);`);
 sql.push(`insert into public.chemists(id,tenant_id,code,name,territory_id) values (${q(ids.chemist)},${q(ids.tenant)},'QUALCHEMIST','Synthetic Qualification Chemist',${q(ids.territory)});`);
 sql.push(`insert into public.products(id,tenant_id,code,name,division_id) values (${q(ids.product)},${q(ids.tenant)},'QUALPRODUCT','Synthetic Qualification Product',${q(ids.division)});`);
+sql.push(`insert into public.stockists(id,tenant_id,code,name,territory_id) values (${q(ids.stockist)},${q(ids.tenant)},'QUALSTOCKIST','Synthetic Qualification Stockist',${q(ids.territory)}),(${q(ids.foreignStockist)},${q(ids.foreignTenant)},'QUALSTOCKIST','Synthetic Foreign Stockist',${q(ids.foreignTerritory)});`);
+sql.push(`insert into public.employees(id,tenant_id,user_id,code,name,designation,org_unit_id) values (${q(ids.foreignEmployee)},${q(ids.foreignTenant)},${q(user('FOREIGN_MR'))},'QUALFOREIGNMR','Synthetic Foreign MR','MR',${q(ids.foreignTerritory)});`);
+sql.push(`insert into public.doctors(id,tenant_id,code,name,specialty,territory_id,latitude,longitude) values (${q(ids.foreignDoctor)},${q(ids.foreignTenant)},'QUALDOCTOR','Synthetic Foreign Doctor','Test',${q(ids.foreignTerritory)},12.9716,77.5946);`);
+sql.push(`insert into public.chemists(id,tenant_id,code,name,territory_id) values (${q(ids.foreignChemist)},${q(ids.foreignTenant)},'QUALCHEMIST','Synthetic Foreign Chemist',${q(ids.foreignTerritory)});`);
+sql.push(`insert into public.products(id,tenant_id,code,name,division_id) values (${q(ids.foreignProduct)},${q(ids.foreignTenant)},'QUALPRODUCT','Synthetic Foreign Product',${q(ids.foreignDivision)});`);
+sql.push(`insert into public.samples(id,tenant_id,code,name,product_id,division_id,unit) values (${q(ids.sample)},${q(ids.tenant)},'QUALSAMPLE','Synthetic Qualification Sample',${q(ids.product)},${q(ids.division)},'unit');`);
+sql.push(`insert into public.gifts(id,tenant_id,code,name,division_id,category) values (${q(ids.gift)},${q(ids.tenant)},'QUALGIFT','Synthetic Qualification Gift',${q(ids.division)},'test');`);
 sql.push(`insert into public.business_customer_link_grants(tenant_id,user_id,territory_id) values (${q(ids.tenant)},${q(user('MR'))},${q(ids.territory)});`);
 sql.push(`insert into public.business_customer_links(tenant_id,source_id,target_id,territory_id,relation,approval,evidence_id,verified_at) values (${q(ids.tenant)},${q(ids.doctor)},${q(ids.chemist)},${q(ids.territory)},'QUALIFICATION_ONLY','APPROVED',${q(manifest.runId)},now());`);
 sql.push('commit;');console.log(sql.join('\n'));
