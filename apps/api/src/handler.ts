@@ -173,6 +173,99 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
   const analytics = createAnalyticsService(adapter.analytics);
   const platform = createPlatformAdminService(config, fetcher);
 
+  const CLM_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const clmUserHeaders=(token:string)=>({apikey:config.anonKey,authorization:`Bearer ${token}`,accept:"application/json","content-type":"application/json"});
+  const clmAdminHeaders=(prefer="return=representation")=>{
+    if(!config.serviceRoleKey)throw new ApiError(500,"Server provider key is not configured");
+    return {apikey:config.serviceRoleKey,authorization:`Bearer ${config.serviceRoleKey}`,accept:"application/json","content-type":"application/json",prefer};
+  };
+  const clmText=(value:unknown,name:string,max:number)=>{
+    if(typeof value!=="string"||!value.trim()||value.trim().length>max)throw new ApiError(400,`Invalid ${name}`);
+    return value.trim();
+  };
+  const clmUuid=(value:unknown,name:string)=>{
+    if(typeof value!=="string"||!CLM_UUID.test(value))throw new ApiError(400,`${name} must be UUID`);
+    return value;
+  };
+  const clmDate=(value:unknown,name:string,nullable=false):string|null=>{
+    if((value===null||value===undefined||value==="")&&nullable)return null;
+    if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value))throw new ApiError(400,`Invalid ${name}`);
+    const parsed=new Date(value+"T00:00:00Z");if(Number.isNaN(parsed.getTime())||parsed.toISOString().slice(0,10)!==value)throw new ApiError(400,`Invalid ${name}`);
+    return value;
+  };
+  const mapClmAsset=(row:Record<string,unknown>)=>({
+    id:String(row.id),tenantId:String(row.tenant_id),title:String(row.title),category:String(row.category),
+    version:String(row.version),status:String(row.status),productIds:Array.isArray(row.product_ids)?row.product_ids.map(String):[],
+    slides:Array.isArray(row.slides)?row.slides:[],effectiveFrom:row.effective_from==null?undefined:String(row.effective_from),
+    expiresAt:row.expires_at==null?undefined:String(row.expires_at),provenanceId:String(row.provenance_id),
+    approvedBy:row.approved_by==null?"":String(row.approved_by),approvedAt:row.approved_at==null?"":String(row.approved_at),
+  });
+  async function readClmAssets(tenantId:string,accessToken:string){
+    const q=new URLSearchParams({select:"id,tenant_id,title,category,version,status,product_ids,slides,effective_from,expires_at,provenance_id,approved_by,approved_at",tenant_id:`eq.${tenantId}`,order:"title.asc,version.desc",limit:"500"});
+    const response=await fetcher(new URL("/rest/v1/clm_assets?"+q,config.url).toString(),{headers:clmUserHeaders(accessToken),cache:"no-store"});
+    if(!response.ok)throw new ProviderError("CLM catalog read failed",response.status);
+    return (await response.json() as Array<Record<string,unknown>>).map(mapClmAsset);
+  }
+  async function createClmAsset(tenantId:string,actorId:string,accessToken:string,body:Record<string,unknown>){
+    await rbac.authorize(tenantId,"MASTER_MANAGE",null,accessToken);
+    const title=clmText(body.title,"title",160),category=clmText(body.category,"category",80),version=clmText(body.version,"version",40);
+    const provenanceId=clmText(body.provenanceId,"provenanceId",300);
+    if(!Array.isArray(body.productIds)||body.productIds.length<1||body.productIds.length>50)throw new ApiError(400,"productIds must contain 1 to 50 products");
+    const productIds=[...new Set(body.productIds.map((x)=>clmUuid(x,"productId")))];
+    if(!Array.isArray(body.slides)||body.slides.length<1||body.slides.length>100)throw new ApiError(400,"slides must contain 1 to 100 entries");
+    const ids=new Set<string>();
+    const slides=body.slides.map((raw,index)=>{
+      if(!raw||typeof raw!=="object"||Array.isArray(raw))throw new ApiError(400,`Invalid slide ${index+1}`);
+      const value=raw as Record<string,unknown>;const id=clmText(value.id,"slide id",80);
+      if(ids.has(id))throw new ApiError(400,"Duplicate slide id");ids.add(id);
+      return {id,title:clmText(value.title,"slide title",160),body:typeof value.body==="string"&&value.body.length<=12000?value.body:(()=>{throw new ApiError(400,"Invalid slide body")})()};
+    });
+    const effectiveFrom=clmDate(body.effectiveFrom,"effectiveFrom",true),expiresAt=clmDate(body.expiresAt,"expiresAt",true);
+    if(effectiveFrom&&expiresAt&&expiresAt<effectiveFrom)throw new ApiError(400,"expiresAt must be on or after effectiveFrom");
+    const row={tenant_id:tenantId,title,category,version,status:"APPROVED",product_ids:productIds,slides,effective_from:effectiveFrom,expires_at:expiresAt,
+      provenance_id:provenanceId,approved_by:actorId,approved_at:new Date().toISOString()};
+    const response=await fetcher(new URL("/rest/v1/clm_assets",config.url).toString(),{method:"POST",headers:clmAdminHeaders(),body:JSON.stringify(row)});
+    if(!response.ok)throw new ProviderError("CLM asset create failed",response.status);
+    const saved=(await response.json() as Array<Record<string,unknown>>)[0];if(!saved)throw new ApiError(502,"CLM asset was not returned");
+    return mapClmAsset(saved);
+  }
+  async function recordClmSession(tenantId:string,actorId:string,accessToken:string,body:Record<string,unknown>){
+    const assetId=clmUuid(body.assetId,"assetId"),visitId=clmUuid(body.linkedVisitId,"linkedVisitId"),operationId=clmUuid(body.operationId,"operationId");
+    const startedAt=clmText(body.startedAt,"startedAt",80),endedAt=clmText(body.endedAt,"endedAt",80);
+    const started=Date.parse(startedAt),ended=Date.parse(endedAt);
+    if(!Number.isFinite(started)||!Number.isFinite(ended)||ended<started||ended-started>8*60*60*1000)throw new ApiError(400,"Invalid detailing session time range");
+    if(!Array.isArray(body.slideVisits)||body.slideVisits.length<1||body.slideVisits.length>200)throw new ApiError(400,"slideVisits must contain 1 to 200 entries");
+    const slideVisits=body.slideVisits.map((raw,index)=>{
+      if(!raw||typeof raw!=="object"||Array.isArray(raw))throw new ApiError(400,`Invalid slide visit ${index+1}`);
+      const v=raw as Record<string,unknown>;const slideId=clmText(v.slideId,"slideId",80);
+      if(typeof v.durationMs!=="number"||!Number.isSafeInteger(v.durationMs)||v.durationMs<0||v.durationMs>8*60*60*1000)throw new ApiError(400,"Invalid slide duration");
+      return {slideId,durationMs:v.durationMs};
+    });
+    const assets=await readClmAssets(tenantId,accessToken);const asset=assets.find(x=>x.id===assetId);
+    if(!asset)throw new ApiError(404,"Approved CLM asset not found");
+    const now=new Date().toISOString().slice(0,10);
+    if(asset.status!=="APPROVED"||(asset.effectiveFrom&&asset.effectiveFrom>now)||(asset.expiresAt&&asset.expiresAt<now))throw new ApiError(409,"CLM asset is not currently eligible");
+    const vq=new URLSearchParams({select:"id,status",tenant_id:`eq.${tenantId}`,id:`eq.${visitId}`,status:"eq.CHECKED_IN",limit:"1"});
+    const visitResponse=await fetcher(new URL("/rest/v1/field_visits?"+vq,config.url).toString(),{headers:clmUserHeaders(accessToken),cache:"no-store"});
+    if(!visitResponse.ok)throw new ProviderError("Active visit check failed",visitResponse.status);
+    if(!(await visitResponse.json() as unknown[]).length)throw new ApiError(409,"An authorized checked-in visit is required for detailing");
+    const existingQ=new URLSearchParams({select:"id,asset_id,visit_id,started_at,ended_at,slide_visits,provenance_id",tenant_id:`eq.${tenantId}`,actor_user_id:`eq.${actorId}`,operation_id:`eq.${operationId}`,limit:"1"});
+    const existingResponse=await fetcher(new URL("/rest/v1/clm_detailing_sessions?"+existingQ,config.url).toString(),{headers:clmAdminHeaders("return=representation"),cache:"no-store"});
+    if(!existingResponse.ok)throw new ProviderError("CLM session replay check failed",existingResponse.status);
+    const existing=(await existingResponse.json() as Array<Record<string,unknown>>)[0];
+    if(existing){
+      if(existing.asset_id!==assetId||existing.visit_id!==visitId||existing.started_at!==startedAt||existing.ended_at!==endedAt||JSON.stringify(existing.slide_visits)!==JSON.stringify(slideVisits))throw new ApiError(409,"Idempotency key reused with different detailing session");
+      return {id:String(existing.id),provenanceId:String(existing.provenance_id)};
+    }
+    const provenanceId=`clm-session:${operationId}`;
+    const response=await fetcher(new URL("/rest/v1/clm_detailing_sessions",config.url).toString(),{method:"POST",headers:clmAdminHeaders(),body:JSON.stringify({
+      tenant_id:tenantId,actor_user_id:actorId,asset_id:assetId,visit_id:visitId,operation_id:operationId,started_at:startedAt,ended_at:endedAt,slide_visits:slideVisits,provenance_id:provenanceId,
+    })});
+    if(!response.ok)throw new ProviderError("CLM session record failed",response.status);
+    const saved=(await response.json() as Array<Record<string,unknown>>)[0];if(!saved)throw new ApiError(502,"CLM session was not returned");
+    return {id:String(saved.id),provenanceId};
+  }
+
   /** Authenticates the caller and resolves the active tenant context for a tenant-scoped request. */
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -289,6 +382,23 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
         const customerLinks=createCustomerLinksService(createCustomerLinksPostgrest(config.url,config.anonKey,fetcher));
         const links=await customerLinks.list({tenantId:context.tenantId,userId:user.id,accessToken,permittedTerritoryIds},customerLinksMatch[1]);
         return json(200,{links});
+      }
+
+      if(request.method==="GET"&&path==="/v1/clm/assets"){
+        const {accessToken,context}=await resolveTenantRequest(request);return json(200,{assets:await readClmAssets(context.tenantId,accessToken)});
+      }
+      if(request.method==="POST"&&path==="/v1/clm/assets"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);return json(201,{asset:await createClmAsset(context.tenantId,user.id,accessToken,await readJsonObject(request,65536))});
+      }
+      if(request.method==="POST"&&path==="/v1/clm/sessions"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);return json(201,{session:await recordClmSession(context.tenantId,user.id,accessToken,await readJsonObject(request,65536))});
+      }
+      if(request.method==="GET"&&path==="/v1/clm/sessions"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        const q=new URLSearchParams({select:"id,asset_id,visit_id,started_at,ended_at,provenance_id",tenant_id:`eq.${context.tenantId}`,actor_user_id:`eq.${user.id}`,order:"created_at.desc",limit:"200"});
+        const response=await fetcher(new URL("/rest/v1/clm_detailing_sessions?"+q,config.url).toString(),{headers:clmUserHeaders(accessToken),cache:"no-store"});
+        if(!response.ok)throw new ProviderError("CLM session history failed",response.status);
+        return json(200,{sessions:await response.json()});
       }
 
       if (request.method === "GET" && path === "/v1/tenants") {
