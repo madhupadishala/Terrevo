@@ -104,6 +104,8 @@ export default function App() {
   const [unitName, setUnitName] = useState("");
   const [unitParent, setUnitParent] = useState("");
   const [masterKind, setMasterKind] = useState("doctors");
+  const [masterSearch,setMasterSearch]=useState("");
+  const [masterPage,setMasterPage]=useState(0);
   const [assignmentUser, setAssignmentUser] = useState("");
   const [assignmentRole, setAssignmentRole] = useState<"TENANT_ADMIN" | "MANAGER" | "MR">("MR");
   const [assignmentScope, setAssignmentScope] = useState("");
@@ -182,6 +184,14 @@ export default function App() {
   useEffect(() => {
     if (!visibleNav.some(n => n.id === view)) setView(visibleNav[0]?.id ?? "overview");
   }, [visibleNav, view]);
+  const filteredMasterRows=useMemo(()=>{
+    const q=masterSearch.trim().toLowerCase();
+    const rows=masters[masterKind]??[];
+    return q?rows.filter(m=>m.name.toLowerCase().includes(q)||m.code.toLowerCase().includes(q)):rows;
+  },[masters,masterKind,masterSearch]);
+  const masterPageSize=50;
+  const masterPageCount=Math.max(1,Math.ceil(filteredMasterRows.length/masterPageSize));
+  const visibleMasterRows=filteredMasterRows.slice(Math.min(masterPage,masterPageCount-1)*masterPageSize,(Math.min(masterPage,masterPageCount-1)+1)*masterPageSize);
   const activeStop = progress?.stops.find(s => s.planStopId === visit?.planStopId);
   const customerRefs = useMemo(()=>authorizedCustomerRefs(tenantId,masters),[tenantId,masters]);
   const focusedCustomerRef = focusedCustomer ? customerRefs.find(c=>c.kind===focusedCustomer.kind&&c.id===focusedCustomer.id&&c.territoryId===focusedCustomer.territoryId)??null : null;
@@ -637,9 +647,12 @@ export default function App() {
             <div className="tr-list-sm">{units.map(u=><div className="tr-history-row" key={u.id}><div><strong>{u.name}</strong><p>{u.type} · {u.code}</p></div><Status value={u.status.toUpperCase()}/></div>)}</div>
           </Panel>
           <Panel eyebrow="MASTER DATA & ACCESS" title="Business administration">
-            <label className="tr-select-label" htmlFor="masters-kind">Master type</label><select id="masters-kind" className="tr-select" value={masterKind} onChange={e=>setMasterKind(e.target.value)}>
+            <label className="tr-select-label" htmlFor="masters-kind">Master type</label><select id="masters-kind" className="tr-select" value={masterKind} onChange={e=>{setMasterKind(e.target.value);setMasterSearch("");setMasterPage(0);}}>
               {MASTER_KINDS.map(kind=><option value={kind} key={kind}>{kind}</option>)}</select>
-            <div className="tr-list-sm">{(masters[masterKind]??[]).map(m=><div className="tr-history-row" key={m.id}><div><strong>{m.name}</strong><p>{m.code}</p></div><Status value={m.status.toUpperCase()}/></div>)}</div>
+            <TextInput id="master-search" labelText="Search code or name" value={masterSearch} onChange={e=>{setMasterSearch(e.target.value);setMasterPage(0);}}/>
+            <div className="tr-list-sm">{visibleMasterRows.map(m=><div className="tr-history-row" key={m.id}><div><strong>{m.name}</strong><p>{m.code}</p></div><Status value={m.status.toUpperCase()}/></div>)}</div>
+            {filteredMasterRows.length>masterPageSize&&<div className="tr-button-row"><Button kind="ghost" size="sm" disabled={masterPage<=0} onClick={()=>setMasterPage(p=>Math.max(0,p-1))}>Previous</Button>
+              <span>{Math.min(masterPage,masterPageCount-1)+1} / {masterPageCount}</span><Button kind="ghost" size="sm" disabled={masterPage>=masterPageCount-1} onClick={()=>setMasterPage(p=>Math.min(masterPageCount-1,p+1))}>Next</Button></div>}
             <MasterEditor key={tenantId} kind={masterKind} units={units} products={masters.products??[]} employees={masters.employees??[]} disabled={!connected||busy}
               perform={input=>action(()=>api.createMaster(masterKind,input),"Master record created")}/>
             <h3>Assign an existing user</h3><div className="tr-form"><TextInput id="assign-user" labelText="Existing user UUID" value={assignmentUser} onChange={e=>setAssignmentUser(e.target.value)}/>
