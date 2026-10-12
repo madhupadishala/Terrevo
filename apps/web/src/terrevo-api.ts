@@ -71,6 +71,9 @@ export type ClmAsset = {id:string;tenantId:string;title:string;category:string;v
 export type ClmSessionDraft = {tenantId:string;assetId:string;productIds:string[];startedAt:string;endedAt:string;slideVisits:Array<{slideId:string;durationMs:number}>;linkedVisitId?:string};
 export type { CustomerLink } from "../../../modules/business-customer-links/src/index.ts";
 import type { CustomerLink } from "../../../modules/business-customer-links/src/index.ts";
+import type { AgentId, AgentOutput } from "../../../modules/ai-agents/src/index.ts";
+export type { AgentId, AgentOutput } from "../../../modules/ai-agents/src/index.ts";
+export type AgentCatalogEntry={id:AgentId;name:string;priority:"P1"|"P2";authoritativeDatasets:readonly string[];resultKeys:readonly string[]};
 
 export class ApiFailure extends Error {
   readonly status: number;
@@ -181,6 +184,12 @@ export class TerrevoWebApi {
   }
   async tenants(): Promise<Tenant[]> { return (await this.raw("/v1/tenants", "GET", undefined, false) as { tenants: Tenant[] }).tenants; }
   async access(): Promise<AccessContext> { return (await this.raw("/v1/access-context") as { context: AccessContext }).context; }
+  async aiAgents():Promise<AgentCatalogEntry[]> {
+    return (await this.raw("/v1/ai/agents") as {agents:AgentCatalogEntry[]}).agents;
+  }
+  async runAgent(agentId:AgentId,subject?:{kind:string;id:string}):Promise<AgentOutput> {
+    return (await this.raw("/v1/ai/agents/"+encodeURIComponent(agentId)+"/run","POST",{requestId:crypto.randomUUID(),...(subject?{subject}:{})}) as {output:AgentOutput}).output;
+  }
   async customerLinks(sourceId:string):Promise<CustomerLink[]> {
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sourceId))throw new ApiFailure(400,"Customer ID must be a UUID.");
     const tenant=this.tenantId;
