@@ -29,18 +29,6 @@ export function validateChangedPaths(paths, owner, integrationScope) {
   }
   return violations;
 }
-export function parseNameStatus(text) {
-  const paths = [];
-  for (const line of text.split(/\r?\n/)) {
-    if (!line) continue;
-    const cols = line.split('\t');
-    const status = cols[0];
-    if (!/^[ACDMRTUXB][0-9]*$/.test(status)) throw new Error('Unrecognized git diff status: ' + status);
-    if (status.startsWith('R') || status.startsWith('C')) paths.push(cols[1], cols[2]);
-    else paths.push(cols[1]);
-  }
-  return paths;
-}
 // NUL-delimited git output preserves tabs, newlines and quoted names verbatim.
 export function parseNameStatusZ(text) {
   if (!text) return [];

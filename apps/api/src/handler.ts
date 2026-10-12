@@ -260,11 +260,32 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
         grantUrl.searchParams.set("tenant_id",`eq.${context.tenantId}`);
         grantUrl.searchParams.set("user_id",`eq.${user.id}`);
         grantUrl.searchParams.set("limit","1000");
-        const grantResponse=await fetcher(grantUrl.toString(),{headers:{apikey:config.anonKey,authorization:`Bearer ${accessToken}`,accept:"application/json"},cache:"no-store",signal:AbortSignal.timeout(10_000),redirect:"error"});
-        if(!grantResponse.ok)throw new BusinessAccessError("Customer grant retrieval denied");
-        const grantRows:unknown=await grantResponse.json();
-        if(!Array.isArray(grantRows)||grantRows.some((g:unknown)=>!g||typeof g!=="object"||typeof (g as {territory_id?:unknown}).territory_id!=="string"))throw new BusinessAccessError("Invalid customer grants");
-        const permittedTerritoryIds=[...new Set(grantRows.map(g=>(g as {territory_id:string}).territory_id))];
+        grantUrl.searchParams.set("order","territory_id.asc");
+        const grantDeadline=AbortSignal.timeout(10_000),grantIds=new Set<string>();
+        let offset=0,total:number|undefined;
+        // Exact counts detect provider row caps; reject incomplete, repeated or
+        // changing pages instead of treating a partial set as complete scope.
+        for(let page=0;;page++){
+          if(page>=100)throw new BusinessAccessError("Customer grant pagination limit exceeded");
+          grantDeadline.throwIfAborted();
+          grantUrl.searchParams.set("offset",String(offset));
+          const grantResponse=await fetcher(grantUrl.toString(),{headers:{apikey:config.anonKey,authorization:`Bearer ${accessToken}`,accept:"application/json",prefer:"count=exact"},cache:"no-store",signal:grantDeadline,redirect:"error"});
+          if(!grantResponse.ok)throw new BusinessAccessError("Customer grant retrieval denied");
+          const grantRows:unknown=await grantResponse.json();
+          grantDeadline.throwIfAborted();
+          if(!Array.isArray(grantRows)||grantRows.length>1000||grantRows.some((g:unknown)=>!g||typeof g!=="object"||Array.isArray(g)||typeof (g as {territory_id?:unknown}).territory_id!=="string"||!(g as {territory_id:string}).territory_id.trim()))throw new BusinessAccessError("Invalid customer grants");
+          const range=grantResponse.headers.get("content-range");
+          if(offset===0&&grantRows.length===0&&range==="*/0")break;
+          const match=/^(\d+)-(\d+)\/(\d+)$/.exec(range??"");
+          if(!match)throw new BusinessAccessError("Customer grant completeness unavailable");
+          const [start,end,count]=match.slice(1).map(Number);
+          if(![start,end,count].every(Number.isSafeInteger)||start!==offset||end!==offset+grantRows.length-1||grantRows.length===0||count<=end||count>100_000||(total!==undefined&&total!==count))throw new BusinessAccessError("Inconsistent customer grant pagination");
+          total=count;
+          for(const row of grantRows){const id=(row as {territory_id:string}).territory_id;if(grantIds.has(id))throw new BusinessAccessError("Customer grant pagination did not advance");grantIds.add(id);}
+          offset+=grantRows.length;
+          if(offset===total)break;
+        }
+        const permittedTerritoryIds=[...grantIds];
         const customerLinks=createCustomerLinksService(createCustomerLinksPostgrest(config.url,config.anonKey,fetcher));
         const links=await customerLinks.list({tenantId:context.tenantId,userId:user.id,accessToken,permittedTerritoryIds},customerLinksMatch[1]);
         return json(200,{links});
