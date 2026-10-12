@@ -35,3 +35,17 @@ test('a saved older fixture gains stable tenant-specific master IDs without chan
   assert.notEqual(next.fixture.foreignProduct,next.fixture.product);assert.ok(next.fixture.clmAsset);assert.ok(next.fixture.expensePolicy);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+
+test('a partially persisted core fixture is repaired without losing existing IDs',()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'terrevo-fixture-partial-'));const manifestPath=path.join(dir,'identity.json');
+ try{
+  const roles=['MR','MANAGER','TENANT_ADMIN','FOREIGN_MR'];const users=roles.map((role,i)=>({role,id:`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`}));
+  const preservedTenant='11111111-1111-4111-8111-111111111111';
+  fs.writeFileSync(manifestPath,JSON.stringify({runId:'partial-core',users,fixture:{tenant:preservedTenant}}),{mode:0o600});
+  const script=path.resolve(import.meta.dirname,'../staging/seed-qualification-fixture.mjs');
+  const first=execFileSync(process.execPath,[script,manifestPath],{encoding:'utf8'});const repaired=JSON.parse(fs.readFileSync(manifestPath)).fixture;
+  assert.equal(repaired.tenant,preservedTenant);for(const key of ['foreignTenant','company','division','zone','region','area','territory','mrEmployee','managerEmployee','doctor','chemist','product'])assert.match(repaired[key],/^[0-9a-f-]{36}$/i);
+  assert.equal(execFileSync(process.execPath,[script,manifestPath],{encoding:'utf8'}),first);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
