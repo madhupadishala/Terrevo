@@ -266,6 +266,72 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
     return {id:String(saved.id),provenanceId};
   }
 
+  async function buildManagerReportLedger(tenantId:string,userId:string,accessToken:string){
+        const rights=await rbac.accessContext(tenantId,userId,accessToken);
+        if(!rights.roles.some(r=>r.roleKey==="MANAGER"||r.roleKey==="TENANT_ADMIN"))throw new ApiError(403,"Manager reporting permission required");
+        const userHeaders={apikey:config.anonKey,authorization:`Bearer ${accessToken}`,accept:"application/json",prefer:"count=exact"};
+        const readRows=async(table:string,params:Record<string,string>)=>{
+          const q=new URLSearchParams({select:"*",tenant_id:`eq.${tenantId}`,limit:"5000",...params});
+          const response=await fetcher(new URL(`/rest/v1/${table}?${q}`,config.url).toString(),{headers:userHeaders,cache:"no-store"});
+          if(!response.ok)throw new ProviderError("Reporting source read failed",response.status);
+          const rows=await response.json() as Array<Record<string,unknown>>;
+          const range=response.headers.get("content-range"),m=/^(?:\d+-\d+|\*)\/(\d+)$/.exec(range??"");
+          if(!m||Number(m[1])!==rows.length)throw new ApiError(502,"Reporting source was incomplete");
+          return rows;
+        };
+        const plans=await readRows("tour_plans",{status:"eq.APPROVED",order:"week_start.desc"});
+        const planIds=plans.map(x=>String(x.id));
+        const days=planIds.length?await readRows("tour_plan_days",{tour_plan_id:`in.(${planIds.join(",")})`,order:"plan_date.asc"}):[];
+        const dayIds=days.map(x=>String(x.id));
+        const stops=dayIds.length?await readRows("tour_plan_stops",{tour_plan_day_id:`in.(${dayIds.join(",")})`,order:"sequence_no.asc"}):[];
+        const executions=await readRows("tour_executions",{order:"work_date.desc"});
+        const executionIds=executions.map(x=>String(x.id));
+        const visits=executionIds.length?await readRows("field_visits",{execution_id:`in.(${executionIds.join(",")})`,order:"checkin_at.desc"}):[];
+        const dcrs=await readRows("dcrs",{order:"submitted_at.desc"});
+        const unplannedRows=await readRows("unplanned_calls",{order:"submitted_at.desc"});
+        const ncaRows=await readRows("nca_records",{status:"eq.SUBMITTED",order:"work_date.desc"});
+        const employeeIds=[...new Set([...plans.map(x=>String(x.employee_id??"")),...executions.map(x=>String(x.employee_id??""))].filter(Boolean))];
+        const employees=employeeIds.length?await readRows("employees",{id:`in.(${employeeIds.join(",")})`}):[];
+        const userByEmployee=new Map(employees.map(x=>[String(x.id),String(x.user_id)]));
+        const planById=new Map(plans.map(x=>[String(x.id),x]));
+        const dayById=new Map(days.map(x=>[String(x.id),x]));
+        const executionById=new Map(executions.map(x=>[String(x.id),x]));
+        const completedStops=new Set(visits.filter(x=>x.status==="CHECKED_OUT").map(x=>String(x.plan_stop_id)));
+        const records:Array<Record<string,string>>=[];
+        for(const stop of stops){
+          const day=dayById.get(String(stop.tour_plan_day_id));if(!day)continue;
+          const plan=planById.get(String(day.tour_plan_id));if(!plan)continue;
+          const owner=userByEmployee.get(String(plan.employee_id));if(!owner)continue;
+          const observed=typeof plan.submitted_at==="string"&&Number.isFinite(Date.parse(plan.submitted_at))?plan.submitted_at:String(day.plan_date)+"T00:00:00.000Z";
+          records.push({id:String(stop.id),tenantId:tenantId,territoryId:String(day.territory_id),ownerUserId:owner,workDate:String(day.plan_date),kind:"PLANNED_STOP",status:completedStops.has(String(stop.id))?"COMPLETED":"PLANNED",sourceId:String(stop.id),sourceType:"tour_plan_stop",observedAt:observed});
+        }
+        for(const row of dcrs){
+          const execution=executionById.get(String(row.execution_id));if(!execution)continue;
+          const owner=userByEmployee.get(String(execution.employee_id));if(!owner)continue;
+          records.push({id:String(row.id),tenantId:tenantId,territoryId:String(execution.territory_id),ownerUserId:owner,workDate:String(execution.work_date),kind:"DCR",status:"SUBMITTED",sourceId:String(row.id),sourceType:"dcr",observedAt:String(row.submitted_at)});
+        }
+        for(const row of unplannedRows){
+          const raw=String(row.status),status=raw==="SUBMITTED"?"PENDING":raw;
+          if(status!=="PENDING"&&status!=="APPROVED"&&status!=="REJECTED")continue;
+          records.push({id:String(row.id),tenantId:tenantId,territoryId:String(row.territory_id),ownerUserId:String(row.actor_user_id),workDate:String(row.work_date),kind:"UNPLANNED_CALL",status,sourceId:String(row.id),sourceType:"unplanned_call",observedAt:String(row.reviewed_at??row.submitted_at)});
+        }
+        for(const row of ncaRows){
+          records.push({id:String(row.id),tenantId:tenantId,territoryId:String(row.territory_id),ownerUserId:String(row.created_by),workDate:String(row.work_date),kind:"NCA",status:"REPORTED",sourceId:String(row.id),sourceType:"nca_record",observedAt:String(row.created_at)});
+        }
+        const asOf=new Date().toISOString();
+        return {asOf,records};
+
+  }
+  const reportCsvCell=(value:unknown)=>{
+    const raw=String(value??""),safe=/^[\s\uFEFF]*[=+\-@\t\r]/u.test(raw)?"'"+raw:raw;
+    return '"'+safe.replaceAll('"','""')+'"';
+  };
+  const managerReportCsv=(rows:Array<Record<string,string>>)=>[
+    ["Work date","Territory","Employee","Kind","Status","Source type","Source ID","Observed at"].map(reportCsvCell).join(","),
+    ...rows.map(r=>[r.workDate,r.territoryId,r.ownerUserId,r.kind,r.status,r.sourceType,r.sourceId,r.observedAt].map(reportCsvCell).join(","))
+  ].join("\r\n");
+  const validReportDate=(value:unknown)=>typeof value==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&new Date(value+"T00:00:00Z").toISOString().slice(0,10)===value;
+
   /** Authenticates the caller and resolves the active tenant context for a tenant-scoped request. */
   async function resolveTenantRequest(request: Request) {
     const accessToken = readBearerToken(request.headers.get("authorization"));
@@ -383,80 +449,32 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
         const grantUrl=new URL("/rest/v1/business_customer_link_grants",config.url);
         grantUrl.searchParams.set("select","territory_id");
         grantUrl.searchParams.set("tenant_id",`eq.${context.tenantId}`);
-        grantUrl.searchParams.set("user_id",`eq.${user.id}`);
-        grantUrl.searchParams.set("limit","1000");
-        grantUrl.searchParams.set("order","territory_id.asc");
-        const grantDeadline=AbortSignal.timeout(10_000),grantIds=new Set<string>();
-        let offset=0,total:number|undefined;
-        // Exact counts detect provider row caps; reject incomplete, repeated or
-        // changing pages instead of treating a partial set as complete scope.
-        for(let page=0;;page++){
-          if(page>=100)throw new BusinessAccessError("Customer grant pagination limit exceeded");
-          grantDeadline.throwIfAborted();
-          grantUrl.searchParams.set("offset",String(offset));
-          const grantResponse=await fetcher(grantUrl.toString(),{headers:{apikey:config.anonKey,authorization:`Bearer ${accessToken}`,accept:"application/json",prefer:"count=exact"},cache:"no-store",signal:grantDeadline,redirect:"error"});
-          if(!grantResponse.ok)throw new BusinessAccessError("Customer grant retrieval denied");
-          const grantRows:unknown=await grantResponse.json();
-          grantDeadline.throwIfAborted();
-          if(!Array.isArray(grantRows)||grantRows.length>1000||grantRows.some((g:unknown)=>!g||typeof g!=="object"||Array.isArray(g)||typeof (g as {territory_id?:unknown}).territory_id!=="string"||!(g as {territory_id:string}).territory_id.trim()))throw new BusinessAccessError("Invalid customer grants");
-          const range=grantResponse.headers.get("content-range");
-          if(offset===0&&grantRows.length===0&&range==="*/0")break;
-          const match=/^(\d+)-(\d+)\/(\d+)$/.exec(range??"");
-          if(!match)throw new BusinessAccessError("Customer grant completeness unavailable");
-          const [start,end,count]=match.slice(1).map(Number);
-          if(![start,end,count].every(Number.isSafeInteger)||start!==offset||end!==offset+grantRows.length-1||grantRows.length===0||count<=end||count>100_000||(total!==undefined&&total!==count))throw new BusinessAccessError("Inconsistent customer grant pagination");
-          total=count;
-          for(const row of grantRows){const id=(row as {territory_id:string}).territory_id;if(grantIds.has(id))throw new BusinessAccessError("Customer grant pagination did not advance");grantIds.add(id);}
-          offset+=grantRows.length;
-          if(offset===total)break;
-        }
-        const permittedTerritoryIds=[...grantIds];
-        const customerLinks=createCustomerLinksService(createCustomerLinksPostgrest(config.url,config.anonKey,fetcher));
-        const links=await customerLinks.list({tenantId:context.tenantId,userId:user.id,accessToken,permittedTerritoryIds},customerLinksMatch[1]);
-        return json(200,{links});
-      }
-
-      if(request.method==="GET"&&path==="/v1/clm/assets"){
-        const {accessToken,context}=await resolveTenantRequest(request);return json(200,{assets:await readClmAssets(context.tenantId,accessToken)});
-      }
-      if(request.method==="POST"&&path==="/v1/clm/assets"){
-        const {accessToken,user,context}=await resolveTenantRequest(request);return json(201,{asset:await createClmAsset(context.tenantId,user.id,accessToken,await readJsonObject(request,65536))});
-      }
-      if(request.method==="POST"&&path==="/v1/clm/sessions"){
-        const {accessToken,user,context}=await resolveTenantRequest(request);return json(201,{session:await recordClmSession(context.tenantId,user.id,accessToken,await readJsonObject(request,65536))});
-      }
-      if(request.method==="GET"&&path==="/v1/clm/sessions"){
+        grantUrl.searchPar      if(request.method==="GET"&&path==="/v1/manager/report-records"){
         const {accessToken,user,context}=await resolveTenantRequest(request);
-        const q=new URLSearchParams({select:"id,asset_id,visit_id,started_at,ended_at,provenance_id",tenant_id:`eq.${context.tenantId}`,actor_user_id:`eq.${user.id}`,order:"created_at.desc",limit:"200"});
-        const response=await fetcher(new URL("/rest/v1/clm_detailing_sessions?"+q,config.url).toString(),{headers:clmUserHeaders(accessToken),cache:"no-store"});
-        if(!response.ok)throw new ProviderError("CLM session history failed",response.status);
-        return json(200,{sessions:await response.json()});
+        return json(200,await buildManagerReportLedger(context.tenantId,user.id,accessToken));
+      }
+      if(request.method==="POST"&&path==="/v1/manager/report-export"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        const body=await readJsonObject(request,16_384);
+        const from=body.from==null||body.from===""?"":body.from,to=body.to==null||body.to===""?"":body.to;
+        const territoryId=body.territoryId==null?"":String(body.territoryId),ownerUserId=body.ownerUserId==null?"":String(body.ownerUserId);
+        if((from&&!validReportDate(from))||(to&&!validReportDate(to))||(from&&to&&String(from)>String(to)))throw new ApiError(400,"Invalid report date filter");
+        if(territoryId&&!CLM_UUID.test(territoryId))throw new ApiError(400,"Invalid territory filter");
+        if(ownerUserId&&!CLM_UUID.test(ownerUserId))throw new ApiError(400,"Invalid employee filter");
+        const ledger=await buildManagerReportLedger(context.tenantId,user.id,accessToken);
+        const rows=ledger.records.filter(r=>(!from||r.workDate>=String(from))&&(!to||r.workDate<=String(to))&&(!territoryId||r.territoryId===territoryId)&&(!ownerUserId||r.ownerUserId===ownerUserId));
+        const csv=managerReportCsv(rows);
+        const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(csv));
+        const contentSha256=[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,"0")).join("");
+        const snapshot={tenant_id:context.tenantId,actor_user_id:user.id,as_of:ledger.asOf,
+          filter:{from:String(from),to:String(to),territoryId,ownerUserId},source_ids:rows.map(r=>r.sourceId),row_count:rows.length,csv_text:csv,content_sha256:contentSha256};
+        const response=await fetcher(new URL("/rest/v1/manager_report_snapshots",config.url).toString(),{method:"POST",headers:clmAdminHeaders(),body:JSON.stringify(snapshot)});
+        if(!response.ok)throw new ProviderError("Manager report snapshot write failed",response.status);
+        const saved=(await response.json() as Array<Record<string,unknown>>)[0];if(!saved)throw new ApiError(502,"Report snapshot was not returned");
+        return json(201,{snapshotId:String(saved.id),asOf:ledger.asOf,rowCount:rows.length,contentSha256,csv});
       }
 
-      if (request.method === "GET" && path === "/v1/tenants") {
-        const accessToken = readBearerToken(request.headers.get("authorization"));
-        await identity.authenticate(request.headers.get("authorization"));
-        return json(200, { tenants: await tenants.listAccessible(accessToken) });
-      }
-
-      if (request.method === "GET" && path === "/v1/tenant-context") {
-        const { context } = await resolveTenantRequest(request);
-        return json(200, { context });
-      }
-
-      if (request.method === "GET" && path === "/v1/org-units") {
-        const { accessToken, context } = await resolveTenantRequest(request);
-        return json(200, { units: await organization.listUnits(context.tenantId, accessToken) });
-      }
-
-      if (request.method === "POST" && path === "/v1/org-units") {
-        const { accessToken, context } = await resolveTenantRequest(request);
-        const body = await readJsonObject(request);
-        const unit = await organization.createUnit(context.tenantId, accessToken, body);
-        return json(201, { unit });
-      }
-
-      if (request.method === "POST" && path === "/v1/org-assignments") {
+d === "POST" && path === "/v1/org-assignments") {
         const { accessToken, context } = await resolveTenantRequest(request);
         await organization.assignUser(context.tenantId, accessToken, await readJsonObject(request));
         return new Response(null, { status: 204 });
