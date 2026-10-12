@@ -15,7 +15,7 @@ import { allowedWorkspaceIds } from "./role-navigation";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
-  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall,
+  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall, type ClmAsset,
 } from "./terrevo-api";
 
 type Area = "overview" | "today" | "customers" | "activities" | "edetailing" | "field" | "plans" | "manager" | "admin" | "platform" | BusinessArea;
@@ -115,6 +115,16 @@ export default function App() {
   const [customerActivities,setCustomerActivities] = useState<CustomerActivity[]>([]);
   const [customerProfileLoading,setCustomerProfileLoading] = useState(false);
   const [customerProfileError,setCustomerProfileError] = useState<string|null>(null);
+  const [clmAssets,setClmAssets] = useState<ClmAsset[]>([]);
+  const [clmTitle,setClmTitle] = useState("");
+  const [clmCategory,setClmCategory] = useState("PRODUCT_DETAIL");
+  const [clmVersion,setClmVersion] = useState("1.0");
+  const [clmProduct,setClmProduct] = useState("");
+  const [clmSlideTitle,setClmSlideTitle] = useState("");
+  const [clmSlideBody,setClmSlideBody] = useState("");
+  const [clmEffectiveFrom,setClmEffectiveFrom] = useState("");
+  const [clmExpiresAt,setClmExpiresAt] = useState("");
+  const [clmProvenance,setClmProvenance] = useState("");
 
   function resetTenantState() {
     setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
@@ -122,7 +132,7 @@ export default function App() {
     setSelectedOption(""); setStopId(""); setGpsReason(""); setCallOutcome("");
     setCallRemarks(""); setShortDayReason("");
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
-    setFocusedCustomer(null); setCustomerRelations([]); setCustomerActivities([]); setCustomerProfileError(null); setCustomerProfileLoading(false); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
+    setFocusedCustomer(null); setCustomerRelations([]); setCustomerActivities([]); setCustomerProfileError(null); setCustomerProfileLoading(false); setClmAssets([]); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
     setOwnUnplanned([]);setPendingUnplanned([]);setUnplannedReviewComment("");
   }
 
@@ -157,7 +167,7 @@ export default function App() {
       const base = await Promise.allSettled([
         api.progress(), api.startOptions(), api.openVisit(), api.plans(), api.orgUnits(),
         ...MASTER_KINDS.map(k=>api.masters(k)),
-        api.ncaOptions(),api.ownNcaRecords(),api.ownUnplannedCalls(),
+        api.ncaOptions(),api.ownNcaRecords(),api.ownUnplannedCalls(),api.clmAssets(),
       ]);
       if (generation !== tenantGeneration.current) return;
       setProgress(base[0].status==="fulfilled"?base[0].value:null);
@@ -176,6 +186,8 @@ export default function App() {
       setNcaRecords(ncaRowsResult.status==="fulfilled"?ncaRowsResult.value as NcaRecord[]:[]);
       const unplannedResult=base[7+MASTER_KINDS.length];
       setOwnUnplanned(unplannedResult.status==="fulfilled"?unplannedResult.value as UnplannedCall[]:[]);
+      const clmResult=base[8+MASTER_KINDS.length];
+      setClmAssets(clmResult.status==="fulfilled"?clmResult.value as ClmAsset[]:[]);
       const failures=base.filter(result=>result.status==="rejected").length;
       if (failures) setNotice({kind:"info",title:"Partial data access",
         message:String(failures)+" API requests were denied or unavailable; previous tenant records have been cleared."});
@@ -483,8 +495,9 @@ export default function App() {
 
         {view==="edetailing" && <EDetailingView
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
-          contextKey={contextKey} products={masters.products??[]} assets={[]} today={localDate()}
-          linkedVisitId={visit?.id} loading={loading} />}
+          contextKey={contextKey} products={masters.products??[]} assets={clmAssets} today={localDate()}
+          linkedVisitId={visit?.id} loading={loading}
+          onSaveSessionDraft={draft=>api.saveClmSession(draft)} />}
 
         {view==="plans" && <MonthlyPlanner key={[contextKey,focusedCustomer?.kind??"",focusedCustomer?.id??""].join(":")}
           api={api} connected={connected} busy={busy} plans={plans} units={units} masters={masters}
@@ -558,6 +571,27 @@ export default function App() {
               <Button disabled={busy||!assignmentUser||(!assignmentScope&&assignmentRole!=="TENANT_ADMIN")} onClick={()=>guarded(()=>api.assignRole(assignmentUser,assignmentRole,assignmentRole==="TENANT_ADMIN"?null:assignmentScope),"Role assignment saved")}>Assign role</Button></div>
           </Panel>
         </div>:<Panel eyebrow="ADMIN PERMISSIONS" title="Tenant administration requires authorization"><p className="tr-detail">This area uses existing real organization and role APIs. It does not grant elevated access to a regular field user.</p></Panel>)}
+
+        {view==="admin"&&admin&&<Panel eyebrow="CONTROLLED CLM" title="Approve detailing content">
+          <p className="tr-detail">Approved metadata and slide content are tenant-scoped. Only authorized organization administrators can publish content through the server.</p>
+          <div className="tr-form">
+            <TextInput id="clm-title" labelText="Content title" value={clmTitle} onChange={e=>setClmTitle(e.target.value)} maxLength={160}/>
+            <TextInput id="clm-category" labelText="Category" value={clmCategory} onChange={e=>setClmCategory(e.target.value)} maxLength={80}/>
+            <TextInput id="clm-version" labelText="Version" value={clmVersion} onChange={e=>setClmVersion(e.target.value)} maxLength={40}/>
+            <label className="tr-select-label" htmlFor="clm-product">Product</label>
+            <select id="clm-product" className="tr-select" value={clmProduct} onChange={e=>setClmProduct(e.target.value)}>
+              <option value="">Select product</option>{(masters.products??[]).filter(x=>x.status==="active").map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+            <TextInput id="clm-slide-title" labelText="Slide title" value={clmSlideTitle} onChange={e=>setClmSlideTitle(e.target.value)} maxLength={160}/>
+            <TextArea id="clm-slide-body" labelText="Approved slide body" value={clmSlideBody} onChange={e=>setClmSlideBody(e.target.value)} maxLength={12000}/>
+            <label className="tr-select-label" htmlFor="clm-effective">Effective from</label><input id="clm-effective" className="tr-select" type="date" value={clmEffectiveFrom} onChange={e=>setClmEffectiveFrom(e.target.value)}/>
+            <label className="tr-select-label" htmlFor="clm-expires">Expires at</label><input id="clm-expires" className="tr-select" type="date" value={clmExpiresAt} onChange={e=>setClmExpiresAt(e.target.value)}/>
+            <TextInput id="clm-provenance" labelText="Approval / provenance reference" value={clmProvenance} onChange={e=>setClmProvenance(e.target.value)} maxLength={300}/>
+            <Button disabled={busy||!clmTitle.trim()||!clmCategory.trim()||!clmVersion.trim()||!clmProduct||!clmSlideTitle.trim()||!clmSlideBody||!clmProvenance.trim()||(clmEffectiveFrom&&clmExpiresAt&&clmExpiresAt<clmEffectiveFrom)}
+              onClick={()=>guarded(async()=>{await api.createClmAsset({title:clmTitle,category:clmCategory,version:clmVersion,productIds:[clmProduct],slides:[{id:crypto.randomUUID(),title:clmSlideTitle,body:clmSlideBody}],effectiveFrom:clmEffectiveFrom||null,expiresAt:clmExpiresAt||null,provenanceId:clmProvenance});setClmTitle("");setClmSlideTitle("");setClmSlideBody("");setClmProvenance("");},"CLM content approved")}>Approve and publish content</Button>
+          </div>
+          <p className="tr-detail">{clmAssets.length} approved catalog item(s) currently visible.</p>
+        </Panel>}
 
         {view==="admin"&&admin&&<Panel eyebrow="CONTROLLED NCA MASTER" title="Manage NCA categories and towns">
           <p className="tr-detail">NCA types and towns are client-controlled records; Terrevo does not invent categories or towns.</p>
