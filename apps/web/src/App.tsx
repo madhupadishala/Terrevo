@@ -503,7 +503,7 @@ export default function App() {
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
           contextKey={contextKey} products={masters.products??[]} assets={clmAssets} today={localDate()}
           linkedVisitId={visit?.id} loading={loading}
-          onSaveSessionDraft={draft=>api.saveClmSession(draft)} />}
+          onSaveSessionDraft={async draft=>{await api.saveClmSession(draft);}} />}
 
         {view==="plans" && <MonthlyPlanner key={[contextKey,focusedCustomer?.kind??"",focusedCustomer?.id??""].join(":")}
           api={api} connected={connected} busy={busy} plans={plans} units={units} masters={masters}
@@ -606,7 +606,7 @@ export default function App() {
             <label className="tr-select-label" htmlFor="clm-effective">Effective from</label><input id="clm-effective" className="tr-select" type="date" value={clmEffectiveFrom} onChange={e=>setClmEffectiveFrom(e.target.value)}/>
             <label className="tr-select-label" htmlFor="clm-expires">Expires at</label><input id="clm-expires" className="tr-select" type="date" value={clmExpiresAt} onChange={e=>setClmExpiresAt(e.target.value)}/>
             <TextInput id="clm-provenance" labelText="Approval / provenance reference" value={clmProvenance} onChange={e=>setClmProvenance(e.target.value)} maxLength={300}/>
-            <Button disabled={busy||!clmTitle.trim()||!clmCategory.trim()||!clmVersion.trim()||!clmProduct||!clmSlideTitle.trim()||!clmSlideBody||!clmProvenance.trim()||(clmEffectiveFrom&&clmExpiresAt&&clmExpiresAt<clmEffectiveFrom)}
+            <Button disabled={busy||!clmTitle.trim()||!clmCategory.trim()||!clmVersion.trim()||!clmProduct||!clmSlideTitle.trim()||!clmSlideBody||!clmProvenance.trim()||Boolean(clmEffectiveFrom&&clmExpiresAt&&clmExpiresAt<clmEffectiveFrom)}
               onClick={()=>guarded(async()=>{await api.createClmAsset({title:clmTitle,category:clmCategory,version:clmVersion,productIds:[clmProduct],slides:[{id:crypto.randomUUID(),title:clmSlideTitle,body:clmSlideBody}],effectiveFrom:clmEffectiveFrom||null,expiresAt:clmExpiresAt||null,provenanceId:clmProvenance});setClmTitle("");setClmSlideTitle("");setClmSlideBody("");setClmProvenance("");},"CLM content approved")}>Approve and publish content</Button>
           </div>
           <p className="tr-detail">{clmAssets.length} approved catalog item(s) currently visible.</p>
