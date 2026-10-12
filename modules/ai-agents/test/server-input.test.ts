@@ -59,3 +59,18 @@ test("Follow-up Action uses only an explicitly persisted nextAction",()=>{
  assert.deepEqual(empty.draft_actions,[]);
  assert.equal((empty.ambiguous_items as any[]).length,1);
 });
+
+
+test("Expense Audit flags only persisted over-limit and duplicate claim evidence",()=>{
+ const input=buildDeterministicAgentInput("AI-10",{
+  expensePolicies:[{category:"TRAVEL",maxMinor:10000,currency:"INR",effectiveFrom:"2026-01-01",expiresAt:"2026-12-31",policyId:"policy-1"}],
+  expenseClaims:[
+   {id:"claim-1",ownerUserId:"u1",workDate:"2026-10-13",currencyCode:"INR",status:"SUBMITTED",lines:[{sequence:1,category:"TRAVEL",amount:125}]},
+   {id:"claim-2",ownerUserId:"u1",workDate:"2026-10-13",currencyCode:"INR",status:"SUBMITTED",lines:[{sequence:1,category:"TRAVEL",amount:125}]},
+  ],
+ });
+ assert.equal((input.flags as any[]).length,2);
+ assert.equal((input.flags as any[])[0].rule_id,"POLICY_LIMIT_EXCEEDED");
+ assert.equal((input.possible_duplicates as any[]).length,1);
+ assert.deepEqual((input.possible_duplicates as any[])[0].claim_ids,["claim-1","claim-2"]);
+});
