@@ -561,6 +561,16 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
           try{snapshots.rcpa=await rcpa.get(context.tenantId,accessToken,subject.id) as unknown as Record<string,unknown>;}catch(error){if(!(error instanceof RcpaNotFoundError))throw error;}
         }
         if(agentId==="AI-09")snapshots.clmAssets=await readClmAssets(context.tenantId,accessToken) as unknown as Array<Record<string,unknown>>;
+        if(agentId==="AI-10"){
+          snapshots.expenseClaims=await expenses.list(context.tenantId,accessToken) as unknown as Array<Record<string,unknown>>;
+          const q=new URLSearchParams({select:"category,max_minor,currency_code,effective_from,expires_at,policy_ref",tenant_id:`eq.${context.tenantId}`,order:"effective_from.desc",limit:"1000"});
+          const response=await fetcher(new URL("/rest/v1/expense_policy_limits?"+q,config.url).toString(),{headers:clmAdminHeaders(),cache:"no-store"});
+          if(!response.ok)throw new ProviderError("Expense policy evidence failed",response.status);
+          snapshots.expensePolicies=(await response.json() as Array<Record<string,unknown>>).map(x=>({
+            category:String(x.category),maxMinor:Number(x.max_minor),currency:String(x.currency_code),
+            effectiveFrom:String(x.effective_from),expiresAt:String(x.expires_at),policyId:String(x.policy_ref),
+          }));
+        }
         if(agentId==="AI-11")snapshots.inventory=await inventory.listBalances(context.tenantId,accessToken) as unknown as Array<Record<string,unknown>>;
         if(agentId==="AI-13"&&subject&&typeof subject.id==="string"&&CLM_UUID.test(subject.id)){
           try{snapshots.doctorCall=await doctorCalls.getByVisit(context.tenantId,accessToken,subject.id) as unknown as Record<string,unknown>;}
