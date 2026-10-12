@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Tag, TextArea, TextInput } from "@carbon/react";
-import { freshPosition, type FieldVisit, type Master, type Progress, type TerrevoWebApi } from "./terrevo-api";
-import { WorkforceEvidenceView, type Claim, type ReceiptManifest } from "./features/workforce-evidence/WorkforceEvidenceView";
+import { freshPosition, type FieldVisit, type Master, type Progress, type TerrevoWebApi, type WorkforceEvidencePayload } from "./terrevo-api";
+import { WorkforceEvidenceView, type Claim } from "./features/workforce-evidence/WorkforceEvidenceView";
 
 export type BusinessArea = "trade" | "inventory" | "workforce" | "approvals" | "reports";
 
@@ -51,7 +51,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, admin, tenant
   const [weeks, setWeeks] = useState<Week[]>([]);
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [evidenceExpenses,setEvidenceExpenses]=useState<Expense[]>([]);
+  const [workforceEvidence,setWorkforceEvidence]=useState<WorkforceEvidencePayload|null>(null);
   const [joint, setJoint] = useState<Joint[]>([]);
   const [approvals, setApprovals] = useState<{leaves:Approval[];expenses:Approval[];timesheets:Approval[]}>({leaves:[],expenses:[],timesheets:[]});
   const [currentRcpa, setCurrentRcpa] = useState<string>("");
@@ -73,6 +73,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, admin, tenant
   const [expenseCategory, setExpenseCategory] = useState<"TRAVEL"|"MEAL"|"LODGING"|"LOCAL_CONVEYANCE"|"OTHER">("TRAVEL");
   const [expenseAmount, setExpenseAmount] = useState(0);
   const [expenseCurrency, setExpenseCurrency] = useState("INR");
+  const [expenseReceiptReference,setExpenseReceiptReference]=useState("");
   const [comment, setComment] = useState("");
 
   const activeStop = progress?.stops.find(s=>s.planStopId === visit?.planStopId);
@@ -83,7 +84,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, admin, tenant
   useEffect(() => {
     if (!connected) {
       setDcrs([]);setBalances([]);setDistributions([]);setDays([]);setWeeks([]);setAttendance([]);setGpsExceptions([]);
-      setLeaves([]);setExpenses([]);setEvidenceExpenses([]);setJoint([]);setApprovals({leaves:[],expenses:[],timesheets:[]});
+      setLeaves([]);setExpenses([]);setWorkforceEvidence(null);setJoint([]);setApprovals({leaves:[],expenses:[],timesheets:[]});
       return;
     }
     let live = true;
@@ -102,7 +103,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, admin, tenant
           if(visit){const dist=await api.distributions(visit.id);if(live)setDistributions(dist);}else if(live)setDistributions([]);
         }
         if(mode==="workforce") {
-          const all=await Promise.allSettled([api.dailyTimesheets(),api.weeklyTimesheets(),api.leaves(),api.expenses(),api.jointWork(),api.attendance(),manager?api.visibleExpenses():api.expenses()]);
+          const all=await Promise.allSettled([api.dailyTimesheets(),api.weeklyTimesheets(),api.leaves(),api.expenses(),api.jointWork(),api.attendance(),api.workforceEvidence()]);
           if(!live)return;
           setDays(all[0].status==="fulfilled"?all[0].value:[]);
           setWeeks(all[1].status==="fulfilled"?all[1].value:[]);
@@ -110,7 +111,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, admin, tenant
           setExpenses(all[3].status==="fulfilled"?all[3].value:[]);
           setJoint(all[4].status==="fulfilled"?all[4].value:[]);
           setAttendance(all[5].status==="fulfilled"?all[5].value:[]);
-          setEvidenceExpenses(all[6].status==="fulfilled"?all[6].value:[]);
+          setWorkforceEvidence(all[6].status==="fulfilled"?all[6].value:null);
           const failed=all.filter(x=>x.status==="rejected").length;
           if(failed)setMessage(String(failed)+" workforce APIs were unavailable for this account.");
         }
@@ -208,21 +209,21 @@ export function BusinessWorkspace({ mode, api, connected, manager, admin, tenant
             {["TRAVEL","MEAL","LODGING","LOCAL_CONVEYANCE","OTHER"].map(x=><option key={x} value={x}>{x.replace("_"," ")}</option>)}</select>
           <TextInput id="expense-amount" type="number" labelText="Amount" value={String(expenseAmount)} onChange={e=>setExpenseAmount(Number(e.target.value))}/>
           <TextInput id="expense-currency" labelText="Currency (ISO 4217)" value={expenseCurrency} maxLength={3} onChange={e=>setExpenseCurrency(e.target.value.toUpperCase())}/>
-          <Button disabled={!canAct||!progress||!(expenseAmount>0)||!/^[A-Z]{3}$/.test(expenseCurrency)} onClick={()=>progress&&void act(()=>api.saveExpense(progress.executionId,expenseCurrency,expenseAmount,expenseCategory,null),"Expense claim saved")}>Save expense</Button></div>
+          <TextInput id="expense-receipt-reference" labelText="Receipt/document reference (optional)" value={expenseReceiptReference} maxLength={500} onChange={e=>setExpenseReceiptReference(e.target.value)}/>
+          <Button disabled={!canAct||!progress||!(expenseAmount>0)||!/^[A-Z]{3}$/.test(expenseCurrency)} onClick={()=>progress&&void act(async()=>{await api.saveExpense(progress.executionId,expenseCurrency,expenseAmount,expenseCategory,null,expenseReceiptReference.trim()||null);setExpenseReceiptReference("");},"Expense claim saved")}>Save expense</Button></div>
       </Box>
       <Box title="Attendance history">{attendance.length?attendance.map(a=><Entry key={a.workDate} heading={a.workDate} detail={(a.workedMinutes??0)+" of "+(a.requiredMinutes??0)+" minutes recorded"} status={a.status}/>):empty}</Box>
       <WorkforceEvidenceView
-        scope={{tenantId,authorizedForTenantId:tenantId,contextKey,viewerUserId:api.currentUserId??"",role:admin?"ADMIN":manager?"MANAGER":"FIELD",permittedUserIds:[...new Set(evidenceExpenses.map(x=>x.ownerUserId).filter(Boolean))]}}
-        claims={evidenceExpenses.filter(x=>x.ownerUserId).map((x):Claim=>({
+        scope={{tenantId,authorizedForTenantId:tenantId,contextKey,viewerUserId:api.currentUserId??"",role:admin?"ADMIN":manager?"MANAGER":"FIELD",permittedUserIds:[...new Set((workforceEvidence?.claims??[]).map(x=>x.ownerUserId).filter(Boolean))]}}
+        claims={(workforceEvidence?.claims??[]).filter(x=>x.ownerUserId).map((x):Claim=>({
           id:x.id,tenantId,ownerUserId:x.ownerUserId,workDate:x.workDate,currency:x.currencyCode,
           serverTotalMinor:Math.round(x.totalAmount*100),status:x.status as Claim["status"],
-          lines:x.lines.map(line=>({id:x.id+":"+line.sequence,category:line.category,amountMinor:Math.round(line.amount*100),receiptRequired:false})),
-          sourceId:x.id,asOf:new Date().toISOString(),
+          lines:x.lines.map(line=>({id:x.id+":"+line.sequence,category:line.category,amountMinor:Math.round(line.amount*100),receiptRequired:Boolean(line.receiptReference)})),
+          sourceId:x.id,asOf:workforceEvidence?.asOf??new Date().toISOString(),
         }))}
-        receipts={evidenceExpenses.flatMap(x=>x.lines.filter(line=>line.receiptReference).map((line):ReceiptManifest=>({
-          id:x.id+":"+line.sequence+":receipt",tenantId,claimId:x.id,lineId:x.id+":"+line.sequence,status:"PENDING",documentRef:line.receiptReference!,
-        })))}
-        travel={[]} attendance={[]} policies={[]} loading={false}
+        receipts={workforceEvidence?.receipts??[]} travel={workforceEvidence?.travel??[]} attendance={workforceEvidence?.attendance??[]} policies={workforceEvidence?.policies??[]} loading={!workforceEvidence}
+        onVerifyReceipt={manager?async ({claimId,lineId})=>{const sequence=Number(lineId.slice(lineId.lastIndexOf(":")+1));await act(()=>api.reviewReceipt(claimId,sequence,"VERIFY",null),"Receipt verified");}:undefined}
+        onRevokeReceipt={manager?async ({claimId,lineId})=>{const sequence=Number(lineId.slice(lineId.lastIndexOf(":")+1));await act(()=>api.reviewReceipt(claimId,sequence,"REVOKE",null),"Receipt verification revoked");}:undefined}
       />
       <Box title="Joint fieldwork">
         {joint.length?joint.map(x=><Entry key={x.id} heading={x.workDate} detail={"Assigned employee "+x.targetEmployeeId.slice(0,8)+" · "+(x.selfRole??"Participant")} status={x.status}>
