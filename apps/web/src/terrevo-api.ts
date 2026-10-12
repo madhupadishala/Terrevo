@@ -293,6 +293,9 @@ export class TerrevoWebApi {
   async customerHistory(kind:"doctor"|"chemist"|"stockist",customerId:string):Promise<Array<{tenantId:string;customerKind:"doctor"|"chemist"|"stockist";customerId:string;id:string;occurredAt:string;activityType:string;summary:string}>> {
     return (await this.raw("/v1/customers/"+kind+"/"+encodeURIComponent(customerId)+"/history") as {history:Array<{tenantId:string;customerKind:"doctor"|"chemist"|"stockist";customerId:string;id:string;occurredAt:string;activityType:string;summary:string}>}).history;
   }
+  async exportManagerReport(filter:{from:string;to:string;territoryId:string;ownerUserId:string}):Promise<{snapshotId:string;asOf:string;rowCount:number;contentSha256:string;csv:string}> {
+    return await this.raw("/v1/manager/report-export","POST",filter) as {snapshotId:string;asOf:string;rowCount:number;contentSha256:string;csv:string};
+  }
   async managerReportRecords():Promise<ManagerReportLedger> {
     return await this.raw("/v1/manager/report-records") as ManagerReportLedger;
   }
