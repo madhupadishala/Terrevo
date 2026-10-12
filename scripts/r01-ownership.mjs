@@ -47,7 +47,8 @@ export function parseNameStatusZ(text) {
   return paths;
 }
 export function ownerForBranch(branch, assignment, integrationScope) {
-  const registeredOwner = branch && branch === integrationScope?.branch ? 'integrator' : /^feature\/terrevo-s(09-customer-relations|11-clm-library|13-workforce-evidence|14-manager-reporting)-ui$/.test(branch)
+  const integrationBranches = Array.isArray(integrationScope?.integrationBranches) ? integrationScope.integrationBranches : [integrationScope?.branch].filter(Boolean);
+  const registeredOwner = branch && integrationBranches.includes(branch) ? 'integrator' : /^feature\/terrevo-s(09-customer-relations|11-clm-library|13-workforce-evidence|14-manager-reporting)-ui$/.test(branch)
     ? 'engineer2'
     : ['chore/r01-repository-consolidation', 'feature/ui-live-role-workspaces', 'chore/terrevo-trusted-scope-policy'].includes(branch) ? 'engineer1' : null;
   if (!registeredOwner) throw new Error('Unregistered engineer branch');
