@@ -13,7 +13,7 @@ export function allowedWorkspaceIds(input: {
   if (!input.authenticated) return new Set(["overview"]);
   if (!input.connected) return new Set(input.isPlatformAdmin ? ["overview","platform"] : ["overview"]);
   const roleSet = new Set(input.roles);
-  const base = roleSet.has("TENANT_ADMIN") ? ADMIN : roleSet.has("MANAGER") ? MANAGER : EMPLOYEE;
+  const base = roleSet.has("TENANT_ADMIN") ? ADMIN : roleSet.has("MANAGER") ? MANAGER : roleSet.has("MR") ? EMPLOYEE : ["overview"] as const;
   const ids = new Set<string>(base);
   if (input.isPlatformAdmin) ids.add("platform");
   return ids;
