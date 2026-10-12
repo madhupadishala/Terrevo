@@ -232,6 +232,8 @@
     "database/migrations/20261012203000_clm_catalog_sessions.sql",
     "database/migrations/20261012211000_workforce_evidence_governance.down.sql",
     "database/migrations/20261012211000_workforce_evidence_governance.sql",
+    "database/migrations/20261012214500_manager_report_snapshots.down.sql",
+    "database/migrations/20261012214500_manager_report_snapshots.sql",
     "database/migrations/9999b_trusted_audit_actor_attribution.down.sql",
     "database/migrations/9999b_trusted_audit_actor_attribution.sql",
     "database/migrations/9999c_trigger_function_privileges.down.sql",
