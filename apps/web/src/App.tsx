@@ -8,7 +8,7 @@ import { Customer360View } from "./features/customer360/Customer360View";
 import { ActivitiesView } from "./features/activities/ActivitiesView";
 import { EDetailingView } from "./features/edetailing/EDetailingView";
 import { TodayIntelligenceView } from "./features/intelligence/TodayIntelligenceView";
-import { ManagerReportingView, reportCsv } from "./features/manager-reporting/ManagerReportingView";
+import { ManagerReportingView } from "./features/manager-reporting/ManagerReportingView";
 import { localDate } from "./plan-calendar";
 import { customerRelationships } from "./customer-links-adapter";
 import type { CustomerActivity, CustomerRelationship } from "./features/customer360/model";
@@ -559,12 +559,14 @@ export default function App() {
             permittedTeamUserIds:[...new Set(managerReportRecords.map(r=>r.ownerUserId))],
             asOf:managerReportAsOf||new Date().toISOString()}}
           records={managerReportRecords} loading={loading} error={managerReportError}
-          onRequestCsv={({filter})=>{
-            const from=filter.from,to=filter.to,territory=filter.territoryId,user=filter.ownerUserId;
-            const rows=managerReportRecords.filter(r=>(!from||r.workDate>=from)&&(!to||r.workDate<=to)&&(!territory||r.territoryId===territory)&&(!user||r.ownerUserId===user));
-            const blob=new Blob([reportCsv(rows)],{type:"text/csv;charset=utf-8"});
-            const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="terrevo-manager-report.csv";link.click();URL.revokeObjectURL(url);
-          }} />}
+          onRequestCsv={({filter})=>{void (async()=>{
+            try{
+              const exported=await api.exportManagerReport(filter);
+              const blob=new Blob([exported.csv],{type:"text/csv;charset=utf-8"});
+              const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="terrevo-manager-report-"+exported.snapshotId+".csv";link.click();URL.revokeObjectURL(url);
+              setNotice({kind:"success",title:"Report snapshot created",message:exported.rowCount+" authorized row(s) exported and preserved as immutable snapshot "+exported.snapshotId.slice(0,8)+"."});
+            }catch(error){setNotice({kind:"error",title:"Report export failed",message:errText(error)});}
+          })();}} />}
 
         {view==="admin"&&(admin?<div className="tr-grid-wide">
           <Panel eyebrow="ORGANIZATION STRUCTURE" title="Manage reporting hierarchy">
