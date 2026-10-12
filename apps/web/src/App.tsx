@@ -16,6 +16,7 @@ import { localDate } from "./plan-calendar";
 import { customerRelationships } from "./customer-links-adapter";
 import type { CustomerActivity, CustomerRelationship } from "./features/customer360/model";
 import { allowedWorkspaceIds } from "./role-navigation";
+import { parseMasterCsv } from "./master-import";
 import { authorizedCustomerRefs, patientSafeHistory, relationshipEvidenceWithTargets, workforceEvidenceModels } from "./v32-feature-adapters";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
@@ -146,6 +147,9 @@ export default function App() {
   const [fieldSettings,setFieldSettings]=useState<FieldSettings|null>(null);
   const [gpsRadius,setGpsRadius]=useState<50|100|200>(100);
   const [gpsAccuracy,setGpsAccuracy]=useState(50);
+  const [importKind,setImportKind]=useState("doctors");
+  const [importCsv,setImportCsv]=useState("");
+  const [importPreview,setImportPreview]=useState<Array<Record<string,unknown>>>([]);
 
   function resetTenantState() {
     setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
@@ -647,6 +651,28 @@ export default function App() {
               <Button disabled={busy||!assignmentUser||(!assignmentScope&&assignmentRole!=="TENANT_ADMIN")} onClick={()=>guarded(()=>api.assignRole(assignmentUser,assignmentRole,assignmentRole==="TENANT_ADMIN"?null:assignmentScope),"Role assignment saved")}>Assign role</Button></div>
           </Panel>
         </div>:<Panel eyebrow="ADMIN PERMISSIONS" title="Tenant administration requires authorization"><p className="tr-detail">This area uses existing real organization and role APIs. It does not grant elevated access to a regular field user.</p></Panel>)}
+
+        {view==="admin"&&admin&&<Panel eyebrow="CONTROLLED IMPORT" title="Preview and atomically import master data">
+          <p className="tr-detail">CSV is parsed locally, then revalidated by the server. Preview never writes. Execute runs one database transaction; any invalid row rolls back the entire batch.</p>
+          <div className="tr-form">
+            <label className="tr-select-label" htmlFor="import-kind">Master type</label>
+            <select id="import-kind" className="tr-select" value={importKind} onChange={e=>{setImportKind(e.target.value);setImportPreview([]);}}>
+              {MASTER_KINDS.map(kind=><option key={kind} value={kind}>{kind}</option>)}
+            </select>
+            <TextArea id="master-import-csv" labelText="CSV (maximum 200 rows / 128 KiB)" value={importCsv}
+              onChange={e=>{setImportCsv(e.target.value);setImportPreview([]);}} maxLength={131072}/>
+            <div className="tr-button-row">
+              <Button kind="secondary" disabled={busy||!importCsv.trim()} onClick={()=>guarded(async()=>{
+                const rows=parseMasterCsv(importCsv);const preview=await api.masterImport(importKind,rows,true);setImportPreview(preview.rows??[]);
+              },"Import preview validated")}>Validate preview</Button>
+              <Button disabled={busy||importPreview.length===0} onClick={()=>guarded(async()=>{
+                const result=await api.masterImport(importKind,importPreview,false);
+                setImportCsv("");setImportPreview([]);setNotice({kind:"success",title:"Master import complete",message:String(result.inserted??0)+" rows committed atomically."});
+              },"Master import complete")}>Execute atomic import</Button>
+            </div>
+          </div>
+          {importPreview.length>0&&<p className="tr-detail">{importPreview.length} validated row(s) ready to execute. Any database constraint failure cancels the whole batch.</p>}
+        </Panel>}
 
         {view==="admin"&&admin&&<Panel eyebrow="FIELD POLICY" title="GPS and geofence controls">
           <p className="tr-detail">These server-enforced settings apply to field check-in validation for this tenant. Browser UI cannot bypass them.</p>
