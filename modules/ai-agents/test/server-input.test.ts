@@ -74,3 +74,26 @@ test("Expense Audit flags only persisted over-limit and duplicate claim evidence
  assert.equal((input.possible_duplicates as any[]).length,1);
  assert.deepEqual((input.possible_duplicates as any[])[0].claim_ids,["claim-1","claim-2"]);
 });
+
+
+test("Pre-Call Intelligence uses verified history and approved CLM only",()=>{
+ const input=buildDeterministicAgentInput("AI-03",{
+  customerHistory:[{id:"visit-1",occurredAt:"2026-10-01T10:00:00Z",summary:"Discussed product",activityType:"Doctor call"}],
+  clmAssets:[
+   {id:"asset-1",status:"APPROVED",version:"1",productIds:["p1"],regionCodes:["GLOBAL"]},
+   {id:"asset-2",status:"WITHDRAWN",version:"1",productIds:["p1"],regionCodes:["GLOBAL"]},
+  ],
+ });
+ assert.equal(input.last_contact_at,"2026-10-01T10:00:00Z");
+ assert.deepEqual(input.approved_material_ids,["asset-1"]);
+ assert.deepEqual((input.briefing_sections as any[])[0].evidence_ids,["visit-1"]);
+});
+
+test("Customer Relationship uses only verified history and does not invent links",()=>{
+ const input=buildDeterministicAgentInput("AI-08",{customerHistory:[
+  {id:"visit-1",occurredAt:"2026-01-01T10:00:00Z",summary:"Verified call",activityType:"Doctor call"},
+ ]});
+ assert.equal((input.engagement_gaps as any[]).length,1);
+ assert.deepEqual(input.link_warnings,[]);
+ assert.deepEqual((input.evidence as any[]).map(x=>x.source_id),["visit-1"]);
+});
