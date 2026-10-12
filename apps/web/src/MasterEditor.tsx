@@ -11,10 +11,11 @@ export function MasterEditor({kind,units,products,disabled,perform}:Props){
   const [scope,setScope]=useState(""); const [specialty,setSpecialty]=useState("");
   const [designation,setDesignation]=useState(""); const [productId,setProductId]=useState("");
   const [address,setAddress]=useState(""); const [genericName,setGenericName]=useState("");
+  const [manufacturer,setManufacturer]=useState("");
   const [category,setCategory]=useState("");const [unit,setUnit]=useState("");
   const [latitude,setLatitude]=useState("");const [longitude,setLongitude]=useState("");
   const [visitFrequency,setVisitFrequency]=useState(1);
-  const requiredScope=kind==="employees" ? "" : ["products","samples","gifts"].includes(kind)?"division":"territory";
+  const requiredScope=kind==="employees" ? "" : ["products","competitors","samples","gifts"].includes(kind)?"division":"territory";
   const scoped=units.filter(u=>u.status==="active"&&(!requiredScope||u.type===requiredScope));
   const location=()=>({
     latitude:latitude.trim()?Number(latitude):null,
@@ -24,6 +25,7 @@ export function MasterEditor({kind,units,products,disabled,perform}:Props){
     const base:Record<string,unknown>={code:code.trim().toUpperCase(),name:name.trim()};
     if(kind==="employees")return {...base,orgUnitId:scope,designation:designation.trim(),userId:null,reportingManagerEmployeeId:null};
     if(kind==="products")return {...base,divisionId:scope,genericName:genericName.trim()||null};
+    if(kind==="competitors")return {...base,divisionId:scope,manufacturer:manufacturer.trim()||null};
     if(kind==="samples")return {...base,divisionId:scope,productId,unit:unit.trim()||null};
     if(kind==="gifts")return {...base,divisionId:scope,category:category.trim()||null};
     if(kind==="doctors")return {...base,territoryId:scope,specialty:specialty.trim(),category:category.trim()||null,clinic:null,address:address.trim()||null,...location(),visitFrequency};
@@ -46,7 +48,7 @@ export function MasterEditor({kind,units,products,disabled,perform}:Props){
       </select>
       {kind==="employees"&&<TextInput id="master-designation" labelText="Designation" value={designation} onChange={e=>setDesignation(e.target.value)}/>}
       {kind==="doctors"&&<><TextInput id="master-specialty" labelText="Medical specialty" value={specialty} onChange={e=>setSpecialty(e.target.value)}/><TextInput id="master-category" labelText="Category (optional)" value={category} onChange={e=>setCategory(e.target.value)}/></>}
-      {kind==="products"&&<TextInput id="master-generic" labelText="Generic ingredient (optional)" value={genericName} onChange={e=>setGenericName(e.target.value)}/>}
+      {kind==="products"&&<TextInput id="master-generic" labelText="Generic ingredient (optional)" value={genericName} onChange={e=>setGenericName(e.target.value)}/>}\n      {kind==="competitors"&&<TextInput id="master-manufacturer" labelText="Manufacturer (optional)" value={manufacturer} onChange={e=>setManufacturer(e.target.value)}/>}
       {kind==="samples"&&<><label className="tr-select-label" htmlFor="master-product">Related product</label>
         <select className="tr-select" id="master-product" value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Select product</option>
           {products.filter(p=>p.status==="active").map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>
