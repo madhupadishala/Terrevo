@@ -67,7 +67,7 @@ export type ManagerAnalytics = {
   coverage: { plannedStops: number; completedVisits: number; doctorCalls: number; chemistCalls: number; stockistCalls: number };
 };
 export type Coordinates = { latitude: number; longitude: number; accuracyMeters: number };
-export type ClmAsset = {id:string;tenantId:string;title:string;category:string;version:string;status:"APPROVED"|"DRAFT"|"WITHDRAWN"|"EXPIRED";productIds:string[];slides:Array<{id:string;title:string;body:string}>;effectiveFrom?:string;expiresAt?:string;provenanceId:string;approvedBy:string;approvedAt:string};
+export type ClmAsset = {id:string;tenantId:string;title:string;category:string;version:string;status:"APPROVED"|"DRAFT"|"WITHDRAWN"|"EXPIRED";productIds:string[];regionCodes:string[];contentType:string;objectPath:string|null;slides:Array<{id:string;title:string;body:string}>;effectiveFrom?:string;expiresAt?:string;provenanceId:string;approvedBy:string;approvedAt:string};
 export type ClmSessionDraft = {tenantId:string;assetId:string;productIds:string[];startedAt:string;endedAt:string;slideVisits:Array<{slideId:string;durationMs:number}>;linkedVisitId?:string};
 export type { CustomerLink } from "../../../modules/business-customer-links/src/index.ts";
 import type { CustomerLink } from "../../../modules/business-customer-links/src/index.ts";
@@ -302,8 +302,14 @@ export class TerrevoWebApi {
   async clmAssets():Promise<ClmAsset[]> {
     return (await this.raw("/v1/clm/assets") as {assets:ClmAsset[]}).assets;
   }
-  async createClmAsset(input:{title:string;category:string;version:string;productIds:string[];slides:Array<{id:string;title:string;body:string}>;effectiveFrom:string|null;expiresAt:string|null;provenanceId:string}):Promise<ClmAsset> {
+  async createClmAsset(input:{title:string;category:string;version:string;productIds:string[];regionCodes:string[];slides:Array<{id:string;title:string;body:string}>;effectiveFrom:string|null;expiresAt:string|null;provenanceId:string;contentType?:string;fileName?:string;binaryBase64?:string}):Promise<ClmAsset> {
     return (await this.raw("/v1/clm/assets","POST",input) as {asset:ClmAsset}).asset;
+  }
+  async clmBinaryDownload(assetId:string):Promise<{url:string;expiresIn:number;contentType:string}> {
+    return await this.raw("/v1/clm/assets/"+encodeURIComponent(assetId)+"/download") as {url:string;expiresIn:number;contentType:string};
+  }
+  async setClmAssetStatus(assetId:string,status:"WITHDRAWN"|"EXPIRED"):Promise<ClmAsset> {
+    return (await this.raw("/v1/clm/assets/"+encodeURIComponent(assetId)+"/status","PATCH",{status}) as {asset:ClmAsset}).asset;
   }
   async saveClmSession(draft:ClmSessionDraft) {
     if(!draft.linkedVisitId)throw new ApiFailure(400,"An active checked-in visit is required for detailing.");
