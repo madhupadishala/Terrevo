@@ -565,7 +565,17 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
         const {accessToken,context}=await resolveTenantRequest(request);return json(200,{assets:await readClmAssets(context.tenantId,accessToken)});
       }
       if(request.method==="POST"&&path==="/v1/clm/assets"){
-        const {accessToken,user,context}=await resolveTenantRequest(request);return json(201,{asset:await createClmAsset(context.tenantId,user.id,accessToken,await readJsonObject(request,65536))});
+        const {accessToken,user,context}=await resolveTenantRequest(request);return json(201,{asset:await createClmAsset(context.tenantId,user.id,accessToken,await readJsonObject(request,7_500_000))});
+      }
+      const clmDownload=/^\/v1\/clm\/assets\/([^/]+)\/download$/.exec(path);
+      if(request.method==="GET"&&clmDownload){
+        const {accessToken,context}=await resolveTenantRequest(request);return json(200,await signClmBinary(context.tenantId,clmUuid(clmDownload[1],"assetId"),accessToken));
+      }
+      const clmStatus=/^\/v1\/clm\/assets\/([^/]+)\/status$/.exec(path);
+      if(request.method==="PATCH"&&clmStatus){
+        const {accessToken,context}=await resolveTenantRequest(request),body=await readJsonObject(request);
+        if(body.status!=="WITHDRAWN"&&body.status!=="EXPIRED")throw new ApiError(400,"status must be WITHDRAWN or EXPIRED");
+        return json(200,{asset:await setClmAssetStatus(context.tenantId,clmUuid(clmStatus[1],"assetId"),accessToken,body.status)});
       }
       if(request.method==="POST"&&path==="/v1/clm/sessions"){
         const {accessToken,user,context}=await resolveTenantRequest(request);return json(201,{session:await recordClmSession(context.tenantId,user.id,accessToken,await readJsonObject(request,65536))});
