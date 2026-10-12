@@ -8,7 +8,7 @@ test("controlled CSV parser handles quoted commas and numeric fields",()=>{
 });
 
 test("controlled CSV parser handles embedded newlines and escaped quotes",()=>{
- const rows=parseMasterCsv('code,name,address,territory_id\nC1,Chemist,"Line 1\n\"Suite\" 2",11111111-1111-4111-8111-111111111111');
+ const rows=parseMasterCsv('code,name,address,territory_id\nC1,Chemist,"Line 1\n""Suite"" 2",11111111-1111-4111-8111-111111111111');
  assert.equal(rows[0].address,'Line 1\n"Suite" 2');
 });
 
