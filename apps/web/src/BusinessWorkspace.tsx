@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Tag, TextArea, TextInput } from "@carbon/react";
 import { freshPosition, type FieldVisit, type Master, type Progress, type TerrevoWebApi } from "./terrevo-api";
+import { WorkforceEvidenceView, type Claim, type ReceiptManifest } from "./features/workforce-evidence/WorkforceEvidenceView";
 
 export type BusinessArea = "trade" | "inventory" | "workforce" | "approvals" | "reports";
 
@@ -9,6 +10,9 @@ type Props = {
   api: TerrevoWebApi;
   connected: boolean;
   manager: boolean;
+  admin: boolean;
+  tenantId: string;
+  contextKey: string;
   busy: boolean;
   visit: FieldVisit | null;
   progress: Progress | null;
@@ -21,7 +25,7 @@ type Dist = { id: string; itemType: "sample" | "gift"; itemId: string; quantity:
 type Day = { id: string; workDate: string; totalMinutes: number; visitMinutes: number; status: string; callCount: number };
 type Week = { id: string; weekStart: string; status: string; totalMinutes: number; dailyCount: number };
 type Leave = { id: string; leaveType: string; startDate: string; endDate: string; reason: string; status: string };
-type Expense = { id: string; workDate: string; totalAmount: number; currencyCode: string; status: string; executionId: string };
+type Expense = { id: string; executionId:string; employeeId:string; ownerUserId:string; orgUnitId:string; workDate: string; totalAmount: number; currencyCode: string; status: string; lines:Array<{sequence:number;category:string;amount:number;remarks:string|null;receiptReference:string|null}> };
 type Joint = { id: string; workDate: string; status: string; targetEmployeeId: string; selfRole: string | null };
 type Approval = { id: string; status: string; employeeId: string; weekStart?: string; leaveType?: string; startDate?: string; endDate?: string; totalAmount?: number; currencyCode?: string };
 function Box({ title, children }: { title: string; children: React.ReactNode }) {
@@ -35,7 +39,7 @@ const thisMonday = () => { const d = new Date();d.setDate(d.getDate() - ((d.getD
 const thisDate = () => localDate(new Date());
 const empty = <p className="tr-detail">No authorized records were returned for this workspace.</p>;
 
-export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, progress, masters, perform }: Props) {
+export function BusinessWorkspace({ mode, api, connected, manager, admin, tenantId, contextKey, busy, visit, progress, masters, perform }: Props) {
   const [revision, setRevision] = useState(0);
   const [message, setMessage] = useState("");
   const [dcrs, setDcrs] = useState<Dcr[]>([]);
@@ -47,6 +51,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
   const [weeks, setWeeks] = useState<Week[]>([]);
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [evidenceExpenses,setEvidenceExpenses]=useState<Expense[]>([]);
   const [joint, setJoint] = useState<Joint[]>([]);
   const [approvals, setApprovals] = useState<{leaves:Approval[];expenses:Approval[];timesheets:Approval[]}>({leaves:[],expenses:[],timesheets:[]});
   const [currentRcpa, setCurrentRcpa] = useState<string>("");
@@ -78,7 +83,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
   useEffect(() => {
     if (!connected) {
       setDcrs([]);setBalances([]);setDistributions([]);setDays([]);setWeeks([]);setAttendance([]);setGpsExceptions([]);
-      setLeaves([]);setExpenses([]);setJoint([]);setApprovals({leaves:[],expenses:[],timesheets:[]});
+      setLeaves([]);setExpenses([]);setEvidenceExpenses([]);setJoint([]);setApprovals({leaves:[],expenses:[],timesheets:[]});
       return;
     }
     let live = true;
@@ -97,7 +102,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
           if(visit){const dist=await api.distributions(visit.id);if(live)setDistributions(dist);}else if(live)setDistributions([]);
         }
         if(mode==="workforce") {
-          const all=await Promise.allSettled([api.dailyTimesheets(),api.weeklyTimesheets(),api.leaves(),api.expenses(),api.jointWork(),api.attendance()]);
+          const all=await Promise.allSettled([api.dailyTimesheets(),api.weeklyTimesheets(),api.leaves(),api.expenses(),api.jointWork(),api.attendance(),manager?api.visibleExpenses():api.expenses()]);
           if(!live)return;
           setDays(all[0].status==="fulfilled"?all[0].value:[]);
           setWeeks(all[1].status==="fulfilled"?all[1].value:[]);
@@ -105,6 +110,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
           setExpenses(all[3].status==="fulfilled"?all[3].value:[]);
           setJoint(all[4].status==="fulfilled"?all[4].value:[]);
           setAttendance(all[5].status==="fulfilled"?all[5].value:[]);
+          setEvidenceExpenses(all[6].status==="fulfilled"?all[6].value:[]);
           const failed=all.filter(x=>x.status==="rejected").length;
           if(failed)setMessage(String(failed)+" workforce APIs were unavailable for this account.");
         }
@@ -205,6 +211,19 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
           <Button disabled={!canAct||!progress||!(expenseAmount>0)||!/^[A-Z]{3}$/.test(expenseCurrency)} onClick={()=>progress&&void act(()=>api.saveExpense(progress.executionId,expenseCurrency,expenseAmount,expenseCategory,null),"Expense claim saved")}>Save expense</Button></div>
       </Box>
       <Box title="Attendance history">{attendance.length?attendance.map(a=><Entry key={a.workDate} heading={a.workDate} detail={(a.workedMinutes??0)+" of "+(a.requiredMinutes??0)+" minutes recorded"} status={a.status}/>):empty}</Box>
+      <WorkforceEvidenceView
+        scope={{tenantId,authorizedForTenantId:tenantId,contextKey,viewerUserId:api.currentUserId??"",role:admin?"ADMIN":manager?"MANAGER":"FIELD",permittedUserIds:[...new Set(evidenceExpenses.map(x=>x.ownerUserId).filter(Boolean))]}}
+        claims={evidenceExpenses.filter(x=>x.ownerUserId).map((x):Claim=>({
+          id:x.id,tenantId,ownerUserId:x.ownerUserId,workDate:x.workDate,currency:x.currencyCode,
+          serverTotalMinor:Math.round(x.totalAmount*100),status:x.status as Claim["status"],
+          lines:x.lines.map(line=>({id:x.id+":"+line.sequence,category:line.category,amountMinor:Math.round(line.amount*100),receiptRequired:false})),
+          sourceId:x.id,asOf:new Date().toISOString(),
+        }))}
+        receipts={evidenceExpenses.flatMap(x=>x.lines.filter(line=>line.receiptReference).map((line):ReceiptManifest=>({
+          id:x.id+":"+line.sequence+":receipt",tenantId,claimId:x.id,lineId:x.id+":"+line.sequence,status:"PENDING",documentRef:line.receiptReference!,
+        })))}
+        travel={[]} attendance={[]} policies={[]} loading={false}
+      />
       <Box title="Joint fieldwork">
         {joint.length?joint.map(x=><Entry key={x.id} heading={x.workDate} detail={"Assigned employee "+x.targetEmployeeId.slice(0,8)+" · "+(x.selfRole??"Participant")} status={x.status}>
           {x.status==="PLANNED"&&<Button kind="ghost" disabled={!canAct} size="sm" onClick={()=>void act(async()=>api.joinJointWork(x.id,await freshPosition()),"Joint work joined")}>Join with GPS</Button>}
