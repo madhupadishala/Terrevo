@@ -9,6 +9,7 @@ import { ActivitiesView } from "./features/activities/ActivitiesView";
 import { EDetailingView } from "./features/edetailing/EDetailingView";
 import { TodayIntelligenceView } from "./features/intelligence/TodayIntelligenceView";
 import { localDate } from "./plan-calendar";
+import { allowedWorkspaceIds } from "./role-navigation";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
@@ -129,13 +130,14 @@ export default function App() {
   const admin = access?.roles.some(r => r.roleKey === "TENANT_ADMIN") ?? false;
   const manager = admin || (access?.roles.some(r => r.roleKey === "MANAGER") ?? false);
   const visibleNav = useMemo(() => {
-    const employeeAreas = new Set<Area>(["overview","today","customers","activities","edetailing","field","plans","trade","inventory","workforce","reports"]);
-    const managerAreas = new Set<Area>([...employeeAreas,"manager","approvals"]);
-    const adminAreas = new Set<Area>([...managerAreas,"admin"]);
-    if (!session) return NAV.filter(n => n.id === "overview");
-    if (!connected) return NAV.filter(n => n.id === "overview" || (isPlatformAdmin && n.id === "platform"));
-    return NAV.filter(n => (admin ? adminAreas : manager ? managerAreas : employeeAreas).has(n.id) || (isPlatformAdmin && n.id === "platform"));
-  }, [session, connected, admin, manager, isPlatformAdmin]);
+    const allowed = allowedWorkspaceIds({
+      authenticated: Boolean(session),
+      connected,
+      isPlatformAdmin,
+      roles: access?.roles.map(r => r.roleKey) ?? [],
+    });
+    return NAV.filter(n => allowed.has(n.id));
+  }, [session, connected, isPlatformAdmin, access?.roles]);
   useEffect(() => {
     if (!visibleNav.some(n => n.id === view)) setView(visibleNav[0]?.id ?? "overview");
   }, [visibleNav, view]);
