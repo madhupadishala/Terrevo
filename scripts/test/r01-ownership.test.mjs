@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateChangedPaths, parseNameStatus, parseNameStatusZ, ownerForBranch, validateAssignment, loadIntegrationScope } from '../r01-ownership.mjs';
+import { validateChangedPaths, parseNameStatusZ, ownerForBranch, validateAssignment, loadIntegrationScope } from '../r01-ownership.mjs';
 import integrationScope from '../terrevo-v32-integration-scope.json' with {type:'json'};
 import {mkdtempSync,writeFileSync,readFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -38,11 +38,11 @@ test('engineer 2 cannot modify core or another shared feature', () => {
  assert.deepEqual(validateChangedPaths(['apps/web/src/features/clm-library/model.ts','apps/api/src/handler.ts','apps/web/src/App.tsx'],'engineer2'),['apps/api/src/handler.ts','apps/web/src/App.tsx']);
 });
 test('renames check both old and new paths', () => {
- assert.deepEqual(parseNameStatus('R100\tapps/api/a.ts\tapps/web/src/features/clm-library/a.ts\n'),['apps/api/a.ts','apps/web/src/features/clm-library/a.ts']);
+ assert.deepEqual(parseNameStatusZ('R100\0apps/api/a.ts\0apps/web/src/features/clm-library/a.ts\0'),['apps/api/a.ts','apps/web/src/features/clm-library/a.ts']);
 });
 test('reject invalid file paths and status', () => {
  assert.deepEqual(validateChangedPaths(['../other/repo','/etc/passwd'],'engineer1'),['../other/repo','/etc/passwd']);
- assert.throws(()=>parseNameStatus('UNKNOWN\ta'),/Unrecognized/);
+ assert.throws(()=>parseNameStatusZ('UNKNOWN\0a\0'),/Unrecognized/);
 });
 
 test('integration mandate is limited to one exact branch and recorded file paths',()=>{
