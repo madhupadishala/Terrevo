@@ -9,14 +9,17 @@ import { ActivitiesView } from "./features/activities/ActivitiesView";
 import { EDetailingView } from "./features/edetailing/EDetailingView";
 import { TodayIntelligenceView } from "./features/intelligence/TodayIntelligenceView";
 import { ManagerReportingView } from "./features/manager-reporting/ManagerReportingView";
+import { CustomerRelationsView } from "./features/customer-relations/CustomerRelationsView";
+import { WorkforceEvidenceView } from "./features/workforce-evidence/WorkforceEvidenceView";
 import { localDate } from "./plan-calendar";
 import { customerRelationships } from "./customer-links-adapter";
 import type { CustomerActivity, CustomerRelationship } from "./features/customer360/model";
 import { allowedWorkspaceIds } from "./role-navigation";
+import { authorizedCustomerRefs, patientSafeHistory, relationshipEvidenceWithTargets, workforceEvidenceModels } from "./v32-feature-adapters";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
-  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall, type ClmAsset, type ManagerReportRecord,
+  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall, type ClmAsset, type ManagerReportRecord, type WorkforceEvidencePayload, type CustomerLink,
 } from "./terrevo-api";
 
 type Area = "overview" | "today" | "customers" | "activities" | "edetailing" | "field" | "plans" | "manager" | "admin" | "platform" | BusinessArea;
@@ -116,6 +119,9 @@ export default function App() {
   const [customerActivities,setCustomerActivities] = useState<CustomerActivity[]>([]);
   const [customerProfileLoading,setCustomerProfileLoading] = useState(false);
   const [customerProfileError,setCustomerProfileError] = useState<string|null>(null);
+  const [customerLinkEvidence,setCustomerLinkEvidence] = useState<CustomerLink[]>([]);
+  const [workforceEvidence,setWorkforceEvidence] = useState<WorkforceEvidencePayload|null>(null);
+  const [workforceEvidenceError,setWorkforceEvidenceError] = useState<string|null>(null);
   const [clmAssets,setClmAssets] = useState<ClmAsset[]>([]);
   const [clmTitle,setClmTitle] = useState("");
   const [clmCategory,setClmCategory] = useState("PRODUCT_DETAIL");
@@ -142,7 +148,7 @@ export default function App() {
     setSelectedOption(""); setStopId(""); setGpsReason(""); setCallOutcome("");
     setCallRemarks(""); setShortDayReason("");
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
-    setFocusedCustomer(null); setCustomerRelations([]); setCustomerActivities([]); setCustomerProfileError(null); setCustomerProfileLoading(false); setClmAssets([]); setManagerReportRecords([]); setManagerReportAsOf(""); setManagerReportError(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
+    setFocusedCustomer(null); setCustomerRelations([]); setCustomerActivities([]); setCustomerLinkEvidence([]); setCustomerProfileError(null); setCustomerProfileLoading(false); setWorkforceEvidence(null); setWorkforceEvidenceError(null); setClmAssets([]); setManagerReportRecords([]); setManagerReportAsOf(""); setManagerReportError(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
     setOwnUnplanned([]);setPendingUnplanned([]);setUnplannedReviewComment("");
   }
 
@@ -168,6 +174,18 @@ export default function App() {
     if (!visibleNav.some(n => n.id === view)) setView(visibleNav[0]?.id ?? "overview");
   }, [visibleNav, view]);
   const activeStop = progress?.stops.find(s => s.planStopId === visit?.planStopId);
+  const customerRefs = useMemo(()=>authorizedCustomerRefs(tenantId,masters),[tenantId,masters]);
+  const focusedCustomerRef = focusedCustomer ? customerRefs.find(c=>c.kind===focusedCustomer.kind&&c.id===focusedCustomer.id&&c.territoryId===focusedCustomer.territoryId)??null : null;
+  const customerTerritories = useMemo(()=>[...new Set(customerRefs.map(c=>c.territoryId))],[customerRefs]);
+  const relationshipEvidenceRows = useMemo(
+    ()=>relationshipEvidenceWithTargets(tenantId,focusedCustomerRef,customerRefs,customerLinkEvidence),
+    [tenantId,focusedCustomerRef,customerRefs,customerLinkEvidence],
+  );
+  const patientSafeHistoryRows = useMemo(
+    ()=>focusedCustomerRef?patientSafeHistory(tenantId,focusedCustomerRef.territoryId,customerActivities):[],
+    [tenantId,focusedCustomerRef,customerActivities],
+  );
+  const workforceModels = useMemo(()=>workforceEvidence?workforceEvidenceModels(tenantId,workforceEvidence):null,[tenantId,workforceEvidence]);
 
   const refresh = useCallback(async (rights: AccessContext | null) => {
     if (!api.connected) return;
@@ -177,7 +195,7 @@ export default function App() {
       const base = await Promise.allSettled([
         api.progress(), api.startOptions(), api.openVisit(), api.plans(), api.orgUnits(),
         ...MASTER_KINDS.map(k=>api.masters(k)),
-        api.ncaOptions(),api.ownNcaRecords(),api.ownUnplannedCalls(),api.clmAssets(),
+        api.ncaOptions(),api.ownNcaRecords(),api.ownUnplannedCalls(),api.clmAssets(),api.workforceEvidence(),
       ]);
       if (generation !== tenantGeneration.current) return;
       setProgress(base[0].status==="fulfilled"?base[0].value:null);
@@ -198,6 +216,9 @@ export default function App() {
       setOwnUnplanned(unplannedResult.status==="fulfilled"?unplannedResult.value as UnplannedCall[]:[]);
       const clmResult=base[8+MASTER_KINDS.length];
       setClmAssets(clmResult.status==="fulfilled"?clmResult.value as ClmAsset[]:[]);
+      const workforceResult=base[9+MASTER_KINDS.length];
+      if(workforceResult.status==="fulfilled"){setWorkforceEvidence(workforceResult.value as WorkforceEvidencePayload);setWorkforceEvidenceError(null);}
+      else {setWorkforceEvidence(null);setWorkforceEvidenceError(errText(workforceResult.reason));}
       const failures=base.filter(result=>result.status==="rejected").length;
       if (failures) setNotice({kind:"info",title:"Partial data access",
         message:String(failures)+" API requests were denied or unavailable; previous tenant records have been cleared."});
@@ -226,14 +247,14 @@ export default function App() {
     const record=group.find(x=>x.id===customerId&&x.status==="active"&&typeof x.territoryId==="string");
     if(!record)return;
     setFocusedCustomer({kind:customerType,id:record.id,territoryId:String(record.territoryId),name:record.name});
-    setCustomerRelations([]);setCustomerActivities([]);setCustomerProfileError(null);setCustomerProfileLoading(true);
+    setCustomerRelations([]);setCustomerActivities([]);setCustomerLinkEvidence([]);setCustomerProfileError(null);setCustomerProfileLoading(true);
     try {
       const [linksResult,historyResult]=await Promise.allSettled([
         api.customerLinks(customerId),
         api.customerHistory(customerType,customerId),
       ]);
       if(generation!==tenantGeneration.current)return;
-      if(linksResult.status==="fulfilled")setCustomerRelations(customerRelationships(tenantId,customerId,groups,linksResult.value));
+      if(linksResult.status==="fulfilled"){setCustomerLinkEvidence(linksResult.value);setCustomerRelations(customerRelationships(tenantId,customerId,groups,linksResult.value));}
       else setCustomerProfileError(errText(linksResult.reason));
       if(historyResult.status==="fulfilled")setCustomerActivities(historyResult.value);
       else setCustomerProfileError(previous=>previous??errText(historyResult.reason));
@@ -441,6 +462,12 @@ export default function App() {
             }
             setView("plans");
           }} />}
+        {view==="customers" && focusedCustomerRef && <CustomerRelationsView
+          scope={{tenantId,authorizedForTenantId,contextKey,role:admin?"ADMIN":manager?"MANAGER":"FIELD",
+            permittedTerritoryIds:customerTerritories,mayViewHistory:true,mayOpenSource:false}}
+          subject={focusedCustomerRef} authorizedCustomers={customerRefs}
+          relationships={relationshipEvidenceRows} history={patientSafeHistoryRows}
+          loading={customerProfileLoading} error={customerProfileError} />}
 
         {view==="activities" && <ActivitiesView
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
@@ -514,6 +541,15 @@ export default function App() {
         {(["trade","inventory","workforce","approvals","reports"] as Area[]).includes(view) &&
           <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} admin={admin}
             tenantId={tenantId} contextKey={contextKey} busy={busy} visit={visit} progress={progress} masters={masters} perform={(fn,title)=>action(fn,title)} />}
+
+        {view==="workforce" && connected && workforceModels && <WorkforceEvidenceView
+          scope={{tenantId,authorizedForTenantId,contextKey,viewerUserId:session!.user.id,role:admin?"ADMIN":manager?"MANAGER":"FIELD",
+            permittedUserIds:[...new Set(workforceModels.claims.map(c=>c.ownerUserId))]}}
+          claims={workforceModels.claims} receipts={workforceModels.receipts} travel={workforceModels.travel}
+          attendance={workforceModels.attendance} policies={workforceModels.policies}
+          loading={loading} error={workforceEvidenceError}
+          onVerifyReceipt={manager?async intent=>{const sequence=Number(intent.lineId.split(":").at(-1));if(!Number.isSafeInteger(sequence))throw new Error("Invalid receipt line.");await api.reviewReceipt(intent.claimId,sequence,"VERIFY",null);await refresh(access);}:undefined}
+          onRevokeReceipt={manager?async intent=>{const sequence=Number(intent.lineId.split(":").at(-1));if(!Number.isSafeInteger(sequence))throw new Error("Invalid receipt line.");await api.reviewReceipt(intent.claimId,sequence,"REVOKE",null);await refresh(access);}:undefined} />}
 
         {view==="manager"&&manager&&<Panel eyebrow="MANAGER DECISIONS" title="Unplanned customer-call review">
           {pendingUnplanned.length?pendingUnplanned.map(row=><div className="tr-history-row" key={row.id}>
