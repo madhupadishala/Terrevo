@@ -126,6 +126,12 @@ export default function App() {
   const [clmEffectiveFrom,setClmEffectiveFrom] = useState("");
   const [clmExpiresAt,setClmExpiresAt] = useState("");
   const [clmProvenance,setClmProvenance] = useState("");
+  const [expensePolicyCategory,setExpensePolicyCategory]=useState<"TRAVEL"|"MEAL"|"LODGING"|"LOCAL_CONVEYANCE"|"OTHER">("TRAVEL");
+  const [expensePolicyMax,setExpensePolicyMax]=useState(0);
+  const [expensePolicyCurrency,setExpensePolicyCurrency]=useState("INR");
+  const [expensePolicyFrom,setExpensePolicyFrom]=useState(localDate());
+  const [expensePolicyTo,setExpensePolicyTo]=useState(localDate());
+  const [expensePolicyRef,setExpensePolicyRef]=useState("");
   const [managerReportRecords,setManagerReportRecords] = useState<ManagerReportRecord[]>([]);
   const [managerReportAsOf,setManagerReportAsOf] = useState("");
   const [managerReportError,setManagerReportError] = useState<string|null>(null);
@@ -606,6 +612,20 @@ export default function App() {
               onClick={()=>guarded(async()=>{await api.createClmAsset({title:clmTitle,category:clmCategory,version:clmVersion,productIds:[clmProduct],slides:[{id:crypto.randomUUID(),title:clmSlideTitle,body:clmSlideBody}],effectiveFrom:clmEffectiveFrom||null,expiresAt:clmExpiresAt||null,provenanceId:clmProvenance});setClmTitle("");setClmSlideTitle("");setClmSlideBody("");setClmProvenance("");},"CLM content approved")}>Approve and publish content</Button>
           </div>
           <p className="tr-detail">{clmAssets.length} approved catalog item(s) currently visible.</p>
+        </Panel>}
+
+        {view==="admin"&&admin&&<Panel eyebrow="EXPENSE GOVERNANCE" title="Configure effective-dated expense limits">
+          <p className="tr-detail">Limits are stored in minor currency units and applied only to claims whose work date falls inside the policy period.</p>
+          <div className="tr-form">
+            <label className="tr-select-label" htmlFor="expense-policy-category">Category</label><select id="expense-policy-category" className="tr-select" value={expensePolicyCategory} onChange={e=>setExpensePolicyCategory(e.target.value as typeof expensePolicyCategory)}>{["TRAVEL","MEAL","LODGING","LOCAL_CONVEYANCE","OTHER"].map(x=><option key={x} value={x}>{x.replace("_"," ")}</option>)}</select>
+            <TextInput id="expense-policy-max" type="number" labelText="Maximum amount" value={String(expensePolicyMax)} onChange={e=>setExpensePolicyMax(Number(e.target.value))}/>
+            <TextInput id="expense-policy-currency" labelText="Currency" value={expensePolicyCurrency} maxLength={3} onChange={e=>setExpensePolicyCurrency(e.target.value.toUpperCase())}/>
+            <label className="tr-select-label" htmlFor="expense-policy-from">Effective from</label><input id="expense-policy-from" className="tr-select" type="date" value={expensePolicyFrom} onChange={e=>setExpensePolicyFrom(e.target.value)}/>
+            <label className="tr-select-label" htmlFor="expense-policy-to">Expires at</label><input id="expense-policy-to" className="tr-select" type="date" value={expensePolicyTo} onChange={e=>setExpensePolicyTo(e.target.value)}/>
+            <TextInput id="expense-policy-ref" labelText="Policy reference" value={expensePolicyRef} maxLength={300} onChange={e=>setExpensePolicyRef(e.target.value)}/>
+            <Button disabled={busy||!(expensePolicyMax>=0)||!/^[A-Z]{3}$/.test(expensePolicyCurrency)||!expensePolicyRef.trim()||expensePolicyTo<expensePolicyFrom}
+              onClick={()=>guarded(async()=>{await api.createExpensePolicy({category:expensePolicyCategory,maxMinor:Math.round(expensePolicyMax*100),currency:expensePolicyCurrency,effectiveFrom:expensePolicyFrom,expiresAt:expensePolicyTo,policyRef:expensePolicyRef});setExpensePolicyRef("");},"Expense policy created")}>Create policy limit</Button>
+          </div>
         </Panel>}
 
         {view==="admin"&&admin&&<Panel eyebrow="CONTROLLED NCA MASTER" title="Manage NCA categories and towns">
