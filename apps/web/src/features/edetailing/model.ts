@@ -1,9 +1,9 @@
 import type {Master} from "../../terrevo-api";
 export type ApprovedSlide = {id:string;title:string;body:string};
-export type ApprovedAsset = {id:string;tenantId:string;title:string;productIds:string[];category:string;status:"APPROVED"|"DRAFT"|"WITHDRAWN"|"EXPIRED";slides:ApprovedSlide[];effectiveFrom?:string;expiresAt?:string};
+export type ApprovedAsset = {id:string;tenantId:string;title:string;productIds:string[];regionCodes:string[];category:string;status:"APPROVED"|"DRAFT"|"WITHDRAWN"|"EXPIRED";contentType:string;objectPath:string|null;slides:ApprovedSlide[];effectiveFrom?:string;expiresAt?:string};
 export type SlideVisit = {slideId:string;durationMs:number};
 export type DetailingSessionDraft = {tenantId:string;assetId:string;productIds:string[];startedAt:string;endedAt:string;slideVisits:SlideVisit[];linkedVisitId?:string};
-export type EDetailingViewProps = {tenantId:string;contextKey:string;authorizedForTenantId:string;assets?:ApprovedAsset[];products?:Master[];today?:string;linkedVisitId?:string;onSaveSessionDraft?:(draft:DetailingSessionDraft)=>void|Promise<void>;loading?:boolean};
+export type EDetailingViewProps = {tenantId:string;contextKey:string;authorizedForTenantId:string;assets?:ApprovedAsset[];products?:Master[];today?:string;linkedVisitId?:string;onSaveSessionDraft?:(draft:DetailingSessionDraft)=>void|Promise<void>;onRequestBinary?:(assetId:string)=>Promise<{url:string;expiresIn:number;contentType:string}>;loading?:boolean};
 export function isEligibleApprovedAsset(asset:ApprovedAsset,tenantId:string,today:string):boolean{
  return Boolean(tenantId&&asset.tenantId===tenantId&&asset.status==="APPROVED"&&
  asset.id&&asset.title.trim()&&asset.slides.length>0&&asset.slides.every(s=>s.id&&s.title.trim()&&typeof s.body==="string")&&
@@ -19,5 +19,5 @@ export function createDetailingSessionDraft(tenantId:string,asset:ApprovedAsset,
 
 /** Stable content comparison for a single authorized asset viewing session. */
 export function assetContentIdentity(asset:ApprovedAsset):string{
- return JSON.stringify({id:asset.id,tenantId:asset.tenantId,title:asset.title,productIds:asset.productIds,category:asset.category,status:asset.status,effectiveFrom:asset.effectiveFrom,expiresAt:asset.expiresAt,slides:asset.slides});
+ return JSON.stringify({id:asset.id,tenantId:asset.tenantId,title:asset.title,productIds:asset.productIds,regionCodes:asset.regionCodes,category:asset.category,status:asset.status,contentType:asset.contentType,objectPath:asset.objectPath,effectiveFrom:asset.effectiveFrom,expiresAt:asset.expiresAt,slides:asset.slides});
 }
