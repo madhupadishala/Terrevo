@@ -98,6 +98,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/ci/customer-link-policy-tests.sql
       - name: Competitor master tenant isolation and denied-write policy
         run: psql -v ON_ERROR_STOP=1 -f database/ci/competitor-master-policy-tests.sql
+      - name: Controlled master import atomicity and denied client execution
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/master-import-atomicity-tests.sql
       - name: Customer relationship rollback-only territory and approval fixture
         run: psql -v ON_ERROR_STOP=1 -f modules/business-customer-links/sql/transaction-isolation.sql
       - name: Trusted actor audit attribution and denied forgery
