@@ -27,3 +27,9 @@ test("platform control is independently authorized", () => {
   const connected=allowedWorkspaceIds({authenticated:true,connected:true,isPlatformAdmin:true,roles:["MR"]});
   assert.equal(connected.has("platform"),true);assert.equal(connected.has("admin"),false);
 });
+
+
+test("unknown tenant roles fail closed to overview-only navigation", () => {
+  const ids=allowedWorkspaceIds({authenticated:true,connected:true,isPlatformAdmin:false,roles:["UNKNOWN"]});
+  assert.deepEqual([...ids],["overview"]);
+});
