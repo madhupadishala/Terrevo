@@ -45,7 +45,7 @@ const NAV: Array<{ id: Area; title: string; icon: string; subtitle: string }> = 
 const roles: Record<string, string> = {
   TENANT_ADMIN: "Organization administrator", MANAGER: "Field manager", MR: "Field representative",
 };
-const MASTER_KINDS = ["employees", "doctors", "chemists", "stockists", "products", "samples", "gifts"];
+const MASTER_KINDS = ["employees", "doctors", "chemists", "stockists", "products", "competitors", "samples", "gifts"];
 const dateTime = (value: string | null | undefined) => value ? new Date(value).toLocaleString() : "—";
 const errText = (error: unknown) => error instanceof Error ? error.message : "The operation could not be completed.";
 const fmt = (v: number | string | null | undefined) => v == null ? "—" : String(v);
