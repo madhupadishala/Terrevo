@@ -222,19 +222,15 @@ export default function App() {
     setFocusedCustomer({kind:customerType,id:record.id,territoryId:String(record.territoryId),name:record.name});
     setCustomerRelations([]);setCustomerActivities([]);setCustomerProfileError(null);setCustomerProfileLoading(true);
     try {
-      const [linksResult,dcrResult]=await Promise.allSettled([
+      const [linksResult,historyResult]=await Promise.allSettled([
         api.customerLinks(customerId),
-        customerType==="doctor"?api.dcrs():Promise.resolve([]),
+        api.customerHistory(customerType,customerId),
       ]);
       if(generation!==tenantGeneration.current)return;
       if(linksResult.status==="fulfilled")setCustomerRelations(customerRelationships(tenantId,customerId,groups,linksResult.value));
       else setCustomerProfileError(errText(linksResult.reason));
-      if(dcrResult.status==="fulfilled"&&customerType==="doctor"){
-        setCustomerActivities(dcrResult.value.filter(x=>x.doctorId===customerId).map(x=>({
-          tenantId,customerKind:"doctor" as const,customerId,id:x.id,occurredAt:x.submittedAt,
-          activityType:"DCR",summary:x.callOutcome,
-        })));
-      }
+      if(historyResult.status==="fulfilled")setCustomerActivities(historyResult.value);
+      else setCustomerProfileError(previous=>previous??errText(historyResult.reason));
     } finally { if(generation===tenantGeneration.current)setCustomerProfileLoading(false); }
   }
 
