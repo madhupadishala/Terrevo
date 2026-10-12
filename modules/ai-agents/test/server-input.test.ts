@@ -36,3 +36,26 @@ test("Field Data Quality reports duplicate master codes but never merges automat
 test("unsupported source adapter yields no evidence rather than a fabricated result",()=>{
  assert.deepEqual(buildDeterministicAgentInput("AI-12",{}),{evidence:[]});
 });
+
+
+test("Tour Planning proposes only doctors whose controlled territory has an approved day",()=>{
+ const input=buildDeterministicAgentInput("AI-02",{
+  startOptions:[{planDayId:"day-1",workDate:"2026-10-14",territoryId:"terr-1"}],
+  doctors:[
+   {id:"d1",territoryId:"terr-1",visitFrequency:2},
+   {id:"d2",territoryId:"terr-2",visitFrequency:1},
+  ],
+ });
+ assert.deepEqual((input.proposed_visits as any[]).map(x=>x.customer_id),["d1"]);
+ assert.equal((input.proposed_visits as any[])[0].visit_frequency,2);
+ assert.equal(input.feasibility,"requires_human_review");
+});
+
+test("Follow-up Action uses only an explicitly persisted nextAction",()=>{
+ const input=buildDeterministicAgentInput("AI-13",{doctorCall:{id:"call-1",nextAction:"Follow up in two weeks",callOutcome:"Discussed",updatedAt:"2026-10-13T00:00:00Z"}});
+ assert.deepEqual((input.draft_actions as any[]).map(x=>x.title),["Follow up in two weeks"]);
+ assert.deepEqual((input.evidence as any[]).map(x=>x.source_id),["call-1"]);
+ const empty=buildDeterministicAgentInput("AI-13",{doctorCall:{id:"call-2",nextAction:null,callOutcome:"Discussed"}});
+ assert.deepEqual(empty.draft_actions,[]);
+ assert.equal((empty.ambiguous_items as any[]).length,1);
+});
