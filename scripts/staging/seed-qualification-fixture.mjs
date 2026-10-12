@@ -9,7 +9,7 @@ const identityRoles=[...mainRoles,'FOREIGN_MR'];
 for(const role of identityRoles)if(manifest.users.filter(u=>u.role===role).length!==1||!uuid.test(manifest.users.find(u=>u.role===role)?.id??''))throw Error('Supported Auth identity missing or ambiguous');
 const coreKeys=['tenant','foreignTenant','company','division','zone','region','area','territory','foreignCompany','foreignDivision','foreignZone','foreignRegion','foreignArea','foreignTerritory','mrEmployee','managerEmployee','doctor','unplannedDoctor','chemist','product'];
 const ids={...Object.fromEntries(coreKeys.map(k=>[k,randomUUID()])),...(manifest.fixture??{})};
-const extendedIds=['stockist','sample','gift','foreignEmployee','foreignDoctor','foreignChemist','foreignStockist','foreignProduct','clmAsset','expensePolicy'];
+const extendedIds=['stockist','sample','gift','competitor','foreignEmployee','foreignDoctor','foreignChemist','foreignStockist','foreignProduct','clmAsset','expensePolicy'];
 if(manifest.users.some(u=>u.role==='MR2'))extendedIds.push('mr2Employee');
 let updated=false;
 for(const key of extendedIds)if(!ids[key]){ids[key]=randomUUID();updated=true;}
@@ -48,6 +48,7 @@ sql.push(`insert into public.chemists(id,tenant_id,code,name,territory_id) value
 sql.push(`insert into public.products(id,tenant_id,code,name,division_id) values (${q(ids.foreignProduct)},${q(ids.foreignTenant)},'QUALPRODUCT','Synthetic Foreign Product',${q(ids.foreignDivision)});`);
 sql.push(`insert into public.samples(id,tenant_id,code,name,product_id,division_id,unit) values (${q(ids.sample)},${q(ids.tenant)},'QUALSAMPLE','Synthetic Qualification Sample',${q(ids.product)},${q(ids.division)},'unit');`);
 sql.push(`insert into public.gifts(id,tenant_id,code,name,division_id,category) values (${q(ids.gift)},${q(ids.tenant)},'QUALGIFT','Synthetic Qualification Gift',${q(ids.division)},'test');`);
+sql.push(`insert into public.competitors(id,tenant_id,division_id,code,name,manufacturer) values (${q(ids.competitor)},${q(ids.tenant)},${q(ids.division)},'QUALCOMP','Synthetic Qualification Competitor','Synthetic Manufacturer');`);
 sql.push(`insert into public.clm_assets(id,tenant_id,title,category,version,status,product_ids,slides,effective_from,expires_at,provenance_id,approved_by,approved_at)
 values (${q(ids.clmAsset)},${q(ids.tenant)},'Synthetic Qualification Product Detail','PRODUCT_DETAIL','1.0','APPROVED',array[${q(ids.product)}]::uuid[],
 '[{"id":"slide-1","title":"Synthetic qualification detail","body":"Controlled synthetic content for staging qualification only."}]'::jsonb,current_date-1,current_date+30,${q(manifest.runId+'-clm')},${q(user('TENANT_ADMIN'))},now());`);
