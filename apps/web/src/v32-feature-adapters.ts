@@ -10,15 +10,6 @@ export function authorizedCustomerRefs(tenantId:string,masters:Record<string,Mas
      ?[{tenantId,kind,id:record.id,name:record.name,territoryId:String(record.territoryId)}]:[]));
 }
 
-export function relationshipEvidence(tenantId:string,source:CustomerRef|null,links:readonly CustomerLink[]):RelationshipEvidence[]{
- if(!source)return[];
- return links.flatMap(link=>{
-   if(link.tenantId!==tenantId||link.sourceId!==source.id||link.approval!=="APPROVED"||!link.evidenceId||!Number.isFinite(Date.parse(link.verifiedAt)))return[];
-   return [{id:link.id,tenantId,source:{kind:source.kind,id:source.id},target:{kind:"chemist" as const,id:link.targetId},
-     relation:link.relation,approval:"APPROVED" as const,evidenceId:link.evidenceId,evidenceType:"TERREVO_LINK",verifiedAt:link.verifiedAt}];
- });
-}
-
 /** Resolve target kinds only from the current authorized customer set; ambiguous IDs are rejected. */
 export function relationshipEvidenceWithTargets(tenantId:string,source:CustomerRef|null,customers:CustomerRef[],links:readonly CustomerLink[]):RelationshipEvidence[]{
  if(!source)return[];
@@ -62,10 +53,10 @@ export function clmSessionSummaries(tenantId:string,assets:ClmAsset[],rows:Array
 }
 
 const claimStatuses=new Set(["DRAFT","SUBMITTED","APPROVED","REJECTED","RETURNED"]);
-export function workforceEvidenceModels(payload:WorkforceEvidencePayload){
+export function workforceEvidenceModels(tenantId:string,payload:WorkforceEvidencePayload){
  const claims:Claim[]=payload.claims.flatMap(c=>{
    if(!claimStatuses.has(c.status)||!Number.isFinite(c.totalAmount))return[];
-   return [{id:c.id,tenantId:c.tenantId??"",ownerUserId:c.ownerUserId,workDate:c.workDate,currency:c.currencyCode,
+   return [{id:c.id,tenantId,ownerUserId:c.ownerUserId,workDate:c.workDate,currency:c.currencyCode,
      serverTotalMinor:Math.round(c.totalAmount*100),status:c.status as Claim["status"],sourceId:c.id,asOf:payload.asOf,
      lines:c.lines.flatMap(line=>Number.isFinite(line.amount)?[{id:`${c.id}:${line.sequence}`,category:line.category,amountMinor:Math.round(line.amount*100),receiptRequired:Boolean(line.receiptReference)}]:[])}];
  });
