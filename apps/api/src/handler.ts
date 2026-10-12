@@ -66,6 +66,34 @@ async function readJsonObject(request: Request, maxBytes = 8_192): Promise<Recor
   return readBoundedJsonObject(request, maxBytes);
 }
 
+const MASTER_IMPORT_FIELDS:Record<MasterKind,readonly string[]>={
+  employees:["user_id","code","name","designation","org_unit_id","reporting_manager_employee_id"],
+  doctors:["code","name","specialty","category","clinic","address","latitude","longitude","visit_frequency","territory_id"],
+  products:["code","name","generic_name","division_id"],
+  competitors:["code","name","manufacturer","division_id"],
+  chemists:["code","name","address","latitude","longitude","territory_id"],
+  stockists:["code","name","address","latitude","longitude","territory_id"],
+  samples:["code","name","product_id","division_id","unit"],
+  gifts:["code","name","division_id","category"],
+};
+const importKey=(key:string)=>key.replace(/[A-Z]/g,m=>"_"+m.toLowerCase());
+function normalizeMasterImportRows(kind:MasterKind,value:unknown):Array<Record<string,unknown>>{
+  if(!Array.isArray(value)||value.length<1||value.length>200)throw new ApiError(400,"Import must contain 1 to 200 rows");
+  const allowed=new Set(MASTER_IMPORT_FIELDS[kind]);
+  return value.map((raw,index)=>{
+    if(!raw||typeof raw!=="object"||Array.isArray(raw))throw new ApiError(400,`Import row ${index+1} must be an object`);
+    const row:Record<string,unknown>={};
+    for(const [key,val] of Object.entries(raw as Record<string,unknown>)){
+      const normalized=importKey(key);
+      if(!allowed.has(normalized))throw new ApiError(400,`Unsupported import field ${key}`);
+      if(val!==null&&typeof val!=="string"&&typeof val!=="number")throw new ApiError(400,`Invalid import value for ${key}`);
+      row[normalized]=val;
+    }
+    if(typeof row.code!=="string"||!row.code.trim()||typeof row.name!=="string"||!row.name.trim())throw new ApiError(400,`Import row ${index+1} requires code and name`);
+    return row;
+  });
+}
+
 /** Resolves the supported Supabase environment aliases into one provider configuration. */
 function requireConfig(env: ApiEnv): SupabaseConfig {
   const publishableKey = env.SUPABASE_PUBLISHABLE_KEY ?? env.SUPABASE_ANON_KEY;
@@ -488,6 +516,19 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
         const user = await identity.authenticate(request.headers.get("authorization"));
         const offset = Number(new URL(request.url).searchParams.get("offset") ?? "0");
         return json(200, { events: await platform.audit(user.id, offset) });
+      }
+
+      if(request.method==="POST"&&path==="/v1/admin/master-import"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        const rights=await rbac.accessContext(context.tenantId,user.id,accessToken);
+        if(!rights.roles.some(r=>r.roleKey==="TENANT_ADMIN"))throw new ApiError(403,"Tenant administrator required");
+        const body=await readJsonObject(request,131_072);
+        const kind=typeof body.kind==="string"&&MASTER_KINDS.includes(body.kind as MasterKind)?body.kind as MasterKind:null;
+        if(!kind)throw new ApiError(400,"Unsupported master import kind");
+        const rows=normalizeMasterImportRows(kind,body.rows);
+        if(body.preview===true)return json(200,{kind,count:rows.length,rows});
+        const inserted=await adapter.masterImport.execute(context.tenantId,kind,rows);
+        return json(201,{kind,inserted});
       }
 
       if(request.method==="GET"&&path==="/v1/ai/agents"){
