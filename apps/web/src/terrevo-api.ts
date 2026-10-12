@@ -104,6 +104,7 @@ export class TerrevoWebApi {
   }
   constructor(onUpdate?: (session: Session | null) => void) { this.onUpdate = onUpdate; }
   get connected(): boolean { return Boolean(this.session?.accessToken && this.tenantId); }
+  get currentUserId(): string | null { return this.session?.user.id ?? null; }
   setSession(session: Session | null) { if(this.session?.user.id!==session?.user.id)this.contextVersion++;this.session = session; this.onUpdate?.(session); }
   setTenant(id: string | null) { if(this.tenantId!==id)this.contextVersion++;this.tenantId = id; }
   reset() { this.contextVersion++;this.session = null; this.tenantId = null; this.onUpdate?.(null); }
@@ -330,8 +331,11 @@ export class TerrevoWebApi {
   async requestLeave(leaveType:"FULL_DAY"|"HALF_DAY",startDate:string,endDate:string,reason:string) {
     return this.raw("/v1/leaves","POST",{operationId:crypto.randomUUID(),leaveType,startDate,endDate,reason});
   }
-  async expenses():Promise<Array<{id:string;workDate:string;totalAmount:number;currencyCode:string;status:string;executionId:string}>> {
-    return (await this.raw("/v1/expenses/own") as {claims:Array<{id:string;workDate:string;totalAmount:number;currencyCode:string;status:string;executionId:string}>}).claims;
+  async expenses():Promise<Array<{id:string;executionId:string;employeeId:string;ownerUserId:string;orgUnitId:string;workDate:string;currencyCode:string;status:string;totalAmount:number;lines:Array<{sequence:number;category:string;amount:number;remarks:string|null;receiptReference:string|null}>}>> {
+    return (await this.raw("/v1/expenses/own") as {claims:Array<{id:string;executionId:string;employeeId:string;ownerUserId:string;orgUnitId:string;workDate:string;currencyCode:string;status:string;totalAmount:number;lines:Array<{sequence:number;category:string;amount:number;remarks:string|null;receiptReference:string|null}>}>}).claims;
+  }
+  async visibleExpenses():Promise<Array<{id:string;executionId:string;employeeId:string;ownerUserId:string;orgUnitId:string;workDate:string;currencyCode:string;status:string;totalAmount:number;lines:Array<{sequence:number;category:string;amount:number;remarks:string|null;receiptReference:string|null}>}>> {
+    return (await this.raw("/v1/expenses") as {claims:Array<{id:string;executionId:string;employeeId:string;ownerUserId:string;orgUnitId:string;workDate:string;currencyCode:string;status:string;totalAmount:number;lines:Array<{sequence:number;category:string;amount:number;remarks:string|null;receiptReference:string|null}>}>}).claims;
   }
   async saveExpense(executionId:string,currencyCode:string,amount:number,category:"TRAVEL"|"MEAL"|"LODGING"|"LOCAL_CONVEYANCE"|"OTHER",remarks:string|null) {
     return this.raw("/v1/executions/" + encodeURIComponent(executionId) + "/expense","PUT",{operationId:crypto.randomUUID(),currencyCode,lines:[{sequence:1,category,amount,remarks,receiptReference:null}]});
