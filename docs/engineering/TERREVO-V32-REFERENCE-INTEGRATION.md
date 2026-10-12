@@ -62,3 +62,38 @@ Rollback: abandon/revert this unmerged integration branch; there are no session 
 7. Final authenticated journey, owner UAT and explicit controlled production release are S10 gates. Production remains untouched and Vercel automatic deployment remains disabled.
 
 Historical evidence imported from PR #65 describes earlier runs by that branch's author. It is preserved for traceability and is not presented as newly executed validation of this combined tree.
+
+## PR #68 CodeRabbit remediation — 2026-10-12
+
+Scope: the 13 review findings, focused API/model/browser/script regressions,
+historical-evidence provenance, rollback-only SQL fixture and the trusted
+ownership-policy bootstrap. No product dependency, schema or API contract change;
+no redesign, production deployment, secret access or hosted database mutation.
+
+Runtime changes defer the HTTPS-only customer-link adapter to its own route,
+reset report filters through keyed context remounts, render receipt-request state
+while retaining immediate deduplication, and preserve one-decimal coverage.
+Qualification changes normalize provider origins, reconcile uncertain plan
+creation, write private state atomically, record response row counts and return
+failure when load budgets fail. The SQL fixture now has authorized active master
+records and is included in migration CI.
+
+Historical measurements are preserved. Revocation evidence is explicitly marked
+manually appended. Missing historical row counts are null with an explicit
+not-recorded annotation, never fabricated zeroes. The final qualification record
+retains original artifact hashes and separately identifies amendment hashes.
+The older threat-model counts are labeled historical and linked to later evidence.
+
+Local checks: typecheck, API/domain 127 tests, web/model 69 tests, release-safety
+40 tests, foundation, release preflight (35 checks) and production build pass.
+Seven customer-link domain tests overlap between API and web suites. Browser
+harness bundles successfully; local execution remains blocked by unavailable
+Chromium. Exact-commit CI must verify all 16 browser tests and the SQL fixture.
+
+Karpathy/Ponytail/React review: focused state/branch changes, existing runtime and
+test tooling, no new dependency or UI design change. This is a manual review, not
+a claim of CodeRabbit approval. WARPATH remains HOLD: the trusted base policy is
+absent and needs independent owner approval as described in
+[Trusted scope bootstrap](TRUSTED-SCOPE-BOOTSTRAP.md). No checker from the reviewed
+branch may substitute for that approval. Rollback is a commit revert; no database
+or production changes were made by this remediation.

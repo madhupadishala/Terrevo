@@ -12,7 +12,7 @@ async function request(origin,path,{role='MR',method='GET',body,expected=200,ten
  if(role)headers.authorization='Bearer '+sessions[role].accessToken;
  const res=await fetch(origin+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(30000)});
  const data=res.status===204?null:await res.json();
- checks.push({path,method,role,status:res.status,elapsedMs:Math.round(performance.now()-start),serverTiming:res.headers.get('server-timing'),requestId:res.headers.get('x-request-id')});
+ checks.push({path,method,role,status:res.status,rowCount:Array.isArray(data)?data.length:null,elapsedMs:Math.round(performance.now()-start),serverTiming:res.headers.get('server-timing'),requestId:res.headers.get('x-request-id')});
  assert.ok((Array.isArray(expected)?expected:[expected]).includes(res.status),`${path}: unexpected status ${res.status}`);return data;
 }
 try{

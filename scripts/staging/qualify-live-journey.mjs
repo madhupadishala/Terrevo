@@ -1,6 +1,7 @@
 import {readFile,writeFile,stat,rename} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import assert from 'node:assert/strict';
+import {recoverOrCreatePlan} from './tour-plan-recovery.mjs';
 
 // Synthetic identities and coordinates qualify software, never physical presence.
 // Successful mutations are checkpointed privately so interruption cannot create
@@ -45,7 +46,7 @@ await check('tenant-admin-platform-denied','GET','/v1/platform/tenants',{role:'T
 const localDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 state.workDate??=localDate;assert.equal(state.workDate,localDate,'Resume on the same tenant work date');
 const monday=new Date(state.workDate+'T00:00:00Z');monday.setUTCDate(monday.getUTCDate()-((monday.getUTCDay()+6)%7));
-const plan=(await check('plan-create','POST','/v1/tour-plans',{status:201,body:{weekStart:monday.toISOString().slice(0,10),days:[{date:state.workDate,territoryId:f.territory,stops:[{sequence:1,type:'doctor',targetId:f.doctor}]}]}})).plan;
+const plan=await recoverOrCreatePlan(check,state,persist,{weekStart:monday.toISOString().slice(0,10),days:[{date:state.workDate,territoryId:f.territory,stops:[{sequence:1,type:'doctor',targetId:f.doctor}]}]});
 await check('plan-submit','POST',`/v1/tour-plans/${plan.id}/submit`,{status:204});
 await check('plan-approve','POST',`/v1/tour-approvals/${plan.id}/decision`,{role:'MANAGER',status:204,body:{decision:'APPROVE'}});
 const options=(await check('approved-start-options','GET','/v1/tour-executions/start-options')).options;

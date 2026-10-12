@@ -2,6 +2,21 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {createHandler} from "../src/handler.ts";
 const tenant="10000000-0000-4000-8000-000000000101",owner="20000000-0000-4000-8000-000000000201",source="40000000-0000-4000-8000-000000000401";
+test("HTTP local provider does not break unrelated routes and customer-links errors stay inside the boundary",async()=>{
+ let calls=0;
+ const local=createHandler({SUPABASE_URL:"http://127.0.0.1:54321",SUPABASE_PUBLISHABLE_KEY:"public-key"},{fetcher:async(input)=>{
+  calls++;const path=new URL(String(input)).pathname;
+  if(path==="/auth/v1/user")return Response.json({id:owner});
+  if(path==="/rest/v1/tenants")return Response.json([{id:tenant}]);
+  if(path==="/rest/v1/business_customer_link_grants")return Response.json([{territory_id:"north"}]);
+  throw Error("unexpected request");
+ }});
+ assert.equal((await local(new Request("http://localhost/health"))).status,200);
+ assert.equal(calls,0);
+ const response=await local(new Request("http://localhost/v1/business/customer-links/"+source,{headers:{authorization:"Bearer valid","x-tenant-id":tenant}}));
+ assert.equal(response.status,500);
+ assert.equal(calls,3);
+});
 const app=createHandler({SUPABASE_URL:"https://staging.example.invalid",SUPABASE_PUBLISHABLE_KEY:"public-key"},{
  fetcher:(async(input,init)=>{const url=new URL(String(input));const headers=new Headers(init?.headers);
  if(url.pathname==="/auth/v1/user")return headers.get("authorization")==="Bearer valid"?Response.json({id:owner,email:"test@example.invalid"}):Response.json({msg:"Bad token"},{status:401});

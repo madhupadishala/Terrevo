@@ -17,3 +17,7 @@ test("invalid calendar days, blank record identities and impossible state pairs 
 test("invalid or reversed report filters fail closed",()=>{
  for(const f of [{...filter,from:"2026-02-30"},{...filter,from:"2026-10-11",to:"2026-10-10"}])assert.equal(reportRows(scope,[mk("x","DCR","SUBMITTED")],f).rows.length,0);
 });
+test("plan completion preserves one decimal place",()=>{
+ const rows=Array.from({length:200},(_,i)=>mk(String(i),"PLANNED_STOP",i===199?"PLANNED":"COMPLETED"));
+ assert.equal(reportRows(scope,rows,filter).counts.plannedCompletionPercent,99.5);
+});

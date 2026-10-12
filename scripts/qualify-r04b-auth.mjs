@@ -8,7 +8,7 @@ export function validateR04BEnv(env){
  if(url.username||url.password||url.search||url.hash||url.pathname!=="/")throw Error("Staging API origin must have no credentials/path");
  if(!(url.hostname==="localhost"&&url.protocol==="http:")&&!(url.protocol==="https:"&&url.hostname.endsWith(".vercel.app")&&url.hostname!=="terrevo.vercel.app"))throw Error("Only local or staging preview API is permitted");
  if(env.TERREVO_R04B_ALPHA_EMAIL===env.TERREVO_R04B_BETA_EMAIL)throw Error("Distinct test identities required");
- return {projectRef,base:env.SUPABASE_URL.slice(0,-1),api:url.origin};
+ return {projectRef,base:new URL(env.SUPABASE_URL).origin,api:url.origin};
 }
 export async function qualifyR04B(env,fetcher=fetch){
  const cfg=validateR04BEnv(env),key=env.SUPABASE_PUBLISHABLE_KEY;

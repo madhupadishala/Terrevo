@@ -1,13 +1,16 @@
-import {useEffect,useId,useMemo,useState} from "react";
+import {useId,useMemo,useState} from "react";
 import {Button,Tag} from "@carbon/react";
 import {canViewReports,reportRows,type ReportFilter,type ReportViewProps} from "./model";
 export type {ReportViewProps,ReportScope,ReportRecord,ReportFilter,MetricCounts} from "./model";
 export {reportRows,reportCsv,csvCell,canViewReports} from "./model";
 const initial:ReportFilter={from:"",to:"",territoryId:"",ownerUserId:""};
-export function ManagerReportingView({scope,records=[],loading=false,error,onRequestCsv}:ReportViewProps){
+export function ManagerReportingView(props:ReportViewProps){
+ const {scope}=props;
+ const stamp=JSON.stringify([scope.tenantId,scope.authorizedForTenantId,scope.contextKey,scope.role,scope.permittedTerritoryIds,scope.permittedTeamUserIds]);
+ return <ManagerReportingContent key={stamp} {...props}/>;
+}
+function ManagerReportingContent({scope,records=[],loading=false,error,onRequestCsv}:ReportViewProps){
  const [filter,setFilter]=useState<ReportFilter>(initial);const id=useId();
- const stamp=`${scope.tenantId}:${scope.authorizedForTenantId}:${scope.contextKey}:${scope.role}:${scope.permittedTerritoryIds.join(",")}:${scope.permittedTeamUserIds.join(",")}`;
- useEffect(()=>setFilter(initial),[stamp]);
  const authorized=canViewReports(scope);const result=useMemo(()=>reportRows(scope,records,filter),[scope,records,filter]);
  const updates=(key:keyof ReportFilter,value:string)=>setFilter(old=>({...old,[key]:value}));
  const cards:[string,number|string][]=[["Planned stops",result.counts.plannedStops],["Completed planned stops",result.counts.completedPlanned],["Unplanned pending",result.counts.unplannedPending],["Unplanned approved",result.counts.unplannedApproved],["Unplanned rejected",result.counts.unplannedRejected],["NCA reports",result.counts.ncaReported],["DCR submitted",result.counts.dcrSubmitted],["Plan completion",result.counts.plannedCompletionPercent===null?"N/A":`${result.counts.plannedCompletionPercent}%`]];

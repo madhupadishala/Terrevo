@@ -172,7 +172,6 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
   const managerCommand = createManagerCommandService(adapter.managerCommand);
   const analytics = createAnalyticsService(adapter.analytics);
   const platform = createPlatformAdminService(config, fetcher);
-  const customerLinks = createCustomerLinksService(createCustomerLinksPostgrest(config.url, config.anonKey, fetcher));
 
   /** Authenticates the caller and resolves the active tenant context for a tenant-scoped request. */
   async function resolveTenantRequest(request: Request) {
@@ -266,6 +265,7 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
         const grantRows:unknown=await grantResponse.json();
         if(!Array.isArray(grantRows)||grantRows.some((g:unknown)=>!g||typeof g!=="object"||typeof (g as {territory_id?:unknown}).territory_id!=="string"))throw new BusinessAccessError("Invalid customer grants");
         const permittedTerritoryIds=[...new Set(grantRows.map(g=>(g as {territory_id:string}).territory_id))];
+        const customerLinks=createCustomerLinksService(createCustomerLinksPostgrest(config.url,config.anonKey,fetcher));
         const links=await customerLinks.list({tenantId:context.tenantId,userId:user.id,accessToken,permittedTerritoryIds},customerLinksMatch[1]);
         return json(200,{links});
       }

@@ -96,6 +96,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/ci/public-definer-privileges-tests.sql
       - name: Customer relationship source and counterpart authorization
         run: psql -v ON_ERROR_STOP=1 -f database/ci/customer-link-policy-tests.sql
+      - name: Customer relationship rollback-only territory and approval fixture
+        run: psql -v ON_ERROR_STOP=1 -f modules/business-customer-links/sql/transaction-isolation.sql
       - name: Trusted actor audit attribution and denied forgery
         run: psql -v ON_ERROR_STOP=1 -f database/ci/audit-attribution-policy-tests.sql
       - name: NCA tenant isolation and denied-write policy tests
@@ -145,13 +147,21 @@ jobs:
       - name: Enforce Engineer 1 / Engineer 2 file ownership
         env:
           TERREVO_DIFF_BASE: ${{ github.event.pull_request.base.sha }}
+          TERREVO_DIFF_HEAD: ${{ github.event.pull_request.head.sha }}
           TERREVO_HEAD_BRANCH: ${{ github.head_ref }}
           TERREVO_OWNER: ${{ github.head_ref == 'feature/terrevo-v32-reference-integration' && 'integrator' || contains(fromJSON('["feature/terrevo-s09-customer-relations-ui","feature/terrevo-s11-clm-library-ui","feature/terrevo-s13-workforce-evidence-ui","feature/terrevo-s14-manager-reporting-ui"]'), github.head_ref) && 'engineer2' || 'engineer1' }}
           TERREVO_ASSIGNED_AUTHOR: ${{ github.repository_owner }}
           TERREVO_PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           TERREVO_REPOSITORY: ${{ github.repository }}
           TERREVO_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
-        run: node scripts/r01-ownership.mjs
+        # Bootstrap requires a separately reviewed checker/policy on the base.
+        # Never fall back to HEAD when the base lacks either file.
+        run: |
+          set -euo pipefail
+          [[ "$TERREVO_DIFF_BASE" =~ ^[0-9a-f]{40}$ ]]
+          trusted_checker="$RUNNER_TEMP/terrevo-r01-ownership.mjs"
+          git show "$TERREVO_DIFF_BASE:scripts/r01-ownership.mjs" > "$trusted_checker"
+          node "$trusted_checker"
       - name: Require PR scope declaration
         env:
           PR_BODY: ${{ github.event.pull_request.body }}

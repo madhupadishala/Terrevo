@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateChangedPaths, parseNameStatus, parseNameStatusZ, ownerForBranch, validateAssignment } from '../r01-ownership.mjs';
+import { validateChangedPaths, parseNameStatus, parseNameStatusZ, ownerForBranch, validateAssignment, loadIntegrationScope } from '../r01-ownership.mjs';
+import integrationScope from '../terrevo-v32-integration-scope.json' with {type:'json'};
+import {mkdtempSync,writeFileSync,readFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {execFileSync,spawnSync} from 'node:child_process';
 test('engineer 1 cannot modify delegated files', () => {
  assert.deepEqual(validateChangedPaths(['apps/api/src/handler.ts','apps/web/src/features/clm-library/model.ts'],'engineer1'),['apps/web/src/features/clm-library/model.ts']);
 });
@@ -15,7 +20,7 @@ test('NUL-delimited paths preserve special characters and check both rename side
 test('only the four exact delegated branches select Engineer 2 ownership', () => {
  for(const name of ['09-customer-relations','11-clm-library','13-workforce-evidence','14-manager-reporting'])
   assert.equal(ownerForBranch('feature/terrevo-s'+name+'-ui','engineer2'),'engineer2');
- for(const branch of ['chore/r01-repository-consolidation','feature/ui-live-role-workspaces'])
+ for(const branch of ['chore/r01-repository-consolidation','feature/ui-live-role-workspaces','chore/terrevo-trusted-scope-policy'])
   assert.equal(ownerForBranch(branch,'engineer1'),'engineer1');
  assert.throws(()=>ownerForBranch('feature/terrevo-s09-customer-relations-ui-extra','engineer1'),/Unregistered/);
  assert.throws(()=>ownerForBranch('chore/r01-repository-consolidation'),/assignment mismatch/);
@@ -41,9 +46,34 @@ test('reject invalid file paths and status', () => {
 });
 
 test('integration mandate is limited to one exact branch and recorded file paths',()=>{
- assert.equal(ownerForBranch('feature/terrevo-v32-reference-integration','integrator'),'integrator');
+ assert.equal(ownerForBranch('feature/terrevo-v32-reference-integration','integrator',integrationScope),'integrator');
  assert.throws(()=>ownerForBranch('feature/terrevo-v32-reference-integration-copy','integrator'),/Unregistered/);
- assert.throws(()=>ownerForBranch('feature/terrevo-v32-reference-integration','engineer1'),/mismatch/);
- assert.deepEqual(validateChangedPaths(['apps/api/src/handler.ts','apps/web/src/features/clm-library/model.ts'],'integrator'),[]);
- assert.deepEqual(validateChangedPaths(['AGENTS.md','vercel.json','../secret','apps/api/src/unassigned.ts'],'integrator'),['AGENTS.md','vercel.json','../secret','apps/api/src/unassigned.ts']);
+ assert.throws(()=>ownerForBranch('feature/terrevo-v32-reference-integration','engineer1',integrationScope),/mismatch/);
+ assert.deepEqual(validateChangedPaths(['apps/api/src/handler.ts','apps/web/src/features/clm-library/model.ts'],'integrator',integrationScope),[]);
+ const denied=['AGENTS.md','vercel.json','../secret','apps/api/src/unassigned.ts','apps/web/src/App.tsx'];
+ assert.deepEqual(validateChangedPaths(denied,'integrator',integrationScope),denied);
+ assert.throws(()=>validateChangedPaths(['apps/api/src/handler.ts'],'integrator'),/Trusted integration policy/);
+ for(const base of [undefined,'HEAD','main','--help'])assert.throws(()=>loadIntegrationScope(base),/full commit SHA/);
+});
+
+test('a HEAD checker and allowlist cannot authorize an out-of-scope file',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'terrevo-ownership-'));
+ const script=readFileSync(new URL('../r01-ownership.mjs',import.meta.url),'utf8');
+ const git=(...args)=>execFileSync('git',args,{cwd:dir,encoding:'utf8'}).trim();
+ try{
+  git('init','-q');git('config','user.name','Synthetic Test');git('config','user.email','test@example.invalid');
+  // Git paths mirror the real policy lookup; no reliance on PR-controlled imports.
+  execFileSync(process.execPath,['-e',"require('fs').mkdirSync('scripts')"],{cwd:dir});
+  const policy={branch:integrationScope.branch,allowedPaths:['scripts/r01-ownership.mjs','scripts/terrevo-v32-integration-scope.json']};
+  writeFileSync(join(dir,'scripts/r01-ownership.mjs'),script);
+  writeFileSync(join(dir,'scripts/terrevo-v32-integration-scope.json'),JSON.stringify(policy));
+  git('add','.');git('commit','-qm','Trusted test baseline');const base=git('rev-parse','HEAD');
+  writeFileSync(join(dir,'scripts/terrevo-v32-integration-scope.json'),JSON.stringify({...policy,allowedPaths:[...policy.allowedPaths,'outside.ts']}));
+  writeFileSync(join(dir,'scripts/r01-ownership.mjs'),"process.exit(0);");
+  writeFileSync(join(dir,'outside.ts'),'// forbidden change');
+  git('add','.');git('commit','-qm','Untrusted scope expansion');
+  const trusted=join(dir,'trusted-checker.mjs');writeFileSync(trusted,git('show',base+':scripts/r01-ownership.mjs'));
+  const result=spawnSync(process.execPath,[trusted],{cwd:dir,encoding:'utf8',env:{...process.env,TERREVO_DIFF_BASE:base,TERREVO_DIFF_HEAD:git('rev-parse','HEAD'),TERREVO_HEAD_BRANCH:policy.branch,TERREVO_OWNER:'integrator',TERREVO_PR_AUTHOR:'owner',TERREVO_ASSIGNED_AUTHOR:'owner',TERREVO_REPOSITORY:'owner/repo',TERREVO_HEAD_REPOSITORY:'owner/repo'}});
+  assert.equal(result.status,1);assert.match(result.stderr,/OWNERSHIP VIOLATION[\s\S]*outside\.ts/);
+ }finally{rmSync(dir,{recursive:true,force:true});}
 });

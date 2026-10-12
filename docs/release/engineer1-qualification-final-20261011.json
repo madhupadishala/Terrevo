@@ -523,6 +523,12 @@
       }
     ]
   },
+  "artifactHashProvenance": "artifactSha256 records the original 2026-10-11 files, retained in commit a3c3f73fec528885137b6d9e334f833077876390. The 2026-10-12 provenance-only amendments below are not reruns or new qualification results.",
+  "provenanceAmendmentSha256_20261012": {
+    "engineer1-platform-governance-20261011.json": "d094d8081fab5766761f9604d969d88739320fbfdc9375a65bbb6cc70eb3b573",
+    "engineer1-security-load-initial-20261011.json": "4b588f086ed5989ceefa3a9188267b994a874b750cec34bdaa4612f16f9193b3",
+    "engineer1-security-load-regional-20261011.json": "727d9daba2b671105262c6ed1015348a522dd77621f9420ca91c386a26a8864d"
+  },
   "artifactSha256": {
     "engineer1-live-journey-20261011.json": "22862ae7dd5455ba4c3cf3e2550eba40f5147f30d437f23940517b0144a0f0ff",
     "engineer1-manager-services-20261011.json": "75280a1e4d480cfb069a11dbf627644b2dae3ae8fbf78e12f5a04910e02a31ba",

@@ -29,7 +29,8 @@
       "status": 200,
       "elapsedMs": 10222,
       "serverTiming": "app;dur=389",
-      "requestId": "0fef69fb-ed25-4599-a867-baf556920cf6"
+      "requestId": "0fef69fb-ed25-4599-a867-baf556920cf6",
+      "rowCount": null
     },
     {
       "path": "/v1/auth/login",
@@ -38,7 +39,8 @@
       "status": 200,
       "elapsedMs": 1392,
       "serverTiming": "app;dur=134",
-      "requestId": "04fb42db-349d-4033-93f5-2e2b03a0c979"
+      "requestId": "04fb42db-349d-4033-93f5-2e2b03a0c979",
+      "rowCount": null
     },
     {
       "path": "/v1/auth/login",
@@ -47,7 +49,8 @@
       "status": 200,
       "elapsedMs": 458,
       "serverTiming": "app;dur=124",
-      "requestId": "40064ac5-8fb1-4274-b686-d8feeaec4395"
+      "requestId": "40064ac5-8fb1-4274-b686-d8feeaec4395",
+      "rowCount": null
     },
     {
       "path": "/v1/auth/login",
@@ -56,7 +59,8 @@
       "status": 200,
       "elapsedMs": 704,
       "serverTiming": "app;dur=125",
-      "requestId": "97a35ef3-bb20-4346-a006-7f0260b10940"
+      "requestId": "97a35ef3-bb20-4346-a006-7f0260b10940",
+      "rowCount": null
     },
     {
       "path": "/v1/auth/login",
@@ -65,7 +69,8 @@
       "status": 200,
       "elapsedMs": 444,
       "serverTiming": "app;dur=134",
-      "requestId": "2e2f6960-136f-4700-968b-a1f9b982bc73"
+      "requestId": "2e2f6960-136f-4700-968b-a1f9b982bc73",
+      "rowCount": null
     },
     {
       "path": "/v1/auth/login",
@@ -74,7 +79,8 @@
       "status": 200,
       "elapsedMs": 445,
       "serverTiming": "app;dur=149",
-      "requestId": "29c9bb67-e936-4cce-bbf6-3c51b2eec7e9"
+      "requestId": "29c9bb67-e936-4cce-bbf6-3c51b2eec7e9",
+      "rowCount": null
     },
     {
       "path": "/rest/v1/doctors?select=id&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
@@ -83,7 +89,8 @@
       "status": 200,
       "elapsedMs": 8412,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/doctors?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
@@ -92,7 +99,8 @@
       "status": 200,
       "elapsedMs": 8071,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/chemists?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
@@ -101,7 +109,8 @@
       "status": 200,
       "elapsedMs": 8002,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/tour_plans?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
@@ -110,7 +119,8 @@
       "status": 200,
       "elapsedMs": 7927,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/tour_executions?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
@@ -119,7 +129,8 @@
       "status": 200,
       "elapsedMs": 8026,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/field_visits?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
@@ -128,7 +139,8 @@
       "status": 200,
       "elapsedMs": 9011,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/dcrs?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
@@ -137,7 +149,8 @@
       "status": 200,
       "elapsedMs": 8335,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/unplanned_calls?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
@@ -146,7 +159,8 @@
       "status": 200,
       "elapsedMs": 8081,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/nca_records?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
@@ -155,7 +169,8 @@
       "status": 200,
       "elapsedMs": 8245,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/leave_requests?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
@@ -164,7 +179,8 @@
       "status": 200,
       "elapsedMs": 8027,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/expense_claims?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
@@ -173,7 +189,8 @@
       "status": 200,
       "elapsedMs": 8247,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/business_customer_links?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
@@ -182,7 +199,8 @@
       "status": 200,
       "elapsedMs": 8083,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/business_customer_link_grants?select=*&tenant_id=eq.f1da9282-4a5d-4616-a6b2-303767c55425",
@@ -191,7 +209,8 @@
       "status": 200,
       "elapsedMs": 8060,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/doctors?id=eq.fa72468c-813f-49f2-9088-d4e38bdc9b32",
@@ -200,7 +219,8 @@
       "status": 403,
       "elapsedMs": 10289,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/doctors?id=eq.fa72468c-813f-49f2-9088-d4e38bdc9b32",
@@ -209,7 +229,8 @@
       "status": 403,
       "elapsedMs": 7909,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/doctors?id=eq.fa72468c-813f-49f2-9088-d4e38bdc9b32",
@@ -218,7 +239,8 @@
       "status": 403,
       "elapsedMs": 233,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/business_customer_links",
@@ -227,7 +249,8 @@
       "status": 403,
       "elapsedMs": 240,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/business_customer_link_grants",
@@ -236,7 +259,8 @@
       "status": 403,
       "elapsedMs": 232,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/security_audit_events",
@@ -245,7 +269,8 @@
       "status": 403,
       "elapsedMs": 232,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/platform_admin_grants",
@@ -254,7 +279,8 @@
       "status": 403,
       "elapsedMs": 232,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/rpc/admin_start_tour",
@@ -263,7 +289,8 @@
       "status": 404,
       "elapsedMs": 232,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/rpc/admin_checkin_visit",
@@ -272,7 +299,8 @@
       "status": 404,
       "elapsedMs": 236,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/rpc/user_has_permission",
@@ -281,7 +309,8 @@
       "status": 403,
       "elapsedMs": 236,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/rest/v1/rpc/employee_division",
@@ -290,7 +319,8 @@
       "status": 403,
       "elapsedMs": 224,
       "serverTiming": null,
-      "requestId": null
+      "requestId": null,
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=0",
@@ -299,7 +329,8 @@
       "status": 400,
       "elapsedMs": 972,
       "serverTiming": "app;dur=642",
-      "requestId": "c07aa298-c287-4e98-95d4-0718ecc2006c"
+      "requestId": "c07aa298-c287-4e98-95d4-0718ecc2006c",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=91",
@@ -308,7 +339,8 @@
       "status": 400,
       "elapsedMs": 456,
       "serverTiming": "app;dur=119",
-      "requestId": "10cfbc90-7625-4407-9c36-4c3b47c43f09"
+      "requestId": "10cfbc90-7625-4407-9c36-4c3b47c43f09",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -317,7 +349,8 @@
       "status": 400,
       "elapsedMs": 488,
       "serverTiming": "app;dur=178",
-      "requestId": "809168ad-e760-4644-bc6f-beff9acecca8"
+      "requestId": "809168ad-e760-4644-bc6f-beff9acecca8",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -326,7 +359,8 @@
       "status": 200,
       "elapsedMs": 468,
       "serverTiming": "app;dur=159",
-      "requestId": "387df12e-04ae-427d-a594-05f50acaf0fa"
+      "requestId": "387df12e-04ae-427d-a594-05f50acaf0fa",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -335,7 +369,8 @@
       "status": 200,
       "elapsedMs": 515,
       "serverTiming": "app;dur=174",
-      "requestId": "04402a2d-1b74-4bff-ada8-b056d221e450"
+      "requestId": "04402a2d-1b74-4bff-ada8-b056d221e450",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -344,7 +379,8 @@
       "status": 200,
       "elapsedMs": 717,
       "serverTiming": "app;dur=138",
-      "requestId": "095bdad2-4a4b-470d-a69a-e9355ee25dc8"
+      "requestId": "095bdad2-4a4b-470d-a69a-e9355ee25dc8",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -353,7 +389,8 @@
       "status": 200,
       "elapsedMs": 503,
       "serverTiming": "app;dur=189",
-      "requestId": "7217d6c0-7595-4652-82a6-171db100e8e3"
+      "requestId": "7217d6c0-7595-4652-82a6-171db100e8e3",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -362,7 +399,8 @@
       "status": 200,
       "elapsedMs": 464,
       "serverTiming": "app;dur=121",
-      "requestId": "11d1cbc7-d03e-46fe-a026-43e4b80fe143"
+      "requestId": "11d1cbc7-d03e-46fe-a026-43e4b80fe143",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -371,7 +409,8 @@
       "status": 200,
       "elapsedMs": 444,
       "serverTiming": "app;dur=123",
-      "requestId": "683dd082-c6e3-4159-a613-8333541841e0"
+      "requestId": "683dd082-c6e3-4159-a613-8333541841e0",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -380,7 +419,8 @@
       "status": 200,
       "elapsedMs": 460,
       "serverTiming": "app;dur=142",
-      "requestId": "f238530f-9958-4002-8a85-643bd061b6ec"
+      "requestId": "f238530f-9958-4002-8a85-643bd061b6ec",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -389,7 +429,8 @@
       "status": 200,
       "elapsedMs": 428,
       "serverTiming": "app;dur=101",
-      "requestId": "cf8a89c1-cd78-4200-a9f0-bb0b00d836e1"
+      "requestId": "cf8a89c1-cd78-4200-a9f0-bb0b00d836e1",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -398,7 +439,8 @@
       "status": 200,
       "elapsedMs": 420,
       "serverTiming": "app;dur=113",
-      "requestId": "768b8c5f-bd66-4d50-a0d7-64e517d2fb4c"
+      "requestId": "768b8c5f-bd66-4d50-a0d7-64e517d2fb4c",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -407,7 +449,8 @@
       "status": 200,
       "elapsedMs": 328,
       "serverTiming": "app;dur=94",
-      "requestId": "61b51f30-12c7-4841-96a5-4a6fba98d5d8"
+      "requestId": "61b51f30-12c7-4841-96a5-4a6fba98d5d8",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -416,7 +459,8 @@
       "status": 200,
       "elapsedMs": 436,
       "serverTiming": "app;dur=126",
-      "requestId": "b54dc79e-cffd-4d98-96ae-e505d5c92a2a"
+      "requestId": "b54dc79e-cffd-4d98-96ae-e505d5c92a2a",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -425,7 +469,8 @@
       "status": 200,
       "elapsedMs": 476,
       "serverTiming": "app;dur=124",
-      "requestId": "916a98e2-94e6-42ba-b197-49696a620713"
+      "requestId": "916a98e2-94e6-42ba-b197-49696a620713",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -434,7 +479,8 @@
       "status": 200,
       "elapsedMs": 420,
       "serverTiming": "app;dur=114",
-      "requestId": "f6976d7d-5964-4028-9bb1-b73cc6869ede"
+      "requestId": "f6976d7d-5964-4028-9bb1-b73cc6869ede",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -443,7 +489,8 @@
       "status": 200,
       "elapsedMs": 484,
       "serverTiming": "app;dur=180",
-      "requestId": "19f0c344-9cb3-40e3-ad73-2c208895cd10"
+      "requestId": "19f0c344-9cb3-40e3-ad73-2c208895cd10",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -452,7 +499,8 @@
       "status": 200,
       "elapsedMs": 504,
       "serverTiming": "app;dur=176",
-      "requestId": "41d5dea9-3fe2-42cb-99f6-1fff603b1ef2"
+      "requestId": "41d5dea9-3fe2-42cb-99f6-1fff603b1ef2",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -461,7 +509,8 @@
       "status": 200,
       "elapsedMs": 563,
       "serverTiming": "app;dur=159",
-      "requestId": "9d116d22-e7a1-46ac-95b1-df0573b08985"
+      "requestId": "9d116d22-e7a1-46ac-95b1-df0573b08985",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -470,7 +519,8 @@
       "status": 200,
       "elapsedMs": 8069,
       "serverTiming": "app;dur=136",
-      "requestId": "c02cac67-be29-4377-a4a9-4bad40e7dfc4"
+      "requestId": "c02cac67-be29-4377-a4a9-4bad40e7dfc4",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -479,7 +529,8 @@
       "status": 200,
       "elapsedMs": 8145,
       "serverTiming": "app;dur=189",
-      "requestId": "d23b2948-78f5-46e4-9747-19d6fa9d2d4b"
+      "requestId": "d23b2948-78f5-46e4-9747-19d6fa9d2d4b",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -488,7 +539,8 @@
       "status": 200,
       "elapsedMs": 565,
       "serverTiming": "app;dur=93",
-      "requestId": "7f67aabd-0bf6-4d16-b533-1178fbc48630"
+      "requestId": "7f67aabd-0bf6-4d16-b533-1178fbc48630",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -497,7 +549,8 @@
       "status": 200,
       "elapsedMs": 8316,
       "serverTiming": "app;dur=143",
-      "requestId": "4ae7bfcf-04c7-411d-9eaf-b0fd7c91e074"
+      "requestId": "4ae7bfcf-04c7-411d-9eaf-b0fd7c91e074",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -506,7 +559,8 @@
       "status": 200,
       "elapsedMs": 447,
       "serverTiming": "app;dur=138",
-      "requestId": "0e66886b-071b-4f54-a574-cd260f22fb80"
+      "requestId": "0e66886b-071b-4f54-a574-cd260f22fb80",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -515,7 +569,8 @@
       "status": 200,
       "elapsedMs": 483,
       "serverTiming": "app;dur=131",
-      "requestId": "1bb253dd-12d4-49b6-8816-09d2b1c3001e"
+      "requestId": "1bb253dd-12d4-49b6-8816-09d2b1c3001e",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -524,7 +579,8 @@
       "status": 200,
       "elapsedMs": 692,
       "serverTiming": "app;dur=122",
-      "requestId": "bbae3cf4-b005-4a1a-b77c-b6b9f446ebfe"
+      "requestId": "bbae3cf4-b005-4a1a-b77c-b6b9f446ebfe",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -533,7 +589,8 @@
       "status": 200,
       "elapsedMs": 364,
       "serverTiming": "app;dur=73",
-      "requestId": "c49049ce-4bb7-4b3a-952d-a381679dea32"
+      "requestId": "c49049ce-4bb7-4b3a-952d-a381679dea32",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -542,7 +599,8 @@
       "status": 200,
       "elapsedMs": 715,
       "serverTiming": "app;dur=128",
-      "requestId": "7a8dbcac-a999-4d26-ad97-9916a9f7f164"
+      "requestId": "7a8dbcac-a999-4d26-ad97-9916a9f7f164",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -551,7 +609,8 @@
       "status": 200,
       "elapsedMs": 395,
       "serverTiming": "app;dur=99",
-      "requestId": "5c00b612-ff65-4945-b4ea-55f53b7d5475"
+      "requestId": "5c00b612-ff65-4945-b4ea-55f53b7d5475",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -560,7 +619,8 @@
       "status": 200,
       "elapsedMs": 441,
       "serverTiming": "app;dur=111",
-      "requestId": "fa456764-8700-4170-9970-80086b5ebee0"
+      "requestId": "fa456764-8700-4170-9970-80086b5ebee0",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -569,7 +629,8 @@
       "status": 200,
       "elapsedMs": 708,
       "serverTiming": "app;dur=122",
-      "requestId": "1e79aa6a-7eb2-402e-924f-fa274b70a341"
+      "requestId": "1e79aa6a-7eb2-402e-924f-fa274b70a341",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -578,7 +639,8 @@
       "status": 200,
       "elapsedMs": 428,
       "serverTiming": "app;dur=133",
-      "requestId": "ac516ee9-a73b-4fc5-992f-054030916eaf"
+      "requestId": "ac516ee9-a73b-4fc5-992f-054030916eaf",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -587,7 +649,8 @@
       "status": 200,
       "elapsedMs": 431,
       "serverTiming": "app;dur=131",
-      "requestId": "130cc97f-85c9-4ed6-8d0c-4c4e18bb44aa"
+      "requestId": "130cc97f-85c9-4ed6-8d0c-4c4e18bb44aa",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -596,7 +659,8 @@
       "status": 200,
       "elapsedMs": 455,
       "serverTiming": "app;dur=143",
-      "requestId": "2054be1f-c641-4774-9b51-1d853db6dd22"
+      "requestId": "2054be1f-c641-4774-9b51-1d853db6dd22",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -605,7 +669,8 @@
       "status": 200,
       "elapsedMs": 424,
       "serverTiming": "app;dur=130",
-      "requestId": "ef08ff4d-9afa-475b-975d-f4257e12ef0f"
+      "requestId": "ef08ff4d-9afa-475b-975d-f4257e12ef0f",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -614,7 +679,8 @@
       "status": 200,
       "elapsedMs": 488,
       "serverTiming": "app;dur=144",
-      "requestId": "0c61ad2c-9ac9-4006-99c8-015fa8907bc2"
+      "requestId": "0c61ad2c-9ac9-4006-99c8-015fa8907bc2",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -623,7 +689,8 @@
       "status": 200,
       "elapsedMs": 428,
       "serverTiming": "app;dur=131",
-      "requestId": "93d5cc38-a07e-4f7b-b748-b927bea762f6"
+      "requestId": "93d5cc38-a07e-4f7b-b748-b927bea762f6",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -632,7 +699,8 @@
       "status": 200,
       "elapsedMs": 392,
       "serverTiming": "app;dur=97",
-      "requestId": "4fd294f9-4e05-403a-ac2a-2853eed24de4"
+      "requestId": "4fd294f9-4e05-403a-ac2a-2853eed24de4",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -641,7 +709,8 @@
       "status": 200,
       "elapsedMs": 444,
       "serverTiming": "app;dur=119",
-      "requestId": "1a8aaec6-a6a3-4fae-88c7-5171c3a3fb4a"
+      "requestId": "1a8aaec6-a6a3-4fae-88c7-5171c3a3fb4a",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -650,7 +719,8 @@
       "status": 200,
       "elapsedMs": 472,
       "serverTiming": "app;dur=101",
-      "requestId": "b9260218-604c-44b3-8398-1731e4eaf3db"
+      "requestId": "b9260218-604c-44b3-8398-1731e4eaf3db",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -659,7 +729,8 @@
       "status": 200,
       "elapsedMs": 500,
       "serverTiming": "app;dur=146",
-      "requestId": "4c327a0b-797e-44fe-8fca-7d0020ba45fc"
+      "requestId": "4c327a0b-797e-44fe-8fca-7d0020ba45fc",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -668,7 +739,8 @@
       "status": 200,
       "elapsedMs": 392,
       "serverTiming": "app;dur=92",
-      "requestId": "4e435005-f0d9-469d-bcc8-4c2b4c741a25"
+      "requestId": "4e435005-f0d9-469d-bcc8-4c2b4c741a25",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -677,7 +749,8 @@
       "status": 200,
       "elapsedMs": 400,
       "serverTiming": "app;dur=93",
-      "requestId": "cb2639bb-8d92-4434-877b-4ed974b6aa06"
+      "requestId": "cb2639bb-8d92-4434-877b-4ed974b6aa06",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -686,7 +759,8 @@
       "status": 200,
       "elapsedMs": 492,
       "serverTiming": "app;dur=148",
-      "requestId": "5ca04c94-7d46-4d7a-afa3-d88a7fb6ec1e"
+      "requestId": "5ca04c94-7d46-4d7a-afa3-d88a7fb6ec1e",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -695,7 +769,8 @@
       "status": 200,
       "elapsedMs": 396,
       "serverTiming": "app;dur=103",
-      "requestId": "d4bc3409-c5bc-4f78-84b4-72bd60f535b1"
+      "requestId": "d4bc3409-c5bc-4f78-84b4-72bd60f535b1",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -704,7 +779,8 @@
       "status": 200,
       "elapsedMs": 416,
       "serverTiming": "app;dur=100",
-      "requestId": "d60764a4-d7f1-442a-964a-0f676e4b8fb4"
+      "requestId": "d60764a4-d7f1-442a-964a-0f676e4b8fb4",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -713,7 +789,8 @@
       "status": 200,
       "elapsedMs": 412,
       "serverTiming": "app;dur=117",
-      "requestId": "98f10b92-0799-4685-b6b2-44d8d6c3b73a"
+      "requestId": "98f10b92-0799-4685-b6b2-44d8d6c3b73a",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -722,7 +799,8 @@
       "status": 200,
       "elapsedMs": 393,
       "serverTiming": "app;dur=105",
-      "requestId": "eaafd757-1ce1-4bb1-a25a-98ec8f6a19f4"
+      "requestId": "eaafd757-1ce1-4bb1-a25a-98ec8f6a19f4",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -731,7 +809,8 @@
       "status": 200,
       "elapsedMs": 388,
       "serverTiming": "app;dur=107",
-      "requestId": "cb475f02-03e5-497a-8ccb-037c599747e2"
+      "requestId": "cb475f02-03e5-497a-8ccb-037c599747e2",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -740,7 +819,8 @@
       "status": 200,
       "elapsedMs": 440,
       "serverTiming": "app;dur=141",
-      "requestId": "65ee8ceb-9dac-47a0-b44d-825ee7ad520a"
+      "requestId": "65ee8ceb-9dac-47a0-b44d-825ee7ad520a",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -749,7 +829,8 @@
       "status": 200,
       "elapsedMs": 400,
       "serverTiming": "app;dur=106",
-      "requestId": "555922ae-8606-45f2-875c-c17a9610d4e2"
+      "requestId": "555922ae-8606-45f2-875c-c17a9610d4e2",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -758,7 +839,8 @@
       "status": 200,
       "elapsedMs": 443,
       "serverTiming": "app;dur=108",
-      "requestId": "236eac2e-a751-4548-9191-75c23c7c80b8"
+      "requestId": "236eac2e-a751-4548-9191-75c23c7c80b8",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -767,7 +849,8 @@
       "status": 200,
       "elapsedMs": 340,
       "serverTiming": "app;dur=72",
-      "requestId": "71bd3938-0e63-467b-90f1-6ec953338d99"
+      "requestId": "71bd3938-0e63-467b-90f1-6ec953338d99",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -776,7 +859,8 @@
       "status": 200,
       "elapsedMs": 432,
       "serverTiming": "app;dur=121",
-      "requestId": "bd1e4398-f3c6-44d5-9079-0c07df2db8f2"
+      "requestId": "bd1e4398-f3c6-44d5-9079-0c07df2db8f2",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -785,7 +869,8 @@
       "status": 200,
       "elapsedMs": 424,
       "serverTiming": "app;dur=142",
-      "requestId": "26f12f3c-a3a0-4b9c-86f9-71469290228f"
+      "requestId": "26f12f3c-a3a0-4b9c-86f9-71469290228f",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -794,7 +879,8 @@
       "status": 200,
       "elapsedMs": 412,
       "serverTiming": "app;dur=108",
-      "requestId": "6090db27-dab2-4a08-b5e9-545389647117"
+      "requestId": "6090db27-dab2-4a08-b5e9-545389647117",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -803,7 +889,8 @@
       "status": 200,
       "elapsedMs": 456,
       "serverTiming": "app;dur=157",
-      "requestId": "12c75258-bf52-4a8f-bba8-1ade0dcbcfac"
+      "requestId": "12c75258-bf52-4a8f-bba8-1ade0dcbcfac",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -812,7 +899,8 @@
       "status": 200,
       "elapsedMs": 404,
       "serverTiming": "app;dur=101",
-      "requestId": "7febcf22-a411-4485-9876-3775998a7abf"
+      "requestId": "7febcf22-a411-4485-9876-3775998a7abf",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -821,7 +909,8 @@
       "status": 200,
       "elapsedMs": 424,
       "serverTiming": "app;dur=127",
-      "requestId": "e9ab8119-2d08-4fa8-a197-55457a6c1de5"
+      "requestId": "e9ab8119-2d08-4fa8-a197-55457a6c1de5",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/analytics?days=7",
@@ -830,7 +919,8 @@
       "status": 200,
       "elapsedMs": 364,
       "serverTiming": "app;dur=98",
-      "requestId": "c0dee1ed-4e22-49a3-98fd-7730fbe0c1ac"
+      "requestId": "c0dee1ed-4e22-49a3-98fd-7730fbe0c1ac",
+      "rowCount": null
     },
     {
       "path": "/v1/manager/command-center",
@@ -839,7 +929,8 @@
       "status": 200,
       "elapsedMs": 400,
       "serverTiming": "app;dur=106",
-      "requestId": "912b4824-8fb2-46cc-95b1-348129961476"
+      "requestId": "912b4824-8fb2-46cc-95b1-348129961476",
+      "rowCount": null
     },
     {
       "path": "/v1/unplanned-calls/own",
@@ -848,7 +939,8 @@
       "status": 200,
       "elapsedMs": 444,
       "serverTiming": "app;dur=102",
-      "requestId": "20e8a057-3725-4eea-a55f-0e2f38f29cca"
+      "requestId": "20e8a057-3725-4eea-a55f-0e2f38f29cca",
+      "rowCount": null
     },
     {
       "path": "/v1/dcrs",
@@ -857,7 +949,9 @@
       "status": 200,
       "elapsedMs": 412,
       "serverTiming": "app;dur=102",
-      "requestId": "9d4f3735-ded2-4e62-9f60-55572c735b14"
+      "requestId": "9d4f3735-ded2-4e62-9f60-55572c735b14",
+      "rowCount": null
     }
-  ]
+  ],
+  "rowCountProvenance": "Historical 2026-10-11 responses were not retained. rowCount:null on these checks means not recorded, not a measured zero or a known non-array response. Original status/timing preserved. Updated qualify-security-load.mjs records measured array lengths for future runs."
 }

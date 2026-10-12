@@ -21,7 +21,7 @@ export function reportRows(s:ReportScope,records:ReportRecord[],f:ReportFilter):
  const seen=new Set<string>();const rows=eligible.filter(r=>{const key=JSON.stringify([r.kind,r.id]);if(signatures.get(key)!.size!==1||seen.has(key))return false;seen.add(key);return true;}).sort((a,b)=>b.workDate.localeCompare(a.workDate)||a.id.localeCompare(b.id));
  const count=(kind:ActivityKind,status?:ActivityStatus)=>rows.filter(r=>r.kind===kind&&(!status||r.status===status)).length;
  const plannedStops=count("PLANNED_STOP");const completedPlanned=count("PLANNED_STOP","COMPLETED");
- const counts:MetricCounts={plannedStops,completedPlanned,unplannedPending:count("UNPLANNED_CALL","PENDING"),unplannedApproved:count("UNPLANNED_CALL","APPROVED"),unplannedRejected:count("UNPLANNED_CALL","REJECTED"),ncaReported:count("NCA","REPORTED"),dcrSubmitted:count("DCR","SUBMITTED"),plannedCompletionPercent:plannedStops?Math.round(completedPlanned/plannedStops*100):null};
+ const counts:MetricCounts={plannedStops,completedPlanned,unplannedPending:count("UNPLANNED_CALL","PENDING"),unplannedApproved:count("UNPLANNED_CALL","APPROVED"),unplannedRejected:count("UNPLANNED_CALL","REJECTED"),ncaReported:count("NCA","REPORTED"),dcrSubmitted:count("DCR","SUBMITTED"),plannedCompletionPercent:plannedStops?Math.round(completedPlanned*1000/plannedStops)/10:null};
  return {rows,counts,excluded:records.length-rows.length};
 }
 function emptyCounts():MetricCounts{return {plannedStops:0,completedPlanned:0,unplannedPending:0,unplannedApproved:0,unplannedRejected:0,ncaReported:0,dcrSubmitted:0,plannedCompletionPercent:null};}

@@ -158,6 +158,13 @@
     }
   ],
   "allowedPaths": [
+    "docs/engineering/TRUSTED-SCOPE-BOOTSTRAP.md",
+    ".github/workflows/trusted-scope-lock.yml",
+    "apps/web/e2e/fixtures/review-regressions.tsx",
+    "apps/web/e2e/review-regressions.spec.ts",
+    "scripts/staging/tour-plan-recovery.mjs",
+    "scripts/test/tour-plan-recovery.test.mjs",
+    "scripts/test/staging-qualification-regressions.test.mjs",
     ".coderabbit.yaml",
     ".github/workflows/ci.yml",
     "apps/api/src/handler.ts",

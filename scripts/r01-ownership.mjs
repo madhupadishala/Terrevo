@@ -3,14 +3,21 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import integrationScope from './terrevo-v32-integration-scope.json' with {type:'json'};
+
+// The PR's policy is only a proposal. Runtime authorization comes exclusively
+// from the immutable PR base SHA supplied by the trusted workflow.
+export function loadIntegrationScope(base) {
+  if (!/^[0-9a-f]{40}$/.test(base ?? '')) throw new Error('Trusted base must be a full commit SHA');
+  return JSON.parse(execFileSync('git', ['show', base + ':scripts/terrevo-v32-integration-scope.json'], {encoding:'utf8'}));
+}
 
 export const engine2Paths = [
   /^apps\/web\/src\/features\/(customer-relations|clm-library|workforce-evidence|manager-reporting)\//,
   /^apps\/web\/test\/(customer-relations|clm-library|workforce-evidence|manager-reporting)[^/]*\.test\.ts$/
 ];
-export function validateChangedPaths(paths, owner) {
+export function validateChangedPaths(paths, owner, integrationScope) {
   if (!['engineer1', 'engineer2', 'integrator'].includes(owner)) throw new Error('Owner must be engineer1, engineer2 or integrator');
+  if (owner === 'integrator' && !Array.isArray(integrationScope?.allowedPaths)) throw new Error('Trusted integration policy required');
   const violations = [];
   for (const path of paths) {
     if (!path || path.startsWith('/') || path.includes('..') || path.includes('\\')) {
@@ -51,10 +58,10 @@ export function parseNameStatusZ(text) {
   }
   return paths;
 }
-export function ownerForBranch(branch, assignment) {
-  const registeredOwner = branch === integrationScope.branch ? 'integrator' : /^feature\/terrevo-s(09-customer-relations|11-clm-library|13-workforce-evidence|14-manager-reporting)-ui$/.test(branch)
+export function ownerForBranch(branch, assignment, integrationScope) {
+  const registeredOwner = branch && branch === integrationScope?.branch ? 'integrator' : /^feature\/terrevo-s(09-customer-relations|11-clm-library|13-workforce-evidence|14-manager-reporting)-ui$/.test(branch)
     ? 'engineer2'
-    : ['chore/r01-repository-consolidation', 'feature/ui-live-role-workspaces'].includes(branch) ? 'engineer1' : null;
+    : ['chore/r01-repository-consolidation', 'feature/ui-live-role-workspaces', 'chore/terrevo-trusted-scope-policy'].includes(branch) ? 'engineer1' : null;
   if (!registeredOwner) throw new Error('Unregistered engineer branch');
   if (assignment !== registeredOwner) throw new Error('Branch/engineer assignment mismatch');
   return registeredOwner;
@@ -68,15 +75,19 @@ export function validateAssignment({author, assignedAuthor, headRepository, repo
 function main() {
   validateAssignment({author: process.env.TERREVO_PR_AUTHOR, assignedAuthor: process.env.TERREVO_ASSIGNED_AUTHOR,
     headRepository: process.env.TERREVO_HEAD_REPOSITORY, repository: process.env.TERREVO_REPOSITORY});
-  const owner = ownerForBranch(process.env.TERREVO_HEAD_BRANCH, process.env.TERREVO_OWNER);
   const base = process.env.TERREVO_DIFF_BASE;
-  if (!base || !/^[a-zA-Z0-9._\/-]+$/.test(base) || base.startsWith('-')) {
-    throw new Error('TERREVO_DIFF_BASE must be an explicit trusted git ref');
+  if (!/^[0-9a-f]{40}$/.test(base ?? '')) {
+    throw new Error('TERREVO_DIFF_BASE must be a full trusted commit SHA');
   }
   execFileSync('git', ['rev-parse', '--verify', base + '^{commit}'], {stdio:'pipe'});
-  const output = execFileSync('git', ['diff', '--name-status', '-z', '--find-renames', base + '...HEAD'], {encoding:'utf8'});
+  const head = process.env.TERREVO_DIFF_HEAD;
+  if (!/^[0-9a-f]{40}$/.test(head ?? '')) throw new Error('TERREVO_DIFF_HEAD must be a full commit SHA');
+  execFileSync('git', ['rev-parse', '--verify', head + '^{commit}'], {stdio:'pipe'});
+  const integrationScope = process.env.TERREVO_OWNER === 'integrator' ? loadIntegrationScope(base) : undefined;
+  const owner = ownerForBranch(process.env.TERREVO_HEAD_BRANCH, process.env.TERREVO_OWNER, integrationScope);
+  const output = execFileSync('git', ['diff', '--name-status', '-z', '--find-renames', base + '...' + head], {encoding:'utf8'});
   const paths = parseNameStatusZ(output);
-  const violations = validateChangedPaths(paths, owner);
+  const violations = validateChangedPaths(paths, owner, integrationScope);
   if (violations.length) {
     process.stderr.write('R01 OWNERSHIP VIOLATION for ' + owner + ':\n' + violations.join('\n') + '\n');
     process.exitCode = 1;

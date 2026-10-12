@@ -91,6 +91,7 @@
     },
     {
       "name": "platform-after-revocation-denied",
+      "provenance": "Manually appended historical check; the producing command and elapsedMs/at were not retained. Not emitted by qualify-platform-governance.mjs and not rerun for this annotation.",
       "path": "/v1/platform/tenants",
       "method": "GET",
       "status": 403,
@@ -101,5 +102,9 @@
   ],
   "completedAt": "2026-10-11T12:26:17.319Z",
   "temporaryGrantRevoked": true,
-  "revocationVerifiedAt": "2026-10-11T12:58:39.825Z"
+  "revocationVerifiedAt": "2026-10-11T12:58:39.825Z",
+  "revocationFieldProvenance": {
+    "fields": ["temporaryGrantRevoked", "revocationVerifiedAt"],
+    "source": "Manually appended historical fields; producing command not retained. Original values preserved, not independently reverified by this annotation."
+  }
 }
