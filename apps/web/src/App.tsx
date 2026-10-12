@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, InlineNotification, Tag, TextArea, TextInput, Tile } from "@carbon/react";
 import { BusinessWorkspace, type BusinessArea } from "./BusinessWorkspace";
 import { PlatformConsole } from "./PlatformConsole";
@@ -128,6 +128,17 @@ export default function App() {
   const authorizedForTenantId = connected && !loading ? tenantId : "";
   const admin = access?.roles.some(r => r.roleKey === "TENANT_ADMIN") ?? false;
   const manager = admin || (access?.roles.some(r => r.roleKey === "MANAGER") ?? false);
+  const visibleNav = useMemo(() => {
+    const employeeAreas = new Set<Area>(["overview","today","customers","activities","edetailing","field","plans","trade","inventory","workforce","reports"]);
+    const managerAreas = new Set<Area>([...employeeAreas,"manager","approvals"]);
+    const adminAreas = new Set<Area>([...managerAreas,"admin"]);
+    if (!session) return NAV.filter(n => n.id === "overview");
+    if (!connected) return NAV.filter(n => n.id === "overview" || (isPlatformAdmin && n.id === "platform"));
+    return NAV.filter(n => (admin ? adminAreas : manager ? managerAreas : employeeAreas).has(n.id) || (isPlatformAdmin && n.id === "platform"));
+  }, [session, connected, admin, manager, isPlatformAdmin]);
+  useEffect(() => {
+    if (!visibleNav.some(n => n.id === view)) setView(visibleNav[0]?.id ?? "overview");
+  }, [visibleNav, view]);
   const activeStop = progress?.stops.find(s => s.planStopId === visit?.planStopId);
 
   const refresh = useCallback(async (rights: AccessContext | null) => {
@@ -241,14 +252,14 @@ export default function App() {
   function requireLocation(): Promise<{latitude: number; longitude:number; accuracyMeters:number}> {
     return freshPosition();
   }
-  const viewName = NAV.find(n => n.id === view)!;
+  const viewName = visibleNav.find(n => n.id === view) ?? NAV[0];
   const selectedTenantName = tenants.find(t => t.id === tenantId)?.name ?? null;
   return <div className="tr-app">
     <aside className="tr-sidebar" aria-label="Terrevo navigation">
       <div className="tr-brand"><div className="tr-mark">T<span>.</span></div><div><strong>terrevo</strong><small>FIELD INTELLIGENCE</small></div></div>
       <div className="tr-workspace"><span className="tr-workspace-dot" /> {selectedTenantName ?? "PRODUCT WORKSPACE"} </div>
       <p className="tr-nav-label">WORKSPACES</p>
-      <nav className="tr-nav" aria-label="Primary">{NAV.map(n=>
+      <nav className="tr-nav" aria-label="Primary">{visibleNav.map(n=>
         <button key={n.id} type="button" className={view===n.id?"tr-nav-item selected":"tr-nav-item"} aria-current={view===n.id?"page":undefined} onClick={()=>{setView(n.id); setNotice(null);}}>
           <span className="tr-nav-glyph" aria-hidden="true">{n.icon}</span>{n.title}</button>)}</nav>
       <div className="tr-sidebar-foot"><div className="tr-foot-pill"><span className="tr-foot-dot" /> {connected?"Server-connected":"No organization connected"}</div><p>Web · Carbon enterprise UI<br/>Live records only</p></div>
@@ -270,7 +281,7 @@ export default function App() {
 
         {!connected && <div className="tr-connect-grid">
           <Panel eyebrow="ACCOUNT CONNECTION" title={session?"Choose your organization":"Connect an existing Terrevo account"}>
-            <p className="tr-detail">You can explore every workspace without credentials. Live company data and mutations remain protected by the existing identity, RBAC and tenant services. No Super Admin email is required to develop the UI.</p>
+            <p className="tr-detail">Sign in to reveal only the workspaces authorized for your role and organization. Live company data and mutations remain protected by the existing identity, RBAC and tenant services.</p>
             {!session ? <form className="tr-form" onSubmit={e=>{e.preventDefault();void connect();}}>
               <TextInput id="account-email" type="email" labelText="Existing account email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username"/>
               <TextInput id="account-password" type="password" labelText="Password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password"/>
@@ -285,7 +296,7 @@ export default function App() {
             <div className="tr-check-row"><span>Server data source</span><Tag type="blue">Supabase API</Tag></div>
             <div className="tr-check-row"><span>Access requirements</span><Tag type="green">Enforced</Tag></div>
             <div className="tr-check-row"><span>Organization boundaries</span><Tag type="green">Existing RLS</Tag></div>
-            <div className="tr-check-row"><span>Super Admin role</span><Tag type="gray">Backend pending</Tag></div>
+            <div className="tr-check-row"><span>Super Admin role</span><Tag type={isPlatformAdmin?"green":"gray"}>{isPlatformAdmin?"Authorized":"Separate authorization"}</Tag></div>
             <p className="tr-detail">This application never exposes a service-role token or impersonates an end user.</p>
           </Panel>
         </div>}
