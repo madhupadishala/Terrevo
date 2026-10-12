@@ -552,6 +552,7 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
         const subject=body.subject&&typeof body.subject==="object"&&!Array.isArray(body.subject)?body.subject as Record<string,unknown>:null;
         const snapshots:AgentSnapshots={};
         if(agentId==="AI-01"||agentId==="AI-02")snapshots.startOptions=await tourExecution.listStartOptions(context.tenantId,accessToken) as unknown as Array<Record<string,unknown>>;
+        if(agentId==="AI-02")snapshots.doctors=await masters.list("doctors",context.tenantId,accessToken) as unknown as Array<Record<string,unknown>>;
         if(agentId==="AI-04")snapshots.dcrs=await doctorCalls.listDcrs(context.tenantId,accessToken) as unknown as Array<Record<string,unknown>>;
         if(agentId==="AI-05"||agentId==="AI-15"){
           if(agentRoles.includes("MANAGER")||agentRoles.includes("TENANT_ADMIN"))snapshots.analytics=await analytics.getManagerAnalytics(context.tenantId,accessToken,7) as unknown as Record<string,unknown>;
@@ -561,6 +562,10 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
         }
         if(agentId==="AI-09")snapshots.clmAssets=await readClmAssets(context.tenantId,accessToken) as unknown as Array<Record<string,unknown>>;
         if(agentId==="AI-11")snapshots.inventory=await inventory.listBalances(context.tenantId,accessToken) as unknown as Array<Record<string,unknown>>;
+        if(agentId==="AI-13"&&subject&&typeof subject.id==="string"&&CLM_UUID.test(subject.id)){
+          try{snapshots.doctorCall=await doctorCalls.getByVisit(context.tenantId,accessToken,subject.id) as unknown as Record<string,unknown>;}
+          catch(error){if(!(error instanceof DoctorCallNotFoundError))throw error;}
+        }
         if(agentId==="AI-14"){
           const entries=await Promise.all(MASTER_KINDS.map(async kind=>[kind,await masters.list(kind,context.tenantId,accessToken)] as const));
           snapshots.masters=Object.fromEntries(entries) as Record<string,Array<Record<string,unknown>>>;
