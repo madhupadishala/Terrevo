@@ -27,6 +27,8 @@ import { AnalyticsInputError, createAnalyticsService } from "../../../modules/an
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 import { createPlatformAdminService, PlatformForbiddenError, PlatformValidationError, PlatformNotFoundError } from "./platform-admin.ts";
 import { readBoundedJsonObject, RequestBodyError } from "../../../modules/security/src/index.ts";
+import { AGENT_REGISTRY, runAgent, type AgentId, type AgentRole } from "../../../modules/ai-agents/src/index.ts";
+import { buildDeterministicAgentInput, type AgentSnapshots } from "../../../modules/ai-agents/src/server-input.ts";
 
 export type ApiEnv = {
   SUPABASE_URL?: string;
@@ -486,6 +488,50 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
         const user = await identity.authenticate(request.headers.get("authorization"));
         const offset = Number(new URL(request.url).searchParams.get("offset") ?? "0");
         return json(200, { events: await platform.audit(user.id, offset) });
+      }
+
+      if(request.method==="GET"&&path==="/v1/ai/agents"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        const rights=await rbac.accessContext(context.tenantId,user.id,accessToken);
+        const agentRoles=rights.roles.flatMap(r=>r.roleKey==="MR"?["MR" as AgentRole]:r.roleKey==="MANAGER"?["MANAGER" as AgentRole]:r.roleKey==="TENANT_ADMIN"?["TENANT_ADMIN" as AgentRole]:[]);
+        const visible=AGENT_REGISTRY.filter(def=>def.allowedRoles.some(role=>agentRoles.includes(role)));
+        return json(200,{agents:visible.map(def=>({id:def.id,name:def.name,priority:def.priority,authoritativeDatasets:def.authoritativeDatasets,resultKeys:def.resultKeys}))});
+      }
+      const aiRun=/^\/v1\/ai\/agents\/(AI-(?:0[1-9]|1[0-5]))\/run$/.exec(path);
+      if(request.method==="POST"&&aiRun){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        const rights=await rbac.accessContext(context.tenantId,user.id,accessToken);
+        const agentRoles=rights.roles.flatMap(r=>r.roleKey==="MR"?["MR" as AgentRole]:r.roleKey==="MANAGER"?["MANAGER" as AgentRole]:r.roleKey==="TENANT_ADMIN"?["TENANT_ADMIN" as AgentRole]:[]);
+        const agentId=aiRun[1] as AgentId;
+        const definition=AGENT_REGISTRY.find(def=>def.id===agentId);
+        if(!definition)throw new ApiError(404,"Agent not found");
+        if(!definition.allowedRoles.some(role=>agentRoles.includes(role)))throw new ApiError(403,"Agent role denied");
+        const body=await readJsonObject(request,16_384);
+        const requestId=typeof body.requestId==="string"&&body.requestId.trim()&&body.requestId.length<=120?body.requestId.trim():crypto.randomUUID();
+        const subject=body.subject&&typeof body.subject==="object"&&!Array.isArray(body.subject)?body.subject as Record<string,unknown>:null;
+        const snapshots:AgentSnapshots={};
+        if(agentId==="AI-01"||agentId==="AI-02")snapshots.startOptions=await tourExecution.listStartOptions(context.tenantId,accessToken) as unknown as Array<Record<string,unknown>>;
+        if(agentId==="AI-04")snapshots.dcrs=await doctorCalls.listDcrs(context.tenantId,accessToken) as unknown as Array<Record<string,unknown>>;
+        if(agentId==="AI-05"||agentId==="AI-15"){
+          if(agentRoles.includes("MANAGER")||agentRoles.includes("TENANT_ADMIN"))snapshots.analytics=await analytics.getManagerAnalytics(context.tenantId,accessToken,7) as unknown as Record<string,unknown>;
+        }
+        if(agentId==="AI-07"&&subject&&typeof subject.id==="string"&&CLM_UUID.test(subject.id)){
+          try{snapshots.rcpa=await rcpa.get(context.tenantId,accessToken,subject.id) as unknown as Record<string,unknown>;}catch(error){if(!(error instanceof RcpaNotFoundError))throw error;}
+        }
+        if(agentId==="AI-09")snapshots.clmAssets=await readClmAssets(context.tenantId,accessToken) as unknown as Array<Record<string,unknown>>;
+        if(agentId==="AI-11")snapshots.inventory=await inventory.listBalances(context.tenantId,accessToken) as unknown as Array<Record<string,unknown>>;
+        if(agentId==="AI-14"){
+          const entries=await Promise.all(MASTER_KINDS.map(async kind=>[kind,await masters.list(kind,context.tenantId,accessToken)] as const));
+          snapshots.masters=Object.fromEntries(entries) as Record<string,Array<Record<string,unknown>>>;
+        }
+        const derived=buildDeterministicAgentInput(agentId,snapshots);
+        const evidence=Array.isArray(derived.evidence)?derived.evidence as Array<{source_id?:unknown}>:[];
+        const allowedSourceIds=new Set(evidence.flatMap(item=>typeof item.source_id==="string"?[item.source_id]:[]));
+        const output=runAgent({contract_version:"1.0",agent_id:agentId,request_id:requestId,input:derived,
+          ...(subject&&typeof subject.kind==="string"&&typeof subject.id==="string"?{subject:{kind:subject.kind,id:subject.id}}:{}),
+          requested_as_of:new Date().toISOString()},
+          {tenantId:context.tenantId,actorId:user.id,roles:agentRoles,allowedSourceIds,now:new Date().toISOString()});
+        return json(200,{output});
       }
 
       const customerHistoryMatch=/^\/v1\/customers\/(doctor|chemist|stockist)\/([^/]+)\/history$/.exec(path);
