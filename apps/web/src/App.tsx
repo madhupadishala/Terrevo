@@ -8,6 +8,7 @@ import { Customer360View } from "./features/customer360/Customer360View";
 import { ActivitiesView } from "./features/activities/ActivitiesView";
 import { EDetailingView } from "./features/edetailing/EDetailingView";
 import { TodayIntelligenceView } from "./features/intelligence/TodayIntelligenceView";
+import { ManagerReportingView, reportCsv } from "./features/manager-reporting/ManagerReportingView";
 import { localDate } from "./plan-calendar";
 import { customerRelationships } from "./customer-links-adapter";
 import type { CustomerActivity, CustomerRelationship } from "./features/customer360/model";
@@ -15,7 +16,7 @@ import { allowedWorkspaceIds } from "./role-navigation";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
-  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall, type ClmAsset,
+  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall, type ClmAsset, type ManagerReportRecord,
 } from "./terrevo-api";
 
 type Area = "overview" | "today" | "customers" | "activities" | "edetailing" | "field" | "plans" | "manager" | "admin" | "platform" | BusinessArea;
@@ -125,6 +126,9 @@ export default function App() {
   const [clmEffectiveFrom,setClmEffectiveFrom] = useState("");
   const [clmExpiresAt,setClmExpiresAt] = useState("");
   const [clmProvenance,setClmProvenance] = useState("");
+  const [managerReportRecords,setManagerReportRecords] = useState<ManagerReportRecord[]>([]);
+  const [managerReportAsOf,setManagerReportAsOf] = useState("");
+  const [managerReportError,setManagerReportError] = useState<string|null>(null);
 
   function resetTenantState() {
     setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
@@ -132,7 +136,7 @@ export default function App() {
     setSelectedOption(""); setStopId(""); setGpsReason(""); setCallOutcome("");
     setCallRemarks(""); setShortDayReason("");
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
-    setFocusedCustomer(null); setCustomerRelations([]); setCustomerActivities([]); setCustomerProfileError(null); setCustomerProfileLoading(false); setClmAssets([]); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
+    setFocusedCustomer(null); setCustomerRelations([]); setCustomerActivities([]); setCustomerProfileError(null); setCustomerProfileLoading(false); setClmAssets([]); setManagerReportRecords([]); setManagerReportAsOf(""); setManagerReportError(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
     setOwnUnplanned([]);setPendingUnplanned([]);setUnplannedReviewComment("");
   }
 
@@ -192,14 +196,16 @@ export default function App() {
       if (failures) setNotice({kind:"info",title:"Partial data access",
         message:String(failures)+" API requests were denied or unavailable; previous tenant records have been cleared."});
       if (rights?.roles.some(r=>r.roleKey==="TENANT_ADMIN"||r.roleKey==="MANAGER")) {
-        const extra=await Promise.allSettled([api.manager(),api.pendingPlans(),api.analytics(),api.pendingUnplannedCalls()]);
+        const extra=await Promise.allSettled([api.manager(),api.pendingPlans(),api.analytics(),api.pendingUnplannedCalls(),api.managerReportRecords()]);
         if (generation !== tenantGeneration.current) return;
         setCommand(extra[0].status==="fulfilled"?extra[0].value:null);
         setPending(extra[1].status==="fulfilled"?extra[1].value:[]);
         setAnalytics(extra[2].status==="fulfilled"?extra[2].value:null);
         setPendingUnplanned(extra[3].status==="fulfilled"?extra[3].value:[]);
+        if(extra[4].status==="fulfilled"){setManagerReportRecords(extra[4].value.records);setManagerReportAsOf(extra[4].value.asOf);setManagerReportError(null);}
+        else {setManagerReportRecords([]);setManagerReportAsOf("");setManagerReportError(errText(extra[4].reason));}
       } else {
-        setCommand(null);setPending([]);setAnalytics(null);setPendingUnplanned([]);
+        setCommand(null);setPending([]);setAnalytics(null);setPendingUnplanned([]);setManagerReportRecords([]);setManagerReportAsOf("");setManagerReportError(null);
       }
     } finally {
       if (generation === tenantGeneration.current) setLoading(false);
@@ -544,6 +550,19 @@ export default function App() {
             </Panel>
           </div></>:
           <Panel eyebrow="MANAGER ACCESS" title="Manager workspace is permission-gated"><p className="tr-detail">The actual manager command and approval APIs only permit an authorized manager or tenant administrator. No fake results are displayed.</p></Panel>)}
+
+        {view==="manager"&&manager&&<ManagerReportingView
+          scope={{tenantId,authorizedForTenantId:tenantId,contextKey,role:admin?"ADMIN":"MANAGER",
+            permittedTerritoryIds:[...new Set(managerReportRecords.map(r=>r.territoryId))],
+            permittedTeamUserIds:[...new Set(managerReportRecords.map(r=>r.ownerUserId))],
+            asOf:managerReportAsOf||new Date().toISOString()}}
+          records={managerReportRecords} loading={loading} error={managerReportError}
+          onRequestCsv={({filter})=>{
+            const from=filter.from,to=filter.to,territory=filter.territoryId,user=filter.ownerUserId;
+            const rows=managerReportRecords.filter(r=>(!from||r.workDate>=from)&&(!to||r.workDate<=to)&&(!territory||r.territoryId===territory)&&(!user||r.ownerUserId===user));
+            const blob=new Blob([reportCsv(rows)],{type:"text/csv;charset=utf-8"});
+            const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="terrevo-manager-report.csv";link.click();URL.revokeObjectURL(url);
+          }} />}
 
         {view==="admin"&&(admin?<div className="tr-grid-wide">
           <Panel eyebrow="ORGANIZATION STRUCTURE" title="Manage reporting hierarchy">
