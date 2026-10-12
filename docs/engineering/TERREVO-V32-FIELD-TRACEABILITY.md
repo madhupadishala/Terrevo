@@ -1,0 +1,84 @@
+# V3.2 reference traceability — initial reconciliation
+
+Status: IN PROGRESS. Owner instruction on 2026-10-11 takes precedence over handoff section C: implement the Terrevo handoff; the supplied 84-page field guide is functional reference only. Do not copy its branding, access codes, screenshots, wording or navigation. No reference assets are bundled in Terrevo.
+
+This is a source-to-code gap index, not exhaustive field acceptance. Page numbers refer to the supplied reference. Unless stated otherwise, requiredness, defaults, option catalogs, retention, offline policy and exact field-to-API/table tests remain UNKNOWN until verified against the existing domain contracts and approved Terrevo policies. A module's existence is not proof of the complete browser-to-database workflow.
+
+| Reference pages | Functional observation (paraphrased) | Canonical Terrevo area | Reconciliation / acceptance gap |
+|---|---|---|---|
+| 4–8 | Organization selection and authenticated access | `modules/identity`, `modules/tenant` | Existing bearer/session flow retained; do not copy the reference access code or assume OTP is a required replacement |
+| 9 | Refresh assigned master data | `modules/masters`, `apps/mobile` | Sync UX and complete offline master refresh acceptance unverified |
+| 10–11 | Download approved detailing material | `features/clm-library`, `features/edetailing` | Binary ACL/download/revocation/offline expiry missing from verified integration |
+| 16–18 | Plan day, activity category, territory and customer selection | `modules/tour-planning`, `MonthlyPlanner` | Existing types and controlled masters remain authoritative; per-field UI trace unfinished |
+| 19 | Non-call category and town in planning | `modules/nca`, `modules/tour-planning` | NCA execution exists; complete planning linkage requires verification |
+| 20–22 | Coverage checks and submitted/approved plan state | `modules/tour-planning`, `modules/tour-approval` | Full-day coverage and configurable frequency rules require field-level qualification |
+| 23–28 | Approved agenda, attendance and start location | `modules/tour-execution`, `modules/attendance-leave`, `modules/tour-progress` | Retain canonical approved-plan/start contracts; town semantics need confirmation |
+| 29–33 | Planned and unplanned customer activity | `modules/unplanned-calls`, `modules/visit-execution` | Keep unplanned approval ledger distinct from completed planned visits |
+| 34 | NCA reason and remarks | `modules/nca` | Controlled options and tenant-scoped persistence exist; field acceptance still open |
+| 36–40 | Doctor/chemist/stockist linkage | `modules/business-customer-links`, `customer-links-adapter.ts` | Approved read edges and counterpart RLS exist; link creation/approval and full history are not delivered here |
+| 39 | Reference linkage propagation delay | No mandated Terrevo delay | Do not introduce a 30-minute wait; return actual server state |
+| 41–44 | Own/competitor brand counts and final submission | `modules/rcpa` | Verify reported-value provenance, units, linked outlet rule and post-submit immutability |
+| 45–48 | Product, quantity and order confirmation | `modules/orders` | Validate configured pricing, quantities, ledger and customer-link dependency end to end |
+| 49–53 | Rehearsal, detailing start/end and saved session | `features/edetailing`, `features/clm-library` | UI draft/session intent is not persisted approved-content evidence |
+| 54–57 | GPS, missing location and manager-reviewed location correction | `modules/visit-execution`, `database/migrations/0020b_presence_integrity.sql` | Existing GPS exceptions retained; specific customer-location change approval needs mapping |
+| 58–59 | Detailed products and distributed items | `modules/doctor-call`, `modules/inventory` | Verify session-to-call and stock movement linkage; never infer distribution |
+| 60 | Individual-call remarks | `modules/doctor-call` | Existing call contract retained; exact reference field constraints not established |
+| 61–63 | Joint work, co-presence and manager selection | `modules/joint-work`, `database/migrations/0020b_presence_integrity.sql` | Existing server confirmation retained; physical-device discovery is unqualified |
+| 65–67 | End location, day closure and report submission | `modules/tour-submit`, `modules/timesheet-daily` | Verify persisted final report and reference end-town mapping; no auto success inference |
+| 72–76 | Expense line, invoice evidence and submission prerequisites | `modules/expenses`, `features/workforce-evidence` | Receipt storage/ACL/policy versions and day-report dependency need complete contracts |
+| 81–82 | Leave category, remarks and status | `modules/attendance-leave` | Existing create/read/approval flow; exact options and date requirements remain source-specific |
+
+## Additional handoff requirements independent of the reference
+
+- S02/S03: full synthetic Alpha/Beta organization setup through authorized admin forms, dynamic policy catalogs and controlled imports.
+- S07: immutable as-of reporting projections and reauthorized exports. The imported model now rejects impossible civil dates, empty IDs and unsupported kind/status combinations.
+- S08: 15 shared agents, each with its own typed contract, source evidence, policy gate and evaluation. No `modules/ai-agents` implementation was found in the reconciled sources; this delivery does not mark any agent built.
+- S09/S10: real database and browser qualification, offline recovery, independent UAT and explicit manual production approval remain gates.
+
+## Named field inventory and contract evidence (S01 audit, 2026-10-12)
+
+The guide's text layer names the fields below; the tables describe **Terrevo's own** current contracts. `?` means that the guide and current accepted Terrevo policy do not establish the value. `R` means required by the cited service; `C` conditional; `O` optional. All tenant identifiers are taken from the authenticated request context, not from a form. Server authorization and database RLS must both hold. This inventory does not certify that each browser field is mounted or that a complete journey passes. The guide does not specify defaults, precise visibility rules, medical-content retention, or an offline conflict policy for these fields; those values remain `?` except where a linked Terrevo service explicitly decides them.
+
+| Field ID / Terrevo label | Type, requirement, options and validation | Role, API and persistence | Linkage, audit/offline, test and acceptance status |
+|---|---|---|---|
+| AUTH-01 Tenant selection | UUID, R; active membership; default ? | Authenticated user; `/v1/tenant-context`; `tenant_memberships` | All downstream writes scoped by tenant; session/offline account switch needs device qualification; `identity-tenant.test.ts`; technically tested |
+| AUTH-02 Credential/session | Terrevo credentials and refresh token; reference access code/OTP is **not** a Terrevo mandate | User; `/v1/auth/login`, `/v1/auth/refresh`, `/v1/auth/logout`; identity service | Token lifecycle and role UAT still open; `identity-tenant.test.ts`; implementation started |
+| SYNC-01 Assigned master refresh | server-scoped data, read; update policy ? | MR/manager; `/v1/masters/*`; `masters`, organization tables | Device cache freshness and conflict policy ?; `masters.test.ts`; integration acceptance open |
+| CLM-01 Approved catalog and binary | Product, region, content version, validity, download authorization all ? | Assigned MR; no verified versioned CLM catalog/download API/table | Only a UI contract draft; revocation/offline expiry and tests absent; absent backend |
+| PLAN-01 Plan period | ISO date, R; current implementation is a **Monday week**, not reference monthly period | MR; `/v1/tour-plans`; `tour_plans.week_start` | Monthly recurrence/coverage gap; `tour-planning.test.ts`; technically tested weekly only |
+| PLAN-02 Plan day | ISO civil date, R; one to seven distinct days inside selected week | MR; `/v1/tour-plans`; `tour_plan_days` | Unique date, linked plan; offline policy ?; `tour-planning.test.ts`; technically tested |
+| PLAN-03 Activity kind | Current plan stops support doctor/chemist/stockist; NCA has a separate PLAN phase; field-work/NCA combined picker ? | MR; `/v1/tour-plans`, `/v1/nca`; `tour_plan_stops`, `nca_records` | Cross-module day coverage not qualified; `tour-planning.test.ts`, `nca.test.ts`; partial |
+| PLAN-04 Territory/beat | Territory UUID, R in plan day; beat/patch mapping ? | MR with `TOUR_PLAN_OWN`; `/v1/tour-plans`; `tour_plan_days.territory_id` | Assignment check; `tour-planning.test.ts`; beat acceptance open |
+| PLAN-05 Planned customer | `type` doctor/chemist/stockist, `targetId` UUID, sequence positive unique, up to 50 stops/day | MR; `/v1/tour-plans`; `tour_plan_stops` | Duplicate target rejected per day; `tour-planning.test.ts`; technically tested |
+| PLAN-06 Day/stop remarks | O text, up to 1,000/500 characters respectively | MR; `/v1/tour-plans`; day/stop remarks | No reference requiredness/default; `tour-planning.test.ts`; technically tested |
+| PLAN-07 NCA category/town | Active category code R; active town UUID R for PLAN, town must belong to territory | MR; `/v1/nca/options`, `/v1/nca`; `nca_categories`, `nca_towns`, `nca_records` | Controlled tenant masters; `nca.test.ts`; technically tested domain/DB, combined UI open |
+| PLAN-08 Submission/approval | Plan status `DRAFT/SUBMITTED/APPROVED/REJECTED/RETURNED`; manager decision and comment rules in service | MR/authorized manager; `/v1/tour-plans/{id}/submit`, `/v1/tour-approvals`; plan/decision tables | Versioned monthly amendments, frequency and holiday checks open; `tour-approval.test.ts`; partial |
+| DAY-01 Attendance/day | Selected approved plan day UUID, R; attendance coupling and required day coverage ? | MR; `/v1/tour-executions/start-options`, `/start`; `tour_executions`, attendance tables | No fake start without server acknowledgement; `tour-execution.test.ts`; partial |
+| DAY-02 Start location | Latitude -90..90, longitude -180..180, accuracy 0..1000m, R; device time/ID/network/version O | MR; `/v1/tour-executions/start`; `tour_executions` | Operation UUID R for retry; GPS-denial journey still open; `tour-execution.test.ts`; technically tested server |
+| DAY-03 Town | Reference start/end town selection; canonical start/submit command has no verified town contract | MR; no established town persistence in `tour_executions` | Must specify authoritative town master and policy before adding a field; absent |
+| VISIT-01 Planned/unplanned source | Planned stop UUID R for check-in; unplanned uses separate authorized ledger | MR; `/v1/visits/check-in`, `/v1/unplanned-calls`; `field_visits`, unplanned tables | Manager review of unplanned does not turn it into planned evidence; `visit-execution.test.ts`, `unplanned-calls.test.ts`; partial journey |
+| VISIT-02 Check-in location | Latitude/longitude/accuracy bounds as DAY-02, R; exception reason O, ≤1,000 chars | MR; `/v1/visits/check-in`; `field_visits` | Geofence status is server derived; manager exception decision; `visit-execution.test.ts`; technically tested server |
+| VISIT-03 Check-out/departure | Location bounds as DAY-02 and operation UUID, R; ≤10 timestamped optional-mock samples | MR; `/v1/visits/{id}/check-out`, presence route; `field_visits`, presence tables | Server presence integrity and offline evidence retry; `visit-execution.test.ts`, `presence.test.ts`; device acceptance open |
+| NCA-01 Reporting reason/remarks | Approved category code R, remarks rules in NCA service; duration 1..1440 minutes | MR; `/v1/nca`, `/v1/nca/{id}/submit`; `nca_records` | Must use tenant category; `nca.test.ts`; technically tested domain/DB |
+| LINK-01 Doctor/outlet relationship | IDs and approved counterpart, authorized read; creation/approval fields ? | MR/manager; `GET /v1/business/customer-links/{doctorId}`; `business_customer_links` | Current read edges do not authorize new links; `business-customer-links.test.ts`; write flow absent |
+| RCPA-01 Own/competitor item | Exactly one product UUID or competitor brand (≤160 chars), 1..50 unique lines | MR; `/v1/visits/{id}/rcpa`; `rcpa_reports`, `rcpa_lines` | Submitted provenance/immutability and linked outlet rule need end-to-end acceptance; `rcpa.test.ts`; partial |
+| RCPA-02 Reported quantities | Prescription, stock, sales integers 0..1,000,000; at least one positive per line | MR; same route/table as RCPA-01 | Reported values only, never measured prescription claim; `rcpa.test.ts`; technically tested validation |
+| ORDER-01 Product/quantity | Product UUID R; integer quantity 1..1,000,000; 1..50 unique lines | MR; `/v1/visits/{id}/order`; `sales_orders`, `sales_order_lines` | Current booking status, pricing/discount policy ?; `orders.test.ts`; partial |
+| ORDER-02 Item remarks | O text, ≤500 chars; sequential positive item number | MR; same route/table as ORDER-01 | Idempotent operation UUID; `orders.test.ts`; technically tested server |
+| DETAIL-01 Session mode/material | Rehearsal versus actual, approved brand/material/version and start/end/save; exact contract ? | MR; existing `edetailing` UI model, no verified session-write API | Cannot infer exposure from a UI click; binary/version/region ACL and session tests absent |
+| CALL-01 Product detail | ≤20 unique product IDs with positive unique sequence | MR; `/v1/visits/{id}/doctor-call`; `doctor_calls`, `doctor_call_products` | Session-to-call evidence link ?; `doctor-call.test.ts`; partial |
+| CALL-02 Outcome/remarks/next action | Outcome R; remarks and next action O; exact enums/limits from doctor/trade services | MR; doctor/trade call routes; `doctor_calls`, `trade_calls` | Follow-up lifecycle beyond text ?; `doctor-call.test.ts`, `trade-call.test.ts`; partial |
+| SAMPLE-01 Distributed item | Sample/gift type, master UUID and quantity 1..100,000; 1..20 unique lines | MR; `/v1/visits/{id}/distributions`; `visit_distributions`, `inventory_ledger` | Allocation/balance enforced, no invented distribution; `inventory.test.ts`; technically tested server |
+| JOINT-01 Co-worker/evidence | Distinct target/participant UUIDs and date; join/leave location R | Manager/assigned participant; `/v1/joint-work`, join/leave; `joint_work_assignments` | Reference device discovery/proximity rule is unqualified; `joint-work.test.ts`; partial |
+| DAY-04 Closure | `shortDayReason` O, ≤1,000 chars, operation UUID R; completed visits derive DCR | MR; `/v1/tour-executions/submit`; `tour_executions`, DCR/timesheet tables | End town and full reconciled-day rule ?; `tour-submit.test.ts`; partial |
+| EXP-01 Expense line | Category enum TRAVEL/MEAL/LODGING/LOCAL_CONVEYANCE/OTHER, amount >0..10m rounded to cents, 1..50 lines | MR; `PUT /v1/executions/{id}/expense`; `expense_claims`, `expense_lines` | Tenant policy/limits and all-days DCR prerequisite ?; `expenses.test.ts`; partial |
+| EXP-02 Receipt reference | O string ≤300 chars; actual binary manifest/upload not verified | MR; expense save; `expense_lines.receipt_reference` | A string alone is not a protected invoice; storage/ACL/test absent |
+| EXP-03 Submission/decision | Operation UUID R, comment O for submit; reject/return comment R, ≤1,000 | MR/authorized manager; `/v1/expenses/{id}/submit`, approval decision; `expense_decisions` | Policy versions and reimbursement workflow ?; `expenses.test.ts`; partial |
+| LEAVE-01 Type/dates/reason | FULL_DAY/HALF_DAY, dates 1..31 inclusive, half-day exactly one date; reason R ≤1,000 | MR; `POST /v1/leaves`; `leave_requests` | Holiday/policy catalog ?; `attendance-leave.test.ts`; technically tested service |
+| LEAVE-02 Review/status | SUBMITTED/APPROVED/REJECTED; rejection comment R, ≤1,000 | MR/authorized manager; `/v1/leave-approvals`; `leave_decisions` | Audit and tenant scope; `attendance-leave.test.ts`; technically tested service |
+
+Common gaps: the reference gives no stable field IDs, defaults or exact option catalog; the IDs above are Terrevo trace IDs, not copied source identifiers. Offline replay coverage is action-specific in `apps/mobile/src/sync.ts`; field-by-field conflict resolution and physical-device GPS acceptance remain open. Tests named above cover service behavior and selected database gates, not automatically UI visibility, upload safety, or an authenticated full-day browser reload.
+
+## Canonical feature decisions
+
+Keep `customer360` for the current directory/workflow navigation and `customer-relations` for the additional evidence/history contract; they are not interchangeable APIs. Keep `edetailing` for rendering/session drafts and `clm-library` for controlled versioned catalog selection. Workforce evidence supplements expense operations. Row-level manager reporting supplements, rather than substitutes for, existing aggregate analytics. New feature packages remain unmounted until their backend facts can be supplied truthfully.

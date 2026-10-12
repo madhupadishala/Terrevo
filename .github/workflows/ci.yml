@@ -14,7 +14,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run verify:foundation
       - run: npm run verify:release
       - run: npm run test:release-safety
@@ -34,7 +34,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run typecheck
       - run: npm test
       - run: npm run bundle:android
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run build:web
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
@@ -94,14 +94,37 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/ci/platform-admin-policy-tests.sql
       - name: Public security definer and administrative RPC privilege isolation
         run: psql -v ON_ERROR_STOP=1 -f database/ci/public-definer-privileges-tests.sql
+      - name: Customer relationship source and counterpart authorization
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/customer-link-policy-tests.sql
+      - name: Customer relationship rollback-only territory and approval fixture
+        run: psql -v ON_ERROR_STOP=1 -f modules/business-customer-links/sql/transaction-isolation.sql
+      - name: Trusted actor audit attribution and denied forgery
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/audit-attribution-policy-tests.sql
       - name: NCA tenant isolation and denied-write policy tests
         run: psql -v ON_ERROR_STOP=1 -f database/ci/nca-policy-tests.sql
       - name: Real PostgreSQL NCA persistence, idempotency and tenant-isolation tests
         run: psql -v ON_ERROR_STOP=1 -f database/ci/nca-integration-tests.sql
+      - name: Planned field lifecycle, conflicting retries and manager metric reconciliation
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/planned-field-lifecycle-tests.sql
+      - name: Planned start/check-in races across independent PostgreSQL connections
+        run: bash database/ci/planned-field-concurrency-tests.sh
       - name: Unplanned call persistence-security policy checks
         run: psql -v ON_ERROR_STOP=1 -f database/ci/unplanned-call-policy-tests.sql
       - name: Unplanned call PostgreSQL persistence and manager-review integration tests
         run: psql -v ON_ERROR_STOP=1 -f database/ci/unplanned-call-integration-tests.sql
+      - name: Back up and restore isolated CI database with synthetic data
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f database/ci/recovery-fixture.sql
+          pg_dump --format=custom --file="$RUNNER_TEMP/terrevo-recovery.dump"
+          createdb terrevo_restore_ci
+          pg_restore --exit-on-error --no-owner --dbname=terrevo_restore_ci "$RUNNER_TEMP/terrevo-recovery.dump"
+          PGDATABASE=terrevo_restore_ci psql -v ON_ERROR_STOP=1 -f database/ci/recovery-assertions.sql
+          for file in database/ci/*policy-tests.sql database/ci/public-definer-privileges-tests.sql database/ci/*integration-tests.sql database/ci/planned-field-lifecycle-tests.sql; do
+            PGDATABASE=terrevo_restore_ci psql -v ON_ERROR_STOP=1 -f "$file"
+          done
+          dropdb terrevo_restore_ci
+          psql -v ON_ERROR_STOP=1 -f database/ci/recovery-cleanup.sql
       - name: Apply all rollback migrations in reverse
         run: |
           set -euo pipefail
@@ -114,6 +137,31 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Enforce Engineer 1 / Engineer 2 file ownership
+        env:
+          TERREVO_DIFF_BASE: ${{ github.event.pull_request.base.sha }}
+          TERREVO_DIFF_HEAD: ${{ github.event.pull_request.head.sha }}
+          TERREVO_HEAD_BRANCH: ${{ github.head_ref }}
+          TERREVO_OWNER: ${{ contains(fromJSON('["feature/terrevo-v32-reference-integration","feature/terrevo-v32-ponytail-execution"]'), github.head_ref) && 'integrator' || contains(fromJSON('["feature/terrevo-s09-customer-relations-ui","feature/terrevo-s11-clm-library-ui","feature/terrevo-s13-workforce-evidence-ui","feature/terrevo-s14-manager-reporting-ui"]'), github.head_ref) && 'engineer2' || 'engineer1' }}
+          TERREVO_ASSIGNED_AUTHOR: ${{ github.repository_owner }}
+          TERREVO_PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          TERREVO_REPOSITORY: ${{ github.repository }}
+          TERREVO_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        # Bootstrap requires a separately reviewed checker/policy on the base.
+        # Never fall back to HEAD when the base lacks either file.
+        run: |
+          set -euo pipefail
+          [[ "$TERREVO_DIFF_BASE" =~ ^[0-9a-f]{40}$ ]]
+          trusted_checker="$RUNNER_TEMP/terrevo-r01-ownership.mjs"
+          git show "$TERREVO_DIFF_BASE:scripts/r01-ownership.mjs" > "$trusted_checker"
+          node "$trusted_checker"
       - name: Require PR scope declaration
         env:
           PR_BODY: ${{ github.event.pull_request.body }}

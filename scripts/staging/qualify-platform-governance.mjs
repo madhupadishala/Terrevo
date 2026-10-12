@@ -1,0 +1,18 @@
+import {readFile,writeFile,stat,rename}from 'node:fs/promises';import assert from 'node:assert/strict';
+import {randomUUID}from 'node:crypto';
+import {findRunTenant,qualificationSlug}from './platform-tenant-recovery.mjs';
+const [manifestPath,statePath,evidencePath]=process.argv.slice(2);if(!manifestPath||!statePath||!evidencePath||(await stat(manifestPath)).mode&0o077)throw Error('Private identity manifest required');const m=JSON.parse(await readFile(manifestPath,'utf8'));const user=m.users.find(u=>u.role==='UNSCOPED');assert.ok(user);const origin='https://eirlubfbjexjilvskqxq.supabase.co/functions/v1/terrevo-staging-api';let state;try{state=JSON.parse(await readFile(statePath,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;state={runId:m.runId,steps:{},checks:[]};}assert.equal(state.runId,m.runId);let token;
+// Serialize private checkpoints and atomically replace the last complete state.
+try{if((await stat(statePath)).mode&0o077)throw Error('Private state must have mode 0600');}catch(e){if(e.code!=='ENOENT')throw e;}
+let checkpoint=Promise.resolve();const persist=()=>checkpoint=checkpoint.then(async()=>{const temporary=statePath+'.'+randomUUID()+'.tmp';await writeFile(temporary,JSON.stringify(state),{mode:0o600});await rename(temporary,statePath);});
+async function call(name,path,{method='GET',body,status=200,cache=true}={}){if(cache&&Object.hasOwn(state.steps,name))return state.steps[name];const start=performance.now();const response=await fetch(origin+path,{method,headers:{'content-type':'application/json','x-region':'ap-northeast-1',...(token?{authorization:'Bearer '+token}:{})},body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(30000)});const data=response.status===204?null:await response.json();const passed=response.status===status;state.checks.push({name,path,method,status:response.status,expected:status,passed,requestId:response.headers.get('x-request-id'),elapsedMs:Math.round(performance.now()-start),at:new Date().toISOString()});if(passed&&cache)state.steps[name]=data;await persist();assert.ok(passed,`${name}: ${response.status}`);return data;}
+try{
+ const login=await call('login','/v1/auth/login',{method:'POST',body:{email:user.email,password:m.password},cache:false});assert.equal(login.user.id,user.id);token=login.accessToken;delete state.steps.login;
+ assert.equal((await call('platform-context','/v1/platform/context')).isSuperAdmin,true);
+ const slug=qualificationSlug(m.runId);
+ const tenant=await findRunTenant(call,slug)??(await call('platform-tenant-create','/v1/platform/tenants',{method:'POST',status:201,body:{name:'Synthetic Governance Qualification',slug}})).tenant;
+ assert.equal((await findRunTenant(call,slug)).id,tenant.id);
+ assert.equal((await call('platform-tenant-deactivate',`/v1/platform/tenants/${tenant.id}/status`,{method:'PATCH',body:{status:'inactive'}})).tenant.status,'inactive');
+ const events=(await call('platform-audit','/v1/platform/audit',{cache:false})).events.filter(e=>e.tenant_id===tenant.id);assert.equal(events.length,2);assert.ok(events.every(e=>e.actor_user_id===user.id));
+ await writeFile(evidencePath,JSON.stringify({runId:m.runId,projectRef:'eirlubfbjexjilvskqxq',synthetic:true,qualified:true,temporaryGrant:true,actorUserId:user.id,tenantId:tenant.id,tenantStatus:'inactive',auditActions:events.map(e=>e.action),checks:state.checks.filter(c=>c.name!=='login'),completedAt:new Date().toISOString()},null,2)+'\n');console.log('Live platform governance and attributed audit PASS');
+}finally{if(token)await call('logout','/v1/auth/logout',{method:'POST',status:204,cache:false}).catch(()=>{});}

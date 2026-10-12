@@ -1,0 +1,7 @@
+Exclusive S11 file ownership (#56); no shared-file edits.
+apps/web/src/features/clm-library/model.ts
+apps/web/src/features/clm-library/ClmLibraryView.tsx
+apps/web/test/clm-library.model.test.ts
+apps/web/src/features/clm-library/README.md
+apps/web/src/features/clm-library/INTEGRATION_REQUEST.md
+apps/web/src/features/clm-library/FILE_MANIFEST.txt

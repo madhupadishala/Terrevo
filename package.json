@@ -12,7 +12,7 @@
     "build": "npm run build:api && npm run build:web && npm run verify:vercel-runtime",
     "typecheck:web": "tsc -p apps/web/tsconfig.json",
     "typecheck": "tsc -p tsconfig.json && npm run typecheck:web",
-    "test": "node --experimental-strip-types --test apps/api/test/*.test.ts",
+    "test": "node --experimental-strip-types --test apps/api/test/*.test.ts modules/business-customer-links/test/*.test.ts",
     "verify": "npm run verify:foundation && npm run typecheck && npm test && npm run build && npm run test:web",
     "test:web": "node --experimental-strip-types --test apps/web/test/*.test.ts",
     "preview:web": "vite preview --config apps/web/vite.config.ts",
@@ -20,7 +20,8 @@
     "verify:release": "node scripts/release-preflight.mjs",
     "verify:staging-target": "node scripts/verify-staging-target.mjs",
     "test:release-safety": "node --test scripts/test/*.test.mjs",
-    "qualify:staging-api": "node scripts/qualify-staging-api.mjs"
+    "qualify:staging-api": "node scripts/qualify-staging-api.mjs",
+    "verify:ownership": "node scripts/r01-ownership.mjs"
   },
   "engines": {
     "node": ">=22"

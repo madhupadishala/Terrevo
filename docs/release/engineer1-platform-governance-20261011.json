@@ -1,0 +1,110 @@
+{
+  "runId": "eng1-3809150601dc",
+  "projectRef": "eirlubfbjexjilvskqxq",
+  "synthetic": true,
+  "qualified": true,
+  "temporaryGrant": true,
+  "actorUserId": "54e121a6-e369-472e-bc94-23c94053347d",
+  "tenantId": "534bdd0f-c17a-4033-aff4-d27fc193f4bf",
+  "tenantStatus": "inactive",
+  "auditActions": [
+    "TENANT_STATUS_CHANGED",
+    "TENANT_CREATED"
+  ],
+  "checks": [
+    {
+      "name": "platform-context",
+      "path": "/v1/platform/context",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "requestId": "246d8219-cf42-423d-847c-e77c5b50f5de",
+      "elapsedMs": 597,
+      "at": "2026-10-11T12:25:29.785Z"
+    },
+    {
+      "name": "platform-tenant-create",
+      "path": "/v1/platform/tenants",
+      "method": "POST",
+      "status": 201,
+      "expected": 201,
+      "passed": true,
+      "requestId": "b87fef7b-db41-438e-a075-e6911dc84074",
+      "elapsedMs": 759,
+      "at": "2026-10-11T12:25:30.546Z"
+    },
+    {
+      "name": "platform-tenant-list",
+      "path": "/v1/platform/tenants",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "requestId": "b37ef382-3f6e-454f-845e-29af81ca6e62",
+      "elapsedMs": 434,
+      "at": "2026-10-11T12:25:30.982Z"
+    },
+    {
+      "name": "platform-tenant-deactivate",
+      "path": "/v1/platform/tenants/534bdd0f-c17a-4033-aff4-d27fc193f4bf/status",
+      "method": "PATCH",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "requestId": "9cb6a6d8-aa45-476b-b403-b6776e49c260",
+      "elapsedMs": 475,
+      "at": "2026-10-11T12:25:31.458Z"
+    },
+    {
+      "name": "platform-audit",
+      "path": "/v1/platform/audit",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "requestId": "2b34d943-d8e0-4081-a5f6-dbe3d6eb9f80",
+      "elapsedMs": 421,
+      "at": "2026-10-11T12:25:31.879Z"
+    },
+    {
+      "name": "logout",
+      "path": "/v1/auth/logout",
+      "method": "POST",
+      "status": 204,
+      "expected": 204,
+      "passed": true,
+      "requestId": "ed8a77bb-da87-4fb4-8df0-12cc8fdaccaa",
+      "elapsedMs": 300,
+      "at": "2026-10-11T12:25:32.180Z"
+    },
+    {
+      "name": "platform-audit",
+      "path": "/v1/platform/audit",
+      "method": "GET",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "requestId": "fddfa0bb-7a2a-4580-b51b-8a2f38d67eae",
+      "elapsedMs": 482,
+      "at": "2026-10-11T12:26:17.318Z"
+    },
+    {
+      "name": "platform-after-revocation-denied",
+      "provenance": "Manually appended historical check; the producing command and elapsedMs/at were not retained. Not emitted by qualify-platform-governance.mjs and not rerun for this annotation.",
+      "path": "/v1/platform/tenants",
+      "method": "GET",
+      "status": 403,
+      "expected": 403,
+      "passed": true,
+      "requestId": "7def0967-021f-43c1-8b83-fa07533f36b4"
+    }
+  ],
+  "completedAt": "2026-10-11T12:26:17.319Z",
+  "temporaryGrantRevoked": true,
+  "revocationVerifiedAt": "2026-10-11T12:58:39.825Z",
+  "revocationFieldProvenance": {
+    "fields": ["temporaryGrantRevoked", "revocationVerifiedAt"],
+    "source": "Manually appended historical fields; producing command not retained. Original values preserved, not independently reverified by this annotation."
+  }
+}

@@ -1,0 +1,26 @@
+import test from "node:test";import assert from "node:assert/strict";
+import {createCustomerLinksService,createCustomerLinksPostgrest,BusinessAccessError} from "../src/index.ts";
+const id=(n:number)=>`00000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
+const tenant=id(1),user=id(2),source=id(3),target=id(4);
+const row={id:id(5),tenantId:tenant,sourceId:source,targetId:target,territoryId:"north",relation:"linked",approval:"APPROVED" as const,evidenceId:"evidence",verifiedAt:"2026-10-11T10:00:00Z"};
+const ctx={tenantId:tenant,userId:user,accessToken:"example-token",permittedTerritoryIds:["north"]};
+test("business service rejects unauthenticated or unscoped requests",async()=>{const service=createCustomerLinksService({list:async()=>[row]});await assert.rejects(()=>service.list({...ctx,permittedTerritoryIds:[]},source),BusinessAccessError);await assert.rejects(()=>service.list({...ctx,accessToken:""},source),BusinessAccessError);await assert.rejects(()=>service.list(ctx,"not-a-uuid"),BusinessAccessError);});
+test("business service fails closed across tenant, source, territory and approval",async()=>{const service=createCustomerLinksService({list:async()=>[row,{...row,id:id(6),tenantId:id(9)},{...row,id:id(7),territoryId:"south"},{...row,id:id(8),approval:"PENDING"},{...row,id:id(10),sourceId:id(12)}]});assert.deepEqual(await service.list(ctx,source),[row]);});
+test("postgrest adapter uses user JWT and mandatory tenant/source predicates",async()=>{let sentUrl="";let auth="";const fetcher:typeof fetch=async(input,init)=>{sentUrl=String(input);auth=new Headers(init?.headers).get("authorization")??"";return Response.json([{id:row.id,tenant_id:tenant,source_id:source,target_id:target,territory_id:"north",relation:"linked",approval:"APPROVED",evidence_id:"evidence",verified_at:row.verifiedAt}]);};const adapter=createCustomerLinksPostgrest("https://example.supabase.co","public-key",fetcher);assert.deepEqual(await adapter.list(tenant,"jwt",source),[row]);assert.equal(auth,"Bearer jwt");const query=new URL(sentUrl);assert.equal(query.searchParams.get("tenant_id"),`eq.${tenant}`);assert.equal(query.searchParams.get("source_id"),`eq.${source}`);});
+
+test("postgrest retrieves all pages in stable id order without truncation",async()=>{const ranges:string[]=[];const fetcher:typeof fetch=async(_input,init)=>{const range=new Headers(init?.headers).get("range")??"";ranges.push(range);const offset=Number(range.split("-")[0]);const count=offset===0?200:1;return Response.json(Array.from({length:count},(_,i)=>({id:id(offset+i+100),tenant_id:tenant,source_id:source,target_id:target,territory_id:"north",relation:"linked",approval:"APPROVED",evidence_id:"e",verified_at:"2026-10-11T10:00:00Z"})));};const rows=await createCustomerLinksPostgrest("https://example.supabase.co","public-key",fetcher).list(tenant,"jwt",source);assert.equal(rows.length,201);assert.deepEqual(ranges,["0-199","200-399"]);});
+
+test("exactly 200 rows terminate on PostgREST unsatisfiable next range",async()=>{const ranges:string[]=[];const fetcher:typeof fetch=async(_input,init)=>{const range=new Headers(init?.headers).get("range")??"";ranges.push(range);if(range==="200-399")return new Response(null,{status:416});return Response.json(Array.from({length:200},(_,i)=>({id:id(i+100),tenant_id:tenant,source_id:source,target_id:target,territory_id:"north",relation:"linked",approval:"APPROVED",evidence_id:"e",verified_at:"2026-10-11T10:00:00Z"})));};const rows=await createCustomerLinksPostgrest("https://example.supabase.co","public-key",fetcher).list(tenant,"jwt",source);assert.equal(rows.length,200);assert.deepEqual(ranges,["0-199","200-399"]);});
+
+test('complete relationship read shares one deadline and rejects unbounded pages',async()=>{
+ let calls=0;let deadline:AbortSignal|null|undefined;
+ const fetcher:typeof fetch=async(_input,init)=>{calls++;if(calls===1)deadline=init?.signal;else assert.equal(init?.signal,deadline);return Response.json(Array.from({length:200},(_,i)=>({id:id(calls*200+i),tenant_id:tenant,source_id:source,target_id:target,territory_id:'north',relation:'linked',approval:'APPROVED',evidence_id:'e',verified_at:row.verifiedAt})));};
+ await assert.rejects(createCustomerLinksPostgrest('https://example.supabase.co','public-key',fetcher).list(tenant,'jwt',source),/result limit exceeded/);assert.equal(calls,6);
+});
+
+test("provider ignoring range fails closed instead of looping or duplicating links",async()=>{
+ let calls=0;
+ const fetcher:typeof fetch=async()=>{calls++;return Response.json(Array.from({length:200},(_,i)=>({id:id(i+100),tenant_id:tenant,source_id:source,target_id:target,territory_id:"north",relation:"linked",approval:"APPROVED",evidence_id:"e",verified_at:row.verifiedAt})));};
+ await assert.rejects(()=>createCustomerLinksPostgrest("https://example.supabase.co","public-key",fetcher).list(tenant,"jwt",source),/pagination/i);
+ assert.equal(calls,2);
+});

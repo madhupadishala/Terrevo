@@ -1,0 +1,5 @@
+# S11 Chat 1 CLM integration request
+No verified content catalog, binary ACL, signed download or session write endpoint. No new routes.
+Parent scope={tenantId,authorizedForTenantId,contextKey,allowedProductIds,allowedRegions,roleCanDetail,today}; supply approved/revoked/versioned CatalogAsset[] with region/product/MLR approval metadata, provenance, effectiveFrom/expiresAt; server session summaries with provenance; authoritative activeVisit (status CHECKED_IN and productIds).
+Required: tenant + role + region + product ACL enforcement, immutable approval history and version, withdrawal revocation, content rendering binary grants, approved active visit authority, idempotent session recording and audit. Prevent revoked-version content viewed between selection and handoff.
+Optional onRequestDetailing({tenantId,contextKey,assetId,assetVersion,productId,regionCode,activeVisitId,provenanceId}) is **only** an intent. Chat 1 must verify on server and adapt to existing EDetailingView without modifying this branch. No verified persistence or medical-legal approval from UI. Cancel stale async results, remount by contextKey. Accessibility/mobile and security UAT required.

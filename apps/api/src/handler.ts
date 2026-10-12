@@ -1,3 +1,4 @@
+import { createCustomerLinksService, createCustomerLinksPostgrest, BusinessAccessError } from "../../../modules/business-customer-links/src/index.ts";
 import { AuthInputError, createIdentityService, readBearerToken } from "../../../modules/identity/src/index.ts";
 import { createTenantService, TenantAccessError } from "../../../modules/tenant/src/index.ts";
 import { createOrganizationService, OrganizationInputError } from "../../../modules/organization/src/index.ts";
@@ -89,6 +90,7 @@ export function runtimeQualificationProof(env: ApiEnv, tenantId: string) {
 /** Maps domain and provider failures to stable public API responses. */
 function mapError(error: unknown): Response {
   if (error instanceof ApiError || error instanceof RequestBodyError) return json(error.status, { error: error.message });
+  if (error instanceof BusinessAccessError) return json(403, { error: "Customer scope denied" });
   if (error instanceof AuthInputError) {
     const status = error.message.includes("Authorization header") ? 401 : 400;
     return json(status, { error: error.message });
@@ -117,8 +119,34 @@ function mapError(error: unknown): Response {
 
 /** Creates the HTTP API handler with tenant-scoped domain services wired to the provider adapter. */
 export function createHandler(env: ApiEnv, deps: Deps = {}) {
-  const adapter = createSupabaseAdapter(requireConfig(env), deps.fetcher);
-  const identity = createIdentityService(adapter.auth);
+  requireConfig(env);
+  return (request: Request) => createRequestHandler(env, deps)(request);
+}
+
+// Actor state belongs to exactly one request, including concurrent callers of
+// the same handler. Only a provider-validated identity can populate it.
+function createRequestHandler(env: ApiEnv, deps: Deps) {
+  const config = requireConfig(env);
+  let trustedActorId: string | null = null;
+  const fetcher: typeof fetch = (input, init) => {
+    const headers = new Headers(init?.headers);
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+    headers.delete("x-terrevo-actor");
+    if (trustedActorId && config.serviceRoleKey && headers.get("apikey") === config.serviceRoleKey &&
+        url.origin === new URL(config.url).origin && url.pathname.startsWith("/rest/v1/")) {
+      headers.set("x-terrevo-actor", trustedActorId);
+    }
+    const forwardedHeaders: Record<string,string> = {};
+    headers.forEach((value,key)=>{forwardedHeaders[key]=value;});
+    return (deps.fetcher ?? fetch)(input, {...init,headers:forwardedHeaders,signal:init?.signal ?? AbortSignal.timeout(10_000),redirect:"error"});
+  };
+  const adapter = createSupabaseAdapter(config, fetcher);
+  const authentication = createIdentityService(adapter.auth);
+  const identity = {...authentication, async authenticate(value: string | null) {
+    const user = await authentication.authenticate(value);
+    trustedActorId = user.id;
+    return user;
+  }};
   const tenants = createTenantService(adapter.tenants);
   const rbac = createRbacService(adapter.rbac);
   const organization = createOrganizationService(adapter.organization, rbac);
@@ -143,7 +171,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const jointWork = createJointWorkService(adapter.jointWork, rbac);
   const managerCommand = createManagerCommandService(adapter.managerCommand);
   const analytics = createAnalyticsService(adapter.analytics);
-  const platform = createPlatformAdminService(requireConfig(env), deps.fetcher);
+  const platform = createPlatformAdminService(config, fetcher);
 
   /** Authenticates the caller and resolves the active tenant context for a tenant-scoped request. */
   async function resolveTenantRequest(request: Request) {
@@ -220,6 +248,47 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         const user = await identity.authenticate(request.headers.get("authorization"));
         const offset = Number(new URL(request.url).searchParams.get("offset") ?? "0");
         return json(200, { events: await platform.audit(user.id, offset) });
+      }
+
+      const customerLinksMatch=new RegExp("^/v1/business/customer-links/([^/]+)$").exec(path);
+      if(request.method==="GET"&&customerLinksMatch){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        // Fetch grants through user-JWT RLS: never accept caller-supplied territory authorization.
+        const config=requireConfig(env);
+        const grantUrl=new URL("/rest/v1/business_customer_link_grants",config.url);
+        grantUrl.searchParams.set("select","territory_id");
+        grantUrl.searchParams.set("tenant_id",`eq.${context.tenantId}`);
+        grantUrl.searchParams.set("user_id",`eq.${user.id}`);
+        grantUrl.searchParams.set("limit","1000");
+        grantUrl.searchParams.set("order","territory_id.asc");
+        const grantDeadline=AbortSignal.timeout(10_000),grantIds=new Set<string>();
+        let offset=0,total:number|undefined;
+        // Exact counts detect provider row caps; reject incomplete, repeated or
+        // changing pages instead of treating a partial set as complete scope.
+        for(let page=0;;page++){
+          if(page>=100)throw new BusinessAccessError("Customer grant pagination limit exceeded");
+          grantDeadline.throwIfAborted();
+          grantUrl.searchParams.set("offset",String(offset));
+          const grantResponse=await fetcher(grantUrl.toString(),{headers:{apikey:config.anonKey,authorization:`Bearer ${accessToken}`,accept:"application/json",prefer:"count=exact"},cache:"no-store",signal:grantDeadline,redirect:"error"});
+          if(!grantResponse.ok)throw new BusinessAccessError("Customer grant retrieval denied");
+          const grantRows:unknown=await grantResponse.json();
+          grantDeadline.throwIfAborted();
+          if(!Array.isArray(grantRows)||grantRows.length>1000||grantRows.some((g:unknown)=>!g||typeof g!=="object"||Array.isArray(g)||typeof (g as {territory_id?:unknown}).territory_id!=="string"||!(g as {territory_id:string}).territory_id.trim()))throw new BusinessAccessError("Invalid customer grants");
+          const range=grantResponse.headers.get("content-range");
+          if(offset===0&&grantRows.length===0&&range==="*/0")break;
+          const match=/^(\d+)-(\d+)\/(\d+)$/.exec(range??"");
+          if(!match)throw new BusinessAccessError("Customer grant completeness unavailable");
+          const [start,end,count]=match.slice(1).map(Number);
+          if(![start,end,count].every(Number.isSafeInteger)||start!==offset||end!==offset+grantRows.length-1||grantRows.length===0||count<=end||count>100_000||(total!==undefined&&total!==count))throw new BusinessAccessError("Inconsistent customer grant pagination");
+          total=count;
+          for(const row of grantRows){const id=(row as {territory_id:string}).territory_id;if(grantIds.has(id))throw new BusinessAccessError("Customer grant pagination did not advance");grantIds.add(id);}
+          offset+=grantRows.length;
+          if(offset===total)break;
+        }
+        const permittedTerritoryIds=[...grantIds];
+        const customerLinks=createCustomerLinksService(createCustomerLinksPostgrest(config.url,config.anonKey,fetcher));
+        const links=await customerLinks.list({tenantId:context.tenantId,userId:user.id,accessToken,permittedTerritoryIds},customerLinksMatch[1]);
+        return json(200,{links});
       }
 
       if (request.method === "GET" && path === "/v1/tenants") {

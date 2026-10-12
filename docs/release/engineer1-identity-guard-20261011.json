@@ -1,0 +1,15 @@
+{
+  "projectRef": "eirlubfbjexjilvskqxq",
+  "runId": "eng1-3809150601dc",
+  "synthetic": true,
+  "qualified": true,
+  "validOwnedIdentities": 6,
+  "rejectedVariants": {
+    "swappedAuthId": 6,
+    "wrongRole": 6,
+    "wrongEmail": 6
+  },
+  "testedSource": "Generated transactional guard from scripts/staging/seed-qualification-fixture.mjs before any insert",
+  "businessWritesPerformed": false,
+  "completedAt": "2026-10-11T13:33:52.150266+00:00"
+}
