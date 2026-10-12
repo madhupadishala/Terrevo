@@ -51,6 +51,8 @@ export type ManagerCommand = {
   submittedToursToday: number; shortDaysToday: number; activeJointWork: number;
   pending: { tourApprovals: number; gpsExceptions: number; weeklyTimesheets: number; leaves: number; expenses: number };
 };
+export type ManagerReportRecord={id:string;tenantId:string;territoryId:string;ownerUserId:string;workDate:string;kind:"PLANNED_STOP"|"UNPLANNED_CALL"|"NCA"|"DCR";status:"PLANNED"|"COMPLETED"|"PENDING"|"APPROVED"|"REJECTED"|"SUBMITTED"|"REPORTED";sourceId:string;sourceType:string;observedAt:string};
+export type ManagerReportLedger={asOf:string;records:ManagerReportRecord[]};
 export type ManagerAnalytics = {
   period: { days: number; startDate: string; endDate: string };
   tours: { submitted: number; totalWorkedMinutes: number };
@@ -279,6 +281,9 @@ export class TerrevoWebApi {
   }
   async createMaster(kind:string,input:Record<string,unknown>):Promise<Master>{
     return (await this.raw("/v1/masters/"+encodeURIComponent(kind),"POST",input) as {item:Master}).item;
+  }
+  async managerReportRecords():Promise<ManagerReportLedger> {
+    return await this.raw("/v1/manager/report-records") as ManagerReportLedger;
   }
   async clmAssets():Promise<ClmAsset[]> {
     return (await this.raw("/v1/clm/assets") as {assets:ClmAsset[]}).assets;
