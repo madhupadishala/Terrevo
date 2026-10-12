@@ -532,6 +532,93 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
       if(request.method==="POST"&&path==="/v1/joint-work"){const {accessToken,user,context}=await resolveTenantRequest(request);return json(201,{assignment:await jointWork.schedule(context.tenantId,user.id,accessToken,await readJsonObject(request))});}
       const join=/^\/v1\/joint-work\/([^/]+)\/join$/.exec(path);if(request.method==="POST"&&join){const {accessToken,user,context}=await resolveTenantRequest(request);return json(200,{assignment:await jointWork.join(context.tenantId,user.id,accessToken,join[1],await readJsonObject(request))});}
       const leave=/^\/v1\/joint-work\/([^/]+)\/leave$/.exec(path);if(request.method==="POST"&&leave){const {accessToken,user,context}=await resolveTenantRequest(request);return json(200,{assignment:await jointWork.leave(context.tenantId,user.id,accessToken,leave[1],await readJsonObject(request))});}
+      if(request.method==="GET"&&path==="/v1/workforce/evidence"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        const rights=await rbac.accessContext(context.tenantId,user.id,accessToken);
+        const elevated=rights.roles.some(r=>r.roleKey==="MANAGER"||r.roleKey==="TENANT_ADMIN");
+        const claims=elevated?await expenses.list(context.tenantId,accessToken):await expenses.listOwn(context.tenantId,user.id,accessToken);
+        const claimIds=claims.map(x=>x.id),executionIds=[...new Set(claims.map(x=>x.executionId).filter(Boolean))];
+        const serviceHeaders=clmAdminHeaders("return=representation");
+        let reviewRows:Array<Record<string,unknown>>=[];
+        if(claimIds.length){
+          const q=new URLSearchParams({select:"id,expense_claim_id,line_sequence,document_ref,status,verified_at",tenant_id:`eq.${context.tenantId}`,expense_claim_id:`in.(${claimIds.join(",")})`,limit:"5000"});
+          const response=await fetcher(new URL("/rest/v1/expense_receipt_reviews?"+q,config.url).toString(),{headers:serviceHeaders,cache:"no-store"});
+          if(!response.ok)throw new ProviderError("Receipt review evidence failed",response.status);
+          reviewRows=await response.json() as Array<Record<string,unknown>>;
+        }
+        const reviewKey=new Map(reviewRows.map(x=>[`${String(x.expense_claim_id)}:${Number(x.line_sequence)}`,x]));
+        const receipts=claims.flatMap(claim=>claim.lines.flatMap(line=>{
+          if(!line.receiptReference)return [];
+          const key=`${claim.id}:${line.sequence}`,review=reviewKey.get(key);
+          return [{id:review?String(review.id):`pending:${key}`,tenantId:context.tenantId,claimId:claim.id,lineId:key,
+            status:review?String(review.status):"PENDING",documentRef:line.receiptReference,
+            ...(review?.verified_at?{verifiedAt:String(review.verified_at)}:{})}];
+        }));
+        let policyRows:Array<Record<string,unknown>>=[];
+        {
+          const q=new URLSearchParams({select:"id,category,max_minor,currency_code,effective_from,expires_at,policy_ref",tenant_id:`eq.${context.tenantId}`,order:"effective_from.desc",limit:"1000"});
+          const response=await fetcher(new URL("/rest/v1/expense_policy_limits?"+q,config.url).toString(),{headers:serviceHeaders,cache:"no-store"});
+          if(!response.ok)throw new ProviderError("Expense policy evidence failed",response.status);
+          policyRows=await response.json() as Array<Record<string,unknown>>;
+        }
+        const policies=policyRows.map(x=>({tenantId:context.tenantId,category:String(x.category),maxMinor:Number(x.max_minor),currency:String(x.currency_code),effectiveFrom:String(x.effective_from),expiresAt:String(x.expires_at),policyId:String(x.policy_ref)}));
+        const userHeaders=clmUserHeaders(accessToken);
+        let presence:Array<Record<string,unknown>>=[],daily:Array<Record<string,unknown>>=[];
+        if(executionIds.length){
+          const pq=new URLSearchParams({select:"id,execution_id,total_distance_meters,recorded_at",tenant_id:`eq.${context.tenantId}`,execution_id:`in.(${executionIds.join(",")})`,limit:"5000"});
+          const pr=await fetcher(new URL("/rest/v1/visit_presence_integrity?"+pq,config.url).toString(),{headers:userHeaders,cache:"no-store"});
+          if(!pr.ok)throw new ProviderError("Travel evidence failed",pr.status);presence=await pr.json() as Array<Record<string,unknown>>;
+          const dq=new URLSearchParams({select:"id,execution_id,work_date,status,submitted_at,reviewed_at",tenant_id:`eq.${context.tenantId}`,execution_id:`in.(${executionIds.join(",")})`,limit:"5000"});
+          const dr=await fetcher(new URL("/rest/v1/daily_timesheets?"+dq,config.url).toString(),{headers:userHeaders,cache:"no-store"});
+          if(!dr.ok)throw new ProviderError("Attendance evidence failed",dr.status);daily=await dr.json() as Array<Record<string,unknown>>;
+        }
+        const travel=claims.flatMap(claim=>{
+          const rows=presence.filter(x=>String(x.execution_id)===claim.executionId);
+          if(!rows.length)return [];
+          const distance=rows.reduce((sum,x)=>sum+(Number.isFinite(Number(x.total_distance_meters))?Number(x.total_distance_meters):0),0);
+          return [{tenantId:context.tenantId,ownerUserId:claim.ownerUserId,workDate:claim.workDate,sourceId:rows.map(x=>String(x.id)).join(","),distanceMeters:Math.round(distance),method:"SERVER_GPS"}];
+        });
+        const attendance=claims.flatMap(claim=>{
+          const row=daily.find(x=>String(x.execution_id)===claim.executionId);if(!row)return [];
+          const status=String(row.status),dayClosed=status==="REVIEWED"||status==="APPROVED";
+          return [{id:String(row.id),tenantId:context.tenantId,ownerUserId:claim.ownerUserId,workDate:claim.workDate,state:"PRESENT",dayClosed,sourceId:String(row.id),asOf:String(row.reviewed_at??row.submitted_at??new Date().toISOString())}];
+        });
+        return json(200,{asOf:new Date().toISOString(),claims,receipts,travel,attendance,policies});
+      }
+      const receiptDecision=/^\/v1\/workforce\/receipts\/([^/]+)\/(\d+)\/decision$/.exec(path);
+      if(request.method==="POST"&&receiptDecision){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        const rights=await rbac.accessContext(context.tenantId,user.id,accessToken);
+        if(!rights.roles.some(r=>r.roleKey==="MANAGER"||r.roleKey==="TENANT_ADMIN"))throw new ApiError(403,"Receipt review permission required");
+        const claimId=clmUuid(receiptDecision[1],"claimId"),sequence=Number(receiptDecision[2]);
+        const visible=(await expenses.list(context.tenantId,accessToken)).find(x=>x.id===claimId);if(!visible)throw new ApiError(404,"Expense claim not found");
+        const line=visible.lines.find(x=>x.sequence===sequence);if(!line?.receiptReference)throw new ApiError(409,"Receipt reference is not available for this line");
+        const body=await readJsonObject(request),decision=body.decision;
+        if(decision!=="VERIFY"&&decision!=="REVOKE")throw new ApiError(400,"decision must be VERIFY or REVOKE");
+        const comment=body.comment==null?null:clmText(body.comment,"comment",1000);
+        const payload={tenant_id:context.tenantId,expense_claim_id:claimId,line_sequence:sequence,document_ref:line.receiptReference,
+          status:decision==="VERIFY"?"VERIFIED":"REVOKED",reviewer_user_id:user.id,verified_at:new Date().toISOString(),review_comment:comment};
+        const headers={...clmAdminHeaders("resolution=merge-duplicates,return=representation")};
+        const response=await fetcher(new URL("/rest/v1/expense_receipt_reviews?on_conflict=tenant_id,expense_claim_id,line_sequence",config.url).toString(),{method:"POST",headers,body:JSON.stringify(payload)});
+        if(!response.ok)throw new ProviderError("Receipt review write failed",response.status);
+        return json(200,{receipt:(await response.json() as unknown[])[0]});
+      }
+      if(request.method==="POST"&&path==="/v1/workforce/policies"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);await rbac.authorize(context.tenantId,"MASTER_MANAGE",null,accessToken);
+        const body=await readJsonObject(request),category=body.category,currency=body.currency,maxMinor=body.maxMinor;
+        if(!["TRAVEL","MEAL","LODGING","LOCAL_CONVEYANCE","OTHER"].includes(String(category)))throw new ApiError(400,"Invalid expense category");
+        if(typeof maxMinor!=="number"||!Number.isSafeInteger(maxMinor)||maxMinor<0)throw new ApiError(400,"maxMinor must be a non-negative safe integer");
+        if(typeof currency!=="string"||!/^[A-Z]{3}$/.test(currency))throw new ApiError(400,"Invalid currency");
+        const effectiveFrom=clmDate(body.effectiveFrom,"effectiveFrom")!,expiresAt=clmDate(body.expiresAt,"expiresAt")!;
+        if(expiresAt<effectiveFrom)throw new ApiError(400,"expiresAt must be on or after effectiveFrom");
+        const policyRef=clmText(body.policyRef,"policyRef",300);
+        const response=await fetcher(new URL("/rest/v1/expense_policy_limits",config.url).toString(),{method:"POST",headers:clmAdminHeaders(),body:JSON.stringify({
+          tenant_id:context.tenantId,category,max_minor:maxMinor,currency_code:currency,effective_from:effectiveFrom,expires_at:expiresAt,policy_ref:policyRef,created_by:user.id,
+        })});
+        if(!response.ok)throw new ProviderError("Expense policy write failed",response.status);
+        return json(201,{policy:(await response.json() as unknown[])[0]});
+      }
+
       if(request.method==="GET"&&path==="/v1/expenses/own"){const {accessToken,user,context}=await resolveTenantRequest(request);return json(200,{claims:await expenses.listOwn(context.tenantId,user.id,accessToken)});}if(request.method==="GET"&&path==="/v1/expenses"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{claims:await expenses.list(context.tenantId,accessToken)});}
       const expenseByExecution=/^\/v1\/executions\/([^/]+)\/expense$/.exec(path);if(request.method==="PUT"&&expenseByExecution){const {accessToken,user,context}=await resolveTenantRequest(request);return json(200,{claim:await expenses.save(context.tenantId,user.id,accessToken,expenseByExecution[1],await readJsonObject(request,65536))});}
       if(request.method==="GET"&&path==="/v1/expense-approvals"){const {accessToken,context}=await resolveTenantRequest(request);return json(200,{claims:await expenses.listPending(context.tenantId,accessToken)});}
