@@ -8,7 +8,10 @@ create table public.clm_assets (
   version text not null check (length(trim(version)) between 1 and 40),
   status text not null check (status in ('APPROVED','DRAFT','WITHDRAWN','EXPIRED')),
   product_ids uuid[] not null check (cardinality(product_ids) between 1 and 50),
-  slides jsonb not null check (jsonb_typeof(slides)='array' and jsonb_array_length(slides) between 1 and 100),
+  region_codes text[] not null default array['GLOBAL']::text[] check (cardinality(region_codes) between 1 and 50),
+  content_type text not null default 'slides/text' check (length(trim(content_type)) between 1 and 120),
+  object_path text check (object_path is null or length(trim(object_path)) between 1 and 500),
+  slides jsonb not null default '[]'::jsonb check (jsonb_typeof(slides)='array' and jsonb_array_length(slides) between 0 and 100),
   effective_from date,
   expires_at date,
   provenance_id text not null check (length(trim(provenance_id)) between 1 and 300),
@@ -16,6 +19,7 @@ create table public.clm_assets (
   approved_at timestamptz,
   created_at timestamptz not null default now(),
   check (expires_at is null or effective_from is null or expires_at>=effective_from),
+  check (jsonb_array_length(slides)>0 or object_path is not null),
   check ((status='APPROVED' and approved_by is not null and approved_at is not null) or status<>'APPROVED'),
   unique (tenant_id,title,version)
 );
