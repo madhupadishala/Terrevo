@@ -11,6 +11,7 @@ import { TodayIntelligenceView } from "./features/intelligence/TodayIntelligence
 import { ManagerReportingView } from "./features/manager-reporting/ManagerReportingView";
 import { CustomerRelationsView } from "./features/customer-relations/CustomerRelationsView";
 import { WorkforceEvidenceView } from "./features/workforce-evidence/WorkforceEvidenceView";
+import { AgentAssistantPanel } from "./AgentAssistantPanel";
 import { localDate } from "./plan-calendar";
 import { customerRelationships } from "./customer-links-adapter";
 import type { CustomerActivity, CustomerRelationship } from "./features/customer360/model";
@@ -441,6 +442,8 @@ export default function App() {
           loading={loading} todayLocalDate={localDate()}
           onOpenPlan={()=>setView("plans")}
           onOpenStop={id=>{setStopId(id);setView("field");}} />}
+        {view==="today" && <AgentAssistantPanel api={api} connected={connected} contextKey={contextKey}
+          preferredAgent="AI-01" title="Daily Briefing Agent" />}
 
         {view==="customers" && <Customer360View
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
@@ -468,6 +471,9 @@ export default function App() {
           subject={focusedCustomerRef} authorizedCustomers={customerRefs}
           relationships={relationshipEvidenceRows} history={patientSafeHistoryRows}
           loading={customerProfileLoading} error={customerProfileError} />}
+        {view==="customers" && <AgentAssistantPanel api={api} connected={connected} contextKey={contextKey}
+          preferredAgent="AI-08" title="Customer Relationship Agent"
+          subject={focusedCustomer?{kind:focusedCustomer.kind,id:focusedCustomer.id}:undefined} />}
 
         {view==="activities" && <ActivitiesView
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
@@ -533,6 +539,8 @@ export default function App() {
           contextKey={contextKey} products={masters.products??[]} assets={clmAssets} today={localDate()}
           linkedVisitId={visit?.id} loading={loading}
           onSaveSessionDraft={async draft=>{await api.saveClmSession(draft);}} />}
+        {view==="edetailing" && <AgentAssistantPanel api={api} connected={connected} contextKey={contextKey}
+          preferredAgent="AI-09" title="CLM Intelligence Agent" subject={visit?{kind:"visit",id:visit.id}:undefined} />}
 
         {view==="plans" && <MonthlyPlanner key={[contextKey,focusedCustomer?.kind??"",focusedCustomer?.id??""].join(":")}
           api={api} connected={connected} busy={busy} plans={plans} units={units} masters={masters}
@@ -603,6 +611,8 @@ export default function App() {
               setNotice({kind:"success",title:"Report snapshot created",message:exported.rowCount+" authorized row(s) exported and preserved as immutable snapshot "+exported.snapshotId.slice(0,8)+"."});
             }catch(error){setNotice({kind:"error",title:"Report export failed",message:errText(error)});}
           })();}} />}
+        {view==="manager"&&manager&&<AgentAssistantPanel api={api} connected={connected} contextKey={contextKey}
+          preferredAgent="AI-05" title="Manager Intelligence Agent" />}
 
         {view==="admin"&&(admin?<div className="tr-grid-wide">
           <Panel eyebrow="ORGANIZATION STRUCTURE" title="Manage reporting hierarchy">
@@ -687,6 +697,9 @@ export default function App() {
           </div>
           <p className="tr-detail">{ncaOptions.categories.length} approved NCA categories · {ncaOptions.towns.length} authorized towns</p>
         </Panel>}
+
+        {view==="admin"&&admin&&<AgentAssistantPanel api={api} connected={connected} contextKey={contextKey}
+          preferredAgent="AI-14" title="Field Data Quality Agent" />}
 
         {view==="platform"&&<PlatformConsole api={api} authenticated={Boolean(session)}
           isSuperAdmin={isPlatformAdmin} busy={busy} perform={(fn,title)=>action(fn,title,false)}/>}
