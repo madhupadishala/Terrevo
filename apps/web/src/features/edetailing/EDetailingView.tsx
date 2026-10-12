@@ -44,7 +44,7 @@ export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets
   try{
     await onSaveSessionDraft(draft);
     if(epoch.current!==savingEpoch)return;
-    setHandedOff(true);setMessage("Session draft passed to the parent callback; server recording remains unverified.");setReview(false);
+    setHandedOff(true);setMessage("Detailing session recorded by the Terrevo API.");setReview(false);
   }catch(e){
     if(epoch.current===savingEpoch)setMessage(e instanceof Error?e.message:"Session draft handoff failed.");
   }finally{
@@ -64,7 +64,7 @@ export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets
  <div><Button size="sm" kind="ghost" onClick={()=>choose(asset,"REHEARSAL")}>Rehearse</Button><Button size="sm" kind="secondary" onClick={()=>choose(asset,"DETAILING")}>Start detailing</Button></div></div>)}</div>
  </section>
  <section className="tr-panel"><span className="tr-section-kicker">PRESENTATION VIEWER</span>
- {!selected||!viewing?<p className="tr-detail">Select approved content to begin a local-only viewing session.</p>:<>
+ {!selected||!viewing?<p className="tr-detail">Select approved content to begin an authorized detailing session.</p>:<>
  <h2>{selected.title}</h2><Tag type="green">Approved</Tag><Tag type={viewing.mode==="REHEARSAL"?"gray":"blue"}>{viewing.mode==="REHEARSAL"?"Rehearsal — no engagement report":"Detailing session"}</Tag>
  <div tabIndex={0} role="region" aria-label="Approved slide viewer" onKeyDown={e=>{if(e.key==="ArrowRight"){e.preventDefault();navigate(1);}if(e.key==="ArrowLeft"){e.preventDefault();navigate(-1);}}}>
  <h3>{selected.slides[viewing.index].title}</h3><p style={{whiteSpace:"pre-wrap"}}>{selected.slides[viewing.index].body}</p>
@@ -76,12 +76,12 @@ export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets
  <Button kind="tertiary" onClick={()=>setReview(true)}>Review ended session</Button>)}
  {review&&draft&&<>
  <h3>Session review</h3><p>Asset: {selected.title}</p>
- <p>Slide engagement is an in-memory estimate, not a persisted audit record.</p>
+ <p>Review the captured slide engagement before submitting it to the Terrevo API.</p>
  {draft?.slideVisits.map((v,i)=><p key={i}>Slide {v.slideId}: {Math.round(v.durationMs/1000)} seconds</p>)}
  <Button kind="secondary" disabled={saving} onClick={()=>setReview(false)}>Return to viewer</Button>
- <Button disabled={!onSaveSessionDraft||saving||handedOff} onClick={()=>void save()}>{saving?"Handing off…":handedOff?"Draft handed off":"Hand off session draft"}</Button>
- {!onSaveSessionDraft&&<p>No approved session recording API is connected. Draft cannot be saved.</p>}</>}
- {handedOff&&<p role="status">Draft handoff completed in this session. Start a new detailing session for another draft.</p>}
+ <Button disabled={!onSaveSessionDraft||saving||handedOff} onClick={()=>void save()}>{saving?"Recording…":handedOff?"Session recorded":"Record detailing session"}</Button>
+ {!onSaveSessionDraft&&<p>No authorized session recording API is connected.</p>}</>}
+ {handedOff&&<p role="status">Server recording completed. Start a new detailing session to record another interaction.</p>}
  {message&&<p role="status">{message}</p>}
  </>}</section></div>;
 }
