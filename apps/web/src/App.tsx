@@ -20,7 +20,7 @@ import { authorizedCustomerRefs, patientSafeHistory, relationshipEvidenceWithTar
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
-  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall, type ClmAsset, type ManagerReportRecord, type WorkforceEvidencePayload, type CustomerLink,
+  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall, type ClmAsset, type ManagerReportRecord, type WorkforceEvidencePayload, type CustomerLink, type FieldSettings,
 } from "./terrevo-api";
 
 type Area = "overview" | "today" | "customers" | "activities" | "edetailing" | "field" | "plans" | "manager" | "admin" | "platform" | BusinessArea;
@@ -142,6 +142,9 @@ export default function App() {
   const [managerReportRecords,setManagerReportRecords] = useState<ManagerReportRecord[]>([]);
   const [managerReportAsOf,setManagerReportAsOf] = useState("");
   const [managerReportError,setManagerReportError] = useState<string|null>(null);
+  const [fieldSettings,setFieldSettings]=useState<FieldSettings|null>(null);
+  const [gpsRadius,setGpsRadius]=useState<50|100|200>(100);
+  const [gpsAccuracy,setGpsAccuracy]=useState(50);
 
   function resetTenantState() {
     setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
@@ -149,7 +152,7 @@ export default function App() {
     setSelectedOption(""); setStopId(""); setGpsReason(""); setCallOutcome("");
     setCallRemarks(""); setShortDayReason("");
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
-    setFocusedCustomer(null); setCustomerRelations([]); setCustomerActivities([]); setCustomerLinkEvidence([]); setCustomerProfileError(null); setCustomerProfileLoading(false); setWorkforceEvidence(null); setWorkforceEvidenceError(null); setClmAssets([]); setManagerReportRecords([]); setManagerReportAsOf(""); setManagerReportError(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
+    setFocusedCustomer(null); setCustomerRelations([]); setCustomerActivities([]); setCustomerLinkEvidence([]); setCustomerProfileError(null); setCustomerProfileLoading(false); setWorkforceEvidence(null); setWorkforceEvidenceError(null); setClmAssets([]); setFieldSettings(null); setGpsRadius(100); setGpsAccuracy(50); setManagerReportRecords([]); setManagerReportAsOf(""); setManagerReportError(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
     setOwnUnplanned([]);setPendingUnplanned([]);setUnplannedReviewComment("");
   }
 
@@ -196,7 +199,7 @@ export default function App() {
       const base = await Promise.allSettled([
         api.progress(), api.startOptions(), api.openVisit(), api.plans(), api.orgUnits(),
         ...MASTER_KINDS.map(k=>api.masters(k)),
-        api.ncaOptions(),api.ownNcaRecords(),api.ownUnplannedCalls(),api.clmAssets(),api.workforceEvidence(),
+        api.ncaOptions(),api.ownNcaRecords(),api.ownUnplannedCalls(),api.clmAssets(),api.workforceEvidence(),api.fieldSettings(),
       ]);
       if (generation !== tenantGeneration.current) return;
       setProgress(base[0].status==="fulfilled"?base[0].value:null);
@@ -220,6 +223,9 @@ export default function App() {
       const workforceResult=base[9+MASTER_KINDS.length];
       if(workforceResult.status==="fulfilled"){setWorkforceEvidence(workforceResult.value as WorkforceEvidencePayload);setWorkforceEvidenceError(null);}
       else {setWorkforceEvidence(null);setWorkforceEvidenceError(errText(workforceResult.reason));}
+      const fieldSettingsResult=base[10+MASTER_KINDS.length];
+      if(fieldSettingsResult.status==="fulfilled"){const value=fieldSettingsResult.value as FieldSettings;setFieldSettings(value);setGpsRadius(value.geofenceRadiusMeters);setGpsAccuracy(value.maxGpsAccuracyMeters);}
+      else setFieldSettings(null);
       const failures=base.filter(result=>result.status==="rejected").length;
       if (failures) setNotice({kind:"info",title:"Partial data access",
         message:String(failures)+" API requests were denied or unavailable; previous tenant records have been cleared."});
@@ -640,6 +646,21 @@ export default function App() {
               <Button disabled={busy||!assignmentUser||(!assignmentScope&&assignmentRole!=="TENANT_ADMIN")} onClick={()=>guarded(()=>api.assignRole(assignmentUser,assignmentRole,assignmentRole==="TENANT_ADMIN"?null:assignmentScope),"Role assignment saved")}>Assign role</Button></div>
           </Panel>
         </div>:<Panel eyebrow="ADMIN PERMISSIONS" title="Tenant administration requires authorization"><p className="tr-detail">This area uses existing real organization and role APIs. It does not grant elevated access to a regular field user.</p></Panel>)}
+
+        {view==="admin"&&admin&&<Panel eyebrow="FIELD POLICY" title="GPS and geofence controls">
+          <p className="tr-detail">These server-enforced settings apply to field check-in validation for this tenant. Browser UI cannot bypass them.</p>
+          <div className="tr-form">
+            <label className="tr-select-label" htmlFor="gps-radius">Geofence radius</label>
+            <select id="gps-radius" className="tr-select" value={gpsRadius} onChange={e=>setGpsRadius(Number(e.target.value) as 50|100|200)}>
+              {[50,100,200].map(v=><option key={v} value={v}>{v} meters</option>)}
+            </select>
+            <TextInput id="gps-accuracy" type="number" labelText="Maximum accepted GPS accuracy (meters)" value={String(gpsAccuracy)}
+              onChange={e=>setGpsAccuracy(Number(e.target.value))} />
+            <Button disabled={busy||!Number.isFinite(gpsAccuracy)||gpsAccuracy<5||gpsAccuracy>500}
+              onClick={()=>guarded(async()=>{const saved=await api.updateFieldSettings({geofenceRadiusMeters:gpsRadius,maxGpsAccuracyMeters:gpsAccuracy});setFieldSettings(saved);},"Field GPS policy updated")}>Save field policy</Button>
+          </div>
+          <p className="tr-detail">{fieldSettings?("Active: "+fieldSettings.geofenceRadiusMeters+" m geofence · GPS accuracy ≤ "+fieldSettings.maxGpsAccuracyMeters+" m"):"Current server policy unavailable."}</p>
+        </Panel>}
 
         {view==="admin"&&admin&&<Panel eyebrow="CONTROLLED CLM" title="Approve detailing content">
           <p className="tr-detail">Approved metadata and slide content are tenant-scoped. Only authorized organization administrators can publish content through the server.</p>
