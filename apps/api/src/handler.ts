@@ -196,15 +196,62 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
   const mapClmAsset=(row:Record<string,unknown>)=>({
     id:String(row.id),tenantId:String(row.tenant_id),title:String(row.title),category:String(row.category),
     version:String(row.version),status:String(row.status),productIds:Array.isArray(row.product_ids)?row.product_ids.map(String):[],
-    slides:Array.isArray(row.slides)?row.slides:[],effectiveFrom:row.effective_from==null?undefined:String(row.effective_from),
-    expiresAt:row.expires_at==null?undefined:String(row.expires_at),provenanceId:String(row.provenance_id),
-    approvedBy:row.approved_by==null?"":String(row.approved_by),approvedAt:row.approved_at==null?"":String(row.approved_at),
+    regionCodes:Array.isArray(row.region_codes)?row.region_codes.map(String):["GLOBAL"],contentType:String(row.content_type??"slides/text"),
+    objectPath:row.object_path==null?null:String(row.object_path),slides:Array.isArray(row.slides)?row.slides:[],
+    effectiveFrom:row.effective_from==null?undefined:String(row.effective_from),expiresAt:row.expires_at==null?undefined:String(row.expires_at),
+    provenanceId:String(row.provenance_id),approvedBy:row.approved_by==null?"":String(row.approved_by),
+    approvedAt:row.approved_at==null?"":String(row.approved_at),
   });
+  async function allowedClmRegionCodes(tenantId:string,accessToken:string){
+    const units=await organization.listUnits(tenantId,accessToken);
+    return new Set(["GLOBAL",...units.filter(x=>x.type==="region"&&x.status==="active").map(x=>x.code)]);
+  }
   async function readClmAssets(tenantId:string,accessToken:string){
-    const q=new URLSearchParams({select:"id,tenant_id,title,category,version,status,product_ids,slides,effective_from,expires_at,provenance_id,approved_by,approved_at",tenant_id:`eq.${tenantId}`,order:"title.asc,version.desc",limit:"500"});
-    const response=await fetcher(new URL("/rest/v1/clm_assets?"+q,config.url).toString(),{headers:clmUserHeaders(accessToken),cache:"no-store"});
+    const q=new URLSearchParams({select:"id,tenant_id,title,category,version,status,product_ids,region_codes,content_type,object_path,slides,effective_from,expires_at,provenance_id,approved_by,approved_at",tenant_id:`eq.${tenantId}`,order:"title.asc,version.desc",limit:"500"});
+    const [response,regions]=await Promise.all([
+      fetcher(new URL("/rest/v1/clm_assets?"+q,config.url).toString(),{headers:clmUserHeaders(accessToken),cache:"no-store"}),
+      allowedClmRegionCodes(tenantId,accessToken),
+    ]);
     if(!response.ok)throw new ProviderError("CLM catalog read failed",response.status);
-    return (await response.json() as Array<Record<string,unknown>>).map(mapClmAsset);
+    return (await response.json() as Array<Record<string,unknown>>).map(mapClmAsset)
+      .filter(asset=>asset.regionCodes.some(code=>regions.has(code)));
+  }
+  const clmStorageHeaders=(contentType?:string):Record<string,string>=>{
+    if(!config.serviceRoleKey)throw new ApiError(500,"Server provider key is not configured");
+    return {apikey:config.serviceRoleKey,authorization:`Bearer ${config.serviceRoleKey}`,...(contentType?{"content-type":contentType}:{})};
+  };
+  async function ensureClmBucket(){
+    const root=config.url.replace(/\/+$/,"");
+    const current=await fetcher(root+"/storage/v1/bucket/clm-assets",{headers:clmStorageHeaders(),cache:"no-store"});
+    if(current.ok)return;
+    if(current.status!==404)throw new ProviderError("CLM storage bucket check failed",current.status);
+    const create=await fetcher(root+"/storage/v1/bucket",{method:"POST",headers:{...clmStorageHeaders("application/json")},body:JSON.stringify({
+      id:"clm-assets",name:"clm-assets",public:false,file_size_limit:5_242_880,
+      allowed_mime_types:["application/pdf","image/png","image/jpeg","video/mp4","application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+    })});
+    if(!create.ok&&create.status!==409)throw new ProviderError("CLM storage bucket create failed",create.status);
+  }
+  async function uploadClmBinary(tenantId:string,assetId:string,body:Record<string,unknown>){
+    if(typeof body.binaryBase64!=="string"||!body.binaryBase64) return null;
+    const contentType=clmText(body.contentType,"contentType",120);
+    const allowed=new Set(["application/pdf","image/png","image/jpeg","video/mp4","application/vnd.openxmlformats-officedocument.presentationml.presentation"]);
+    if(!allowed.has(contentType))throw new ApiError(400,"Unsupported CLM binary content type");
+    const fileName=clmText(body.fileName,"fileName",180);
+    if(!/^[A-Za-z0-9][A-Za-z0-9._ -]*$/.test(fileName)||fileName.includes(".."))throw new ApiError(400,"Invalid CLM file name");
+    if(body.binaryBase64.length>7_000_000||!/^[A-Za-z0-9+/]*={0,2}$/.test(body.binaryBase64))throw new ApiError(413,"CLM binary exceeds the supported size or encoding");
+    let bytes:Uint8Array;try{const decoded=atob(body.binaryBase64);bytes=Uint8Array.from(decoded,ch=>ch.charCodeAt(0));}catch{throw new ApiError(400,"Invalid CLM binary encoding");}
+    if(bytes.byteLength<1||bytes.byteLength>5_242_880)throw new ApiError(413,"CLM binary must be between 1 byte and 5 MB");
+    await ensureClmBucket();
+    const safe=fileName.replace(/\s+/g,"-"),objectPath=`${tenantId}/${assetId}/${safe}`;
+    const response=await fetcher(config.url.replace(/\/+$/,"")+"/storage/v1/object/clm-assets/"+objectPath.split("/").map(encodeURIComponent).join("/"),{
+      method:"POST",headers:{...clmStorageHeaders(contentType),"x-upsert":"false"},body:bytes,
+    });
+    if(!response.ok)throw new ProviderError("CLM binary upload failed",response.status);
+    return objectPath;
+  }
+  async function removeClmBinary(objectPath:string){
+    const response=await fetcher(config.url.replace(/\/+$/,"")+"/storage/v1/object/clm-assets/"+objectPath.split("/").map(encodeURIComponent).join("/"),{method:"DELETE",headers:clmStorageHeaders()});
+    if(!response.ok&&response.status!==404)throw new ProviderError("CLM binary cleanup failed",response.status);
   }
   async function createClmAsset(tenantId:string,actorId:string,accessToken:string,body:Record<string,unknown>){
     await rbac.authorize(tenantId,"MASTER_MANAGE",null,accessToken);
@@ -212,21 +259,53 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
     const provenanceId=clmText(body.provenanceId,"provenanceId",300);
     if(!Array.isArray(body.productIds)||body.productIds.length<1||body.productIds.length>50)throw new ApiError(400,"productIds must contain 1 to 50 products");
     const productIds=[...new Set(body.productIds.map((x)=>clmUuid(x,"productId")))];
-    if(!Array.isArray(body.slides)||body.slides.length<1||body.slides.length>100)throw new ApiError(400,"slides must contain 1 to 100 entries");
+    const regionInput=body.regionCodes??["GLOBAL"];
+    if(!Array.isArray(regionInput)||regionInput.length<1||regionInput.length>50)throw new ApiError(400,"regionCodes must contain 1 to 50 entries");
+    const regionCodes=[...new Set(regionInput.map(raw=>clmText(raw,"regionCode",40).toUpperCase()))];
+    if(regionCodes.some(code=>code!=="GLOBAL"&&!/^[A-Z0-9][A-Z0-9_-]*$/.test(code)))throw new ApiError(400,"Invalid region code");
+    const availableRegions=await allowedClmRegionCodes(tenantId,accessToken);
+    if(regionCodes.some(code=>code!=="GLOBAL"&&!availableRegions.has(code)))throw new ApiError(400,"Region is not available in the authorized organization hierarchy");
+    const rawSlides=body.slides??[];
+    if(!Array.isArray(rawSlides)||rawSlides.length>100)throw new ApiError(400,"slides must be an array with at most 100 entries");
     const ids=new Set<string>();
-    const slides=body.slides.map((raw,index)=>{
+    const slides=rawSlides.map((raw,index)=>{
       if(!raw||typeof raw!=="object"||Array.isArray(raw))throw new ApiError(400,`Invalid slide ${index+1}`);
       const value=raw as Record<string,unknown>;const id=clmText(value.id,"slide id",80);
       if(ids.has(id))throw new ApiError(400,"Duplicate slide id");ids.add(id);
       return {id,title:clmText(value.title,"slide title",160),body:typeof value.body==="string"&&value.body.length<=12000?value.body:(()=>{throw new ApiError(400,"Invalid slide body")})()};
     });
+    const hasBinary=typeof body.binaryBase64==="string"&&body.binaryBase64.length>0;
+    if(!slides.length&&!hasBinary)throw new ApiError(400,"At least one approved slide or binary document is required");
     const effectiveFrom=clmDate(body.effectiveFrom,"effectiveFrom",true),expiresAt=clmDate(body.expiresAt,"expiresAt",true);
     if(effectiveFrom&&expiresAt&&expiresAt<effectiveFrom)throw new ApiError(400,"expiresAt must be on or after effectiveFrom");
-    const row={tenant_id:tenantId,title,category,version,status:"APPROVED",product_ids:productIds,slides,effective_from:effectiveFrom,expires_at:expiresAt,
+    const assetId=crypto.randomUUID(),objectPath=hasBinary?await uploadClmBinary(tenantId,assetId,body):null;
+    const contentType=hasBinary?clmText(body.contentType,"contentType",120):"slides/text";
+    const row={id:assetId,tenant_id:tenantId,title,category,version,status:"APPROVED",product_ids:productIds,region_codes:regionCodes,content_type:contentType,object_path:objectPath,slides,effective_from:effectiveFrom,expires_at:expiresAt,
       provenance_id:provenanceId,approved_by:actorId,approved_at:new Date().toISOString()};
     const response=await fetcher(new URL("/rest/v1/clm_assets",config.url).toString(),{method:"POST",headers:clmAdminHeaders(),body:JSON.stringify(row)});
-    if(!response.ok)throw new ProviderError("CLM asset create failed",response.status);
+    if(!response.ok){if(objectPath)await removeClmBinary(objectPath).catch(()=>{});throw new ProviderError("CLM asset create failed",response.status);}
     const saved=(await response.json() as Array<Record<string,unknown>>)[0];if(!saved)throw new ApiError(502,"CLM asset was not returned");
+    return mapClmAsset(saved);
+  }
+  async function signClmBinary(tenantId:string,assetId:string,accessToken:string){
+    const asset=(await readClmAssets(tenantId,accessToken)).find(x=>x.id===assetId);
+    if(!asset||asset.status!=="APPROVED"||!asset.objectPath)throw new ApiError(404,"Authorized CLM binary not found");
+    const today=new Date().toISOString().slice(0,10);
+    if((asset.effectiveFrom&&asset.effectiveFrom>today)||(asset.expiresAt&&asset.expiresAt<today))throw new ApiError(409,"CLM asset is not currently eligible");
+    const response=await fetcher(config.url.replace(/\/+$/,"")+"/storage/v1/object/sign/clm-assets/"+asset.objectPath.split("/").map(encodeURIComponent).join("/"),{
+      method:"POST",headers:{...clmStorageHeaders("application/json")},body:JSON.stringify({expiresIn:300}),
+    });
+    if(!response.ok)throw new ProviderError("CLM signed download failed",response.status);
+    const data=await response.json() as Record<string,unknown>,signed=typeof data.signedURL==="string"?data.signedURL:typeof data.signedUrl==="string"?data.signedUrl:null;
+    if(!signed)throw new ApiError(502,"Storage provider did not return a signed URL");
+    return {url:signed.startsWith("http")?signed:config.url.replace(/\/+$/,"")+"/storage/v1"+signed,expiresIn:300,contentType:asset.contentType};
+  }
+  async function setClmAssetStatus(tenantId:string,assetId:string,accessToken:string,status:"WITHDRAWN"|"EXPIRED"){
+    await rbac.authorize(tenantId,"MASTER_MANAGE",null,accessToken);
+    const q=new URLSearchParams({tenant_id:`eq.${tenantId}`,id:`eq.${assetId}`});
+    const response=await fetcher(new URL("/rest/v1/clm_assets?"+q,config.url).toString(),{method:"PATCH",headers:clmAdminHeaders(),body:JSON.stringify({status})});
+    if(!response.ok)throw new ProviderError("CLM status update failed",response.status);
+    const saved=(await response.json() as Array<Record<string,unknown>>)[0];if(!saved)throw new ApiError(404,"CLM asset not found");
     return mapClmAsset(saved);
   }
   async function recordClmSession(tenantId:string,actorId:string,accessToken:string,body:Record<string,unknown>){
