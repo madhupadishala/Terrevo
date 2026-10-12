@@ -273,6 +273,7 @@
     "scripts/r01-ownership.mjs",
     "scripts/release-preflight.mjs",
     "scripts/staging/edge-api-entry.ts",
+    "scripts/staging/manage-synthetic-platform-grant.mjs",
     "scripts/staging/platform-tenant-recovery.mjs",
     "scripts/staging/provision-auth.mjs",
     "scripts/staging/qualify-curl-load.mjs",
