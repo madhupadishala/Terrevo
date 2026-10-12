@@ -53,6 +53,14 @@ export type ManagerCommand = {
 };
 export type ManagerReportRecord={id:string;tenantId:string;territoryId:string;ownerUserId:string;workDate:string;kind:"PLANNED_STOP"|"UNPLANNED_CALL"|"NCA"|"DCR";status:"PLANNED"|"COMPLETED"|"PENDING"|"APPROVED"|"REJECTED"|"SUBMITTED"|"REPORTED";sourceId:string;sourceType:string;observedAt:string};
 export type ManagerReportLedger={asOf:string;records:ManagerReportRecord[]};
+export type WorkforceEvidencePayload={
+  asOf:string;
+  claims:Array<{id:string;executionId:string;employeeId:string;ownerUserId:string;orgUnitId:string;workDate:string;currencyCode:string;status:string;totalAmount:number;lines:Array<{sequence:number;category:string;amount:number;remarks:string|null;receiptReference:string|null}>}>;
+  receipts:Array<{id:string;tenantId:string;claimId:string;lineId:string;status:"VERIFIED"|"PENDING"|"MISSING"|"REVOKED";documentRef:string;verifiedAt?:string}>;
+  travel:Array<{tenantId:string;ownerUserId:string;workDate:string;sourceId:string;distanceMeters:number;method:"SERVER_GPS"|"SERVER_ROUTE"|"UNVERIFIED"}>;
+  attendance:Array<{id:string;tenantId:string;ownerUserId:string;workDate:string;state:"PRESENT"|"LEAVE"|"ABSENT"|"PENDING";dayClosed:boolean;sourceId:string;asOf:string}>;
+  policies:Array<{tenantId:string;category:string;maxMinor:number;currency:string;effectiveFrom:string;expiresAt:string;policyId:string}>;
+};
 export type ManagerAnalytics = {
   period: { days: number; startDate: string; endDate: string };
   tours: { submitted: number; totalWorkedMinutes: number };
@@ -360,8 +368,17 @@ export class TerrevoWebApi {
   async visibleExpenses():Promise<Array<{id:string;executionId:string;employeeId:string;ownerUserId:string;orgUnitId:string;workDate:string;currencyCode:string;status:string;totalAmount:number;lines:Array<{sequence:number;category:string;amount:number;remarks:string|null;receiptReference:string|null}>}>> {
     return (await this.raw("/v1/expenses") as {claims:Array<{id:string;executionId:string;employeeId:string;ownerUserId:string;orgUnitId:string;workDate:string;currencyCode:string;status:string;totalAmount:number;lines:Array<{sequence:number;category:string;amount:number;remarks:string|null;receiptReference:string|null}>}>}).claims;
   }
-  async saveExpense(executionId:string,currencyCode:string,amount:number,category:"TRAVEL"|"MEAL"|"LODGING"|"LOCAL_CONVEYANCE"|"OTHER",remarks:string|null) {
-    return this.raw("/v1/executions/" + encodeURIComponent(executionId) + "/expense","PUT",{operationId:crypto.randomUUID(),currencyCode,lines:[{sequence:1,category,amount,remarks,receiptReference:null}]});
+  async saveExpense(executionId:string,currencyCode:string,amount:number,category:"TRAVEL"|"MEAL"|"LODGING"|"LOCAL_CONVEYANCE"|"OTHER",remarks:string|null,receiptReference:string|null=null) {
+    return this.raw("/v1/executions/" + encodeURIComponent(executionId) + "/expense","PUT",{operationId:crypto.randomUUID(),currencyCode,lines:[{sequence:1,category,amount,remarks,receiptReference}]});
+  }
+  async workforceEvidence():Promise<WorkforceEvidencePayload> {
+    return await this.raw("/v1/workforce/evidence") as WorkforceEvidencePayload;
+  }
+  async reviewReceipt(claimId:string,lineSequence:number,decision:"VERIFY"|"REVOKE",comment:string|null) {
+    return this.raw("/v1/workforce/receipts/"+encodeURIComponent(claimId)+"/"+lineSequence+"/decision","POST",{decision,comment});
+  }
+  async createExpensePolicy(input:{category:"TRAVEL"|"MEAL"|"LODGING"|"LOCAL_CONVEYANCE"|"OTHER";maxMinor:number;currency:string;effectiveFrom:string;expiresAt:string;policyRef:string}) {
+    return this.raw("/v1/workforce/policies","POST",input);
   }
   async submitExpense(id:string, comment:string|null) {
     return this.raw("/v1/expenses/"+encodeURIComponent(id)+"/submit","POST",{operationId:crypto.randomUUID(),comment});
