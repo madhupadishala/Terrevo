@@ -254,7 +254,7 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
     if(!existingResponse.ok)throw new ProviderError("CLM session replay check failed",existingResponse.status);
     const existing=(await existingResponse.json() as Array<Record<string,unknown>>)[0];
     if(existing){
-      if(existing.asset_id!==assetId||existing.visit_id!==visitId||existing.started_at!==startedAt||existing.ended_at!==endedAt||JSON.stringify(existing.slide_visits)!==JSON.stringify(slideVisits))throw new ApiError(409,"Idempotency key reused with different detailing session");
+      if(existing.asset_id!==assetId||existing.visit_id!==visitId||Date.parse(String(existing.started_at))!==started||Date.parse(String(existing.ended_at))!==ended||JSON.stringify(existing.slide_visits)!==JSON.stringify(slideVisits))throw new ApiError(409,"Idempotency key reused with different detailing session");
       return {id:String(existing.id),provenanceId:String(existing.provenance_id)};
     }
     const provenanceId=`clm-session:${operationId}`;
