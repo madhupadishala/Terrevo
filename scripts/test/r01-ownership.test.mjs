@@ -45,12 +45,13 @@ test('reject invalid file paths and status', () => {
  assert.throws(()=>parseNameStatusZ('UNKNOWN\0a\0'),/Unrecognized/);
 });
 
-test('integration mandate is limited to one exact branch and recorded file paths',()=>{
+test('integration mandate is limited to trusted integration branches and recorded file paths',()=>{
  assert.equal(ownerForBranch('feature/terrevo-v32-reference-integration','integrator',integrationScope),'integrator');
- assert.throws(()=>ownerForBranch('feature/terrevo-v32-reference-integration-copy','integrator'),/Unregistered/);
+ assert.equal(ownerForBranch('feature/terrevo-v32-ponytail-execution','integrator',integrationScope),'integrator');
+ assert.throws(()=>ownerForBranch('feature/terrevo-v32-reference-integration-copy','integrator',integrationScope),/Unregistered/);
  assert.throws(()=>ownerForBranch('feature/terrevo-v32-reference-integration','engineer1',integrationScope),/mismatch/);
  assert.deepEqual(validateChangedPaths(['apps/api/src/handler.ts','apps/web/src/features/clm-library/model.ts'],'integrator',integrationScope),[]);
- const denied=['AGENTS.md','vercel.json','../secret','apps/api/src/unassigned.ts','apps/web/src/App.tsx'];
+ const denied=['AGENTS.md','vercel.json','../secret','apps/api/src/unassigned.ts','apps/web/src/Unassigned.tsx'];
  assert.deepEqual(validateChangedPaths(denied,'integrator',integrationScope),denied);
  assert.throws(()=>validateChangedPaths(['apps/api/src/handler.ts'],'integrator'),/Trusted integration policy/);
  for(const base of [undefined,'HEAD','main','--help'])assert.throws(()=>loadIntegrationScope(base),/full commit SHA/);
