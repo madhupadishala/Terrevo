@@ -6,6 +6,7 @@ export type AgentSnapshots={
   doctorCall?:Record<string,unknown>|null;
   expenseClaims?:Array<Record<string,unknown>>;
   expensePolicies?:Array<Record<string,unknown>>;
+  customerHistory?:Array<Record<string,unknown>>;
   dcrs?:Array<Record<string,unknown>>;
   analytics?:Record<string,unknown>|null;
   rcpa?:Record<string,unknown>|null;
@@ -36,6 +37,25 @@ export function buildDeterministicAgentInput(id:AgentId,s:AgentSnapshots):Record
   case "AI-13":{
    const call=s.doctorCall&&typeof s.doctorCall==="object"?s.doctorCall:null;const id=call?text(call.id):null;const action=call?text(call.nextAction):null;
    return {evidence:id?[evidence("doctor_call",id,["nextAction","callOutcome","updatedAt"])]:[],draft_actions:id&&action?[{title:action,source_call_id:id,evidence_ids:[id]}]:[],ambiguous_items:id&&!action?["No explicit next action was recorded in the doctor call."]:[]};
+  }
+  case "AI-03":{
+   const history=rows(s.customerHistory).sort((a,b)=>String(b.occurredAt??"").localeCompare(String(a.occurredAt??"")));
+   const assets=rows(s.clmAssets).filter(a=>a.status==="APPROVED");
+   const latest=history[0],latestId=latest?text(latest.id):null,lastContact=latest?text(latest.occurredAt):null;
+   const historyEvidence=history.flatMap(h=>{const id=text(h.id);return id?[evidence("customer_history",id,["occurredAt","activityType","summary"])]:[]});
+   const assetEvidence=assets.flatMap(a=>{const id=text(a.id);return id?[evidence("approved_clm_asset",id,["version","productIds","regionCodes"])]:[]});
+   const approved_material_ids=assets.flatMap(a=>{const id=text(a.id);return id?[id]:[]});
+   const briefing_sections=latestId?[{section:"last_verified_contact",text:text(latest?.summary)??"Verified prior contact",evidence_ids:[latestId]}]:[];
+   return {evidence:[...historyEvidence,...assetEvidence],briefing_sections,last_contact_at:lastContact,open_actions:[],approved_material_ids,evidence_ids:[...historyEvidence,...assetEvidence].map(x=>x.source_id)};
+  }
+  case "AI-08":{
+   const history=rows(s.customerHistory).sort((a,b)=>String(b.occurredAt??"").localeCompare(String(a.occurredAt??"")));
+   const ev=history.flatMap(h=>{const id=text(h.id);return id?[evidence("customer_history",id,["occurredAt","activityType","summary"])]:[]});
+   const latest=history[0],latestId=latest?text(latest.id):null,last=latest?text(latest.occurredAt):null;
+   const days=last?Math.max(0,Math.floor((Date.now()-Date.parse(last))/86_400_000)):null;
+   const engagement_gaps=latestId&&days!==null?[{days_since_last_verified_contact:days,last_contact_at:last,evidence_ids:[latestId]}]:[];
+   const followup_suggestions=latestId&&days!==null&&days>=30?[{suggestion:"Review whether a follow-up visit is appropriate.",reason:"At least 30 days since the last verified contact.",evidence_ids:[latestId]}]:[];
+   return {evidence:ev,engagement_gaps,followup_suggestions,link_warnings:[]};
   }
   case "AI-04":{
    const dcrs=rows(s.dcrs);
