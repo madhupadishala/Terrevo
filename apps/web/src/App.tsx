@@ -128,6 +128,7 @@ export default function App() {
   const [clmCategory,setClmCategory] = useState("PRODUCT_DETAIL");
   const [clmVersion,setClmVersion] = useState("1.0");
   const [clmProduct,setClmProduct] = useState("");
+  const [clmRegion,setClmRegion] = useState("GLOBAL");
   const [clmSlideTitle,setClmSlideTitle] = useState("");
   const [clmSlideBody,setClmSlideBody] = useState("");
   const [clmEffectiveFrom,setClmEffectiveFrom] = useState("");
@@ -672,13 +673,14 @@ export default function App() {
             <select id="clm-product" className="tr-select" value={clmProduct} onChange={e=>setClmProduct(e.target.value)}>
               <option value="">Select product</option>{(masters.products??[]).filter(x=>x.status==="active").map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
             </select>
+            <TextInput id="clm-region" labelText="Region code" value={clmRegion} onChange={e=>setClmRegion(e.target.value.toUpperCase())} maxLength={20}/>
             <TextInput id="clm-slide-title" labelText="Slide title" value={clmSlideTitle} onChange={e=>setClmSlideTitle(e.target.value)} maxLength={160}/>
             <TextArea id="clm-slide-body" labelText="Approved slide body" value={clmSlideBody} onChange={e=>setClmSlideBody(e.target.value)} maxLength={12000}/>
             <label className="tr-select-label" htmlFor="clm-effective">Effective from</label><input id="clm-effective" className="tr-select" type="date" value={clmEffectiveFrom} onChange={e=>setClmEffectiveFrom(e.target.value)}/>
             <label className="tr-select-label" htmlFor="clm-expires">Expires at</label><input id="clm-expires" className="tr-select" type="date" value={clmExpiresAt} onChange={e=>setClmExpiresAt(e.target.value)}/>
             <TextInput id="clm-provenance" labelText="Approval / provenance reference" value={clmProvenance} onChange={e=>setClmProvenance(e.target.value)} maxLength={300}/>
-            <Button disabled={busy||!clmTitle.trim()||!clmCategory.trim()||!clmVersion.trim()||!clmProduct||!clmSlideTitle.trim()||!clmSlideBody||!clmProvenance.trim()||Boolean(clmEffectiveFrom&&clmExpiresAt&&clmExpiresAt<clmEffectiveFrom)}
-              onClick={()=>guarded(async()=>{await api.createClmAsset({title:clmTitle,category:clmCategory,version:clmVersion,productIds:[clmProduct],slides:[{id:crypto.randomUUID(),title:clmSlideTitle,body:clmSlideBody}],effectiveFrom:clmEffectiveFrom||null,expiresAt:clmExpiresAt||null,provenanceId:clmProvenance});setClmTitle("");setClmSlideTitle("");setClmSlideBody("");setClmProvenance("");},"CLM content approved")}>Approve and publish content</Button>
+            <Button disabled={busy||!clmTitle.trim()||!clmCategory.trim()||!clmVersion.trim()||!clmProduct||!clmRegion.trim()||!clmSlideTitle.trim()||!clmSlideBody||!clmProvenance.trim()||Boolean(clmEffectiveFrom&&clmExpiresAt&&clmExpiresAt<clmEffectiveFrom)}
+              onClick={()=>guarded(async()=>{await api.createClmAsset({title:clmTitle,category:clmCategory,version:clmVersion,productIds:[clmProduct],regionCodes:[clmRegion.trim()||"GLOBAL"],slides:[{id:crypto.randomUUID(),title:clmSlideTitle,body:clmSlideBody}],effectiveFrom:clmEffectiveFrom||null,expiresAt:clmExpiresAt||null,provenanceId:clmProvenance});setClmTitle("");setClmSlideTitle("");setClmSlideBody("");setClmProvenance("");},"CLM content approved")}>Approve and publish content</Button>
           </div>
           <p className="tr-detail">{clmAssets.length} approved catalog item(s) currently visible.</p>
         </Panel>}
