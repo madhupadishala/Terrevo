@@ -6,7 +6,7 @@ export type ReportFilter={from:string;to:string;territoryId:string;ownerUserId:s
 export type MetricCounts={plannedStops:number;completedPlanned:number;unplannedPending:number;unplannedApproved:number;unplannedRejected:number;ncaReported:number;dcrSubmitted:number;plannedCompletionPercent:number|null};
 export type ReportResult={rows:ReportRecord[];counts:MetricCounts;excluded:number};
 export type ReportViewProps={scope:ReportScope;records?:ReportRecord[];loading?:boolean;error?:string|null;onRequestCsv?:(intent:{tenantId:string;contextKey:string;asOf:string;filter:ReportFilter;sourceIds:string[]})=>void};
-export function canViewReports(s:ReportScope):boolean{return Boolean(s.tenantId&&s.tenantId===s.authorizedForTenantId&&s.contextKey&&(s.role==="MANAGER"||s.role==="ADMIN")&&s.permittedTerritoryIds.length&&s.permittedTeamUserIds.length&&Number.isFinite(Date.parse(s.asOf)));}
+export function canViewReports(s:ReportScope):boolean{return Boolean(s.tenantId&&s.tenantId===s.authorizedForTenantId&&s.contextKey&&(s.role==="MANAGER"||s.role==="ADMIN")&&Array.isArray(s.permittedTerritoryIds)&&Array.isArray(s.permittedTeamUserIds)&&Number.isFinite(Date.parse(s.asOf)));}
 const validDay=(day:string)=>/^\d{4}-\d{2}-\d{2}$/.test(day)&&Number.isFinite(Date.parse(`${day}T00:00:00Z`))&&new Date(`${day}T00:00:00Z`).toISOString().slice(0,10)===day;
 const validStatuses:Record<ActivityKind,readonly ActivityStatus[]>={PLANNED_STOP:["PLANNED","COMPLETED"],UNPLANNED_CALL:["PENDING","APPROVED","REJECTED"],NCA:["REPORTED"],DCR:["SUBMITTED"]};
 export function reportRows(s:ReportScope,records:ReportRecord[],f:ReportFilter):ReportResult{
