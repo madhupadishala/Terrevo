@@ -282,6 +282,9 @@ export class TerrevoWebApi {
   async createMaster(kind:string,input:Record<string,unknown>):Promise<Master>{
     return (await this.raw("/v1/masters/"+encodeURIComponent(kind),"POST",input) as {item:Master}).item;
   }
+  async customerHistory(kind:"doctor"|"chemist"|"stockist",customerId:string):Promise<Array<{tenantId:string;customerKind:"doctor"|"chemist"|"stockist";customerId:string;id:string;occurredAt:string;activityType:string;summary:string}>> {
+    return (await this.raw("/v1/customers/"+kind+"/"+encodeURIComponent(customerId)+"/history") as {history:Array<{tenantId:string;customerKind:"doctor"|"chemist"|"stockist";customerId:string;id:string;occurredAt:string;activityType:string;summary:string}>}).history;
+  }
   async managerReportRecords():Promise<ManagerReportLedger> {
     return await this.raw("/v1/manager/report-records") as ManagerReportLedger;
   }
