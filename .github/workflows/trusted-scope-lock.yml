@@ -1,0 +1,36 @@
+name: Trusted scope policy
+on:
+  pull_request_target:
+    branches: [feature/ui-live-role-workspaces]
+    types: [opened, synchronize, reopened, edited]
+permissions:
+  contents: read
+jobs:
+  trusted-scope-lock:
+    runs-on: ubuntu-latest
+    steps:
+      # The workflow and executable checker come from the base, never the PR.
+      # No dependency installation, PR checkout or PR-authored code execution.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Check trusted base policy against PR paths
+        env:
+          TERREVO_DIFF_BASE: ${{ github.event.pull_request.base.sha }}
+          TERREVO_DIFF_HEAD: ${{ github.event.pull_request.head.sha }}
+          TERREVO_HEAD_BRANCH: ${{ github.head_ref }}
+          TERREVO_OWNER: ${{ github.head_ref == 'feature/terrevo-v32-reference-integration' && 'integrator' || contains(fromJSON('["feature/terrevo-s09-customer-relations-ui","feature/terrevo-s11-clm-library-ui","feature/terrevo-s13-workforce-evidence-ui","feature/terrevo-s14-manager-reporting-ui"]'), github.head_ref) && 'engineer2' || 'engineer1' }}
+          TERREVO_ASSIGNED_AUTHOR: ${{ github.repository_owner }}
+          TERREVO_PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          TERREVO_REPOSITORY: ${{ github.repository }}
+          TERREVO_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          [[ "$TERREVO_DIFF_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          git fetch --no-tags origin "$TERREVO_DIFF_HEAD"
+          node scripts/r01-ownership.mjs
