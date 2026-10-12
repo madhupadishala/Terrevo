@@ -185,6 +185,9 @@ export class TerrevoWebApi {
   }
   async tenants(): Promise<Tenant[]> { return (await this.raw("/v1/tenants", "GET", undefined, false) as { tenants: Tenant[] }).tenants; }
   async access(): Promise<AccessContext> { return (await this.raw("/v1/access-context") as { context: AccessContext }).context; }
+  async masterImport(kind:string,rows:Array<Record<string,unknown>>,preview=false):Promise<{kind:string;count?:number;rows?:Array<Record<string,unknown>>;inserted?:number}> {
+    return await this.raw("/v1/admin/master-import","POST",{kind,rows,preview}) as {kind:string;count?:number;rows?:Array<Record<string,unknown>>;inserted?:number};
+  }
   async fieldSettings():Promise<FieldSettings> {
     return (await this.raw("/v1/field-settings") as {settings:FieldSettings}).settings;
   }
