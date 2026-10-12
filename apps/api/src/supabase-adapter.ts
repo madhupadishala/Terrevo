@@ -377,6 +377,7 @@ export function createSupabaseAdapter(
     employees: "employees",
     doctors: "doctors",
     products: "products",
+    competitors: "competitors",
     chemists: "chemists",
     stockists: "stockists",
     samples: "samples",
