@@ -4,13 +4,13 @@ import {clampSlideIndex,createDetailingSessionDraft,eligibleAssets,assetContentI
 export type {EDetailingViewProps,ApprovedAsset,DetailingSessionDraft,ApprovedSlide,SlideVisit} from "./model";
 export {eligibleAssets,isEligibleApprovedAsset,clampSlideIndex,createDetailingSessionDraft,assetContentIdentity} from "./model";
 type Viewing = {tenantId:string;contextKey:string;assetId:string;assetContentId:string;linkedVisitId?:string;index:number;mode:"REHEARSAL"|"DETAILING";startedAt:string;enteredAt:number;visits:SlideVisit[];endedAt?:string};
-export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets=[],products=[],today,linkedVisitId,onSaveSessionDraft,loading=false}:EDetailingViewProps){
+export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets=[],products=[],today,linkedVisitId,onSaveSessionDraft,onRequestBinary,loading=false}:EDetailingViewProps){
  const localDate=today||[new Date().getFullYear(),String(new Date().getMonth()+1).padStart(2,"0"),String(new Date().getDate()).padStart(2,"0")].join("-");
  const authorized=Boolean(tenantId&&contextKey&&authorizedForTenantId===tenantId);
  const validAssets=useMemo(()=>authorized?eligibleAssets(assets,tenantId,localDate):[],[authorized,assets,tenantId,localDate]);
  const [search,setSearch]=useState(""),[product,setProduct]=useState(""),[category,setCategory]=useState("");
  const [viewing,setViewing]=useState<Viewing|null>(null),[review,setReview]=useState(false),[message,setMessage]=useState("");
- const [saving,setSaving]=useState(false),[handedOff,setHandedOff]=useState(false);
+ const [saving,setSaving]=useState(false),[handedOff,setHandedOff]=useState(false);const [binaryGrant,setBinaryGrant]=useState<{assetId:string;url:string;expiresAt:number}|null>(null),[binaryLoading,setBinaryLoading]=useState("");
  // An asynchronous completion belongs to the exact asset/tenant session that started it.
  const epoch=useRef(0);
  const activeContext=useRef({tenantId,contextKey});
@@ -18,7 +18,7 @@ export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets
   epoch.current++;
   activeContext.current={tenantId,contextKey};
  }
- useEffect(()=>{setViewing(null);setSearch("");setProduct("");setCategory("");setReview(false);setMessage("");setSaving(false);setHandedOff(false);},[tenantId,contextKey]);
+ useEffect(()=>{setViewing(null);setSearch("");setProduct("");setCategory("");setReview(false);setMessage("");setSaving(false);setHandedOff(false);setBinaryGrant(null);setBinaryLoading("");},[tenantId,contextKey]);
  const results=validAssets.filter(a=>(!search||a.title.toLowerCase().includes(search.toLowerCase()))&&(!category||a.category===category)&&(!product||a.productIds.includes(product)));
  const selected=viewing?.tenantId===tenantId&&viewing.contextKey===contextKey?
   validAssets.find(x=>x.id===viewing.assetId&&assetContentIdentity(x)===viewing.assetContentId):undefined;
@@ -37,6 +37,13 @@ export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets
   const now=Date.now();setViewing({...viewing,index:next,enteredAt:now,visits:visited(viewing,selected,now)});
  }
  const draft=selected&&viewing&&viewing.mode==="DETAILING"&&viewing.endedAt?createDetailingSessionDraft(tenantId,selected,viewing.startedAt,viewing.endedAt,viewing.visits,viewing.linkedVisitId):null;
+ async function requestBinary(asset:ApprovedAsset){
+  if(!asset.objectPath||!onRequestBinary||binaryLoading)return;
+  const requestEpoch=epoch.current;setBinaryLoading(asset.id);setMessage("");
+  try{const grant=await onRequestBinary(asset.id);if(epoch.current!==requestEpoch)return;setBinaryGrant({assetId:asset.id,url:grant.url,expiresAt:Date.now()+grant.expiresIn*1000});}
+  catch(e){if(epoch.current===requestEpoch)setMessage(e instanceof Error?e.message:"Approved document could not be opened.");}
+  finally{if(epoch.current===requestEpoch)setBinaryLoading("");}
+ }
  async function save(){
   if(!review||!draft||!onSaveSessionDraft||saving||handedOff)return;
   const savingEpoch=epoch.current;
@@ -60,8 +67,9 @@ export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets
  <label htmlFor="detail-product">Product</label><select id="detail-product" className="tr-select" value={product} onChange={e=>setProduct(e.target.value)}><option value="">All authorized products</option>{usableProducts.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>
  <label htmlFor="detail-category">Category</label><select id="detail-category" className="tr-select" value={category} onChange={e=>setCategory(e.target.value)}><option value="">All categories</option>{categories.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
  {!results.length&&!loading&&<p role="status">No approved content available for these filters.</p>}
- <div className="tr-list-sm">{results.map(asset=><div className="tr-history-row" key={asset.id}><div><strong>{asset.title}</strong><p>{asset.category} · {asset.slides.length} approved slides</p></div>
- <div><Button size="sm" kind="ghost" onClick={()=>choose(asset,"REHEARSAL")}>Rehearse</Button><Button size="sm" kind="secondary" onClick={()=>choose(asset,"DETAILING")}>Start detailing</Button></div></div>)}</div>
+ <div className="tr-list-sm">{results.map(asset=><div className="tr-history-row" key={asset.id}><div><strong>{asset.title}</strong><p>{asset.category} · {asset.slides.length} approved slides · {asset.regionCodes.join(", ")}</p>{asset.objectPath&&<p>{asset.contentType} · private controlled document</p>}</div>
+ <div><Button size="sm" kind="ghost" onClick={()=>choose(asset,"REHEARSAL")}>Rehearse</Button><Button size="sm" kind="secondary" onClick={()=>choose(asset,"DETAILING")}>Start detailing</Button>{asset.objectPath&&<Button size="sm" kind="tertiary" disabled={!onRequestBinary||binaryLoading===asset.id} onClick={()=>void requestBinary(asset)}>{binaryLoading===asset.id?"Authorizing…":"Request document"}</Button>}</div>
+ {binaryGrant?.assetId===asset.id&&binaryGrant.expiresAt>Date.now()&&<a href={binaryGrant.url} target="_blank" rel="noopener noreferrer">Open signed document (temporary access)</a>}</div>)}</div>
  </section>
  <section className="tr-panel"><span className="tr-section-kicker">PRESENTATION VIEWER</span>
  {!selected||!viewing?<p className="tr-detail">Select approved content to begin an authorized detailing session.</p>:<>
