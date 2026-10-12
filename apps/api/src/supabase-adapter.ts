@@ -135,6 +135,7 @@ export function createSupabaseAdapter(
   organization: OrganizationRepository;
   rbac: RbacRepository;
   masters: MastersRepository;
+  masterImport: { execute(tenantId:string,kind:MasterKind,rows:Array<Record<string,unknown>>):Promise<number> };
   tourPlanning: TourPlanningRepository;
   tourApproval: TourApprovalRepository;
   tourExecution: TourExecutionRepository;
@@ -467,6 +468,16 @@ export function createSupabaseAdapter(
     targetId: row.doctor_id ?? row.chemist_id ?? row.stockist_id ?? "",
     remarks: row.remarks,
   });
+
+  const masterImport={
+    async execute(tenantId:string,kind:MasterKind,rows:Array<Record<string,unknown>>):Promise<number>{
+      const response=await expectOk(await fetcher(`${base}/rest/v1/rpc/import_master_records`,{
+        method:"POST",headers:adminHeaders(config),
+        body:JSON.stringify({p_tenant_id:tenantId,p_kind:kind,p_rows:rows}),
+      }));
+      return await response.json() as number;
+    },
+  };
 
   const tourPlanning: TourPlanningRepository = {
     async listOwn(tenantId, _userId, accessToken): Promise<TourPlanSummary[]> {
@@ -1127,5 +1138,5 @@ export function createSupabaseAdapter(
       }));
     },
   };
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders, attendanceLeave, expenses, jointWork, managerCommand, analytics, nca, unplanned };
+  return { auth, tenants, organization, rbac, masters, masterImport, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders, attendanceLeave, expenses, jointWork, managerCommand, analytics, nca, unplanned };
 }
