@@ -1,7 +1,7 @@
 import type { RbacService } from "../../rbac/src/index.ts";
 export const EXPENSE_CATEGORIES=["TRAVEL","MEAL","LODGING","LOCAL_CONVEYANCE","OTHER"] as const;export type ExpenseCategory=typeof EXPENSE_CATEGORIES[number];
 export type ExpenseLine={sequence:number;category:ExpenseCategory;amount:number;remarks:string|null;receiptReference:string|null};
-export type ExpenseClaim={id:string;executionId:string;employeeId:string;orgUnitId:string;workDate:string;currencyCode:string;status:"DRAFT"|"SUBMITTED"|"APPROVED"|"REJECTED"|"RETURNED";totalAmount:number;submissionComment:string|null;reviewComment:string|null;lines:ExpenseLine[]};
+export type ExpenseClaim={id:string;executionId:string;employeeId:string;ownerUserId:string;orgUnitId:string;workDate:string;currencyCode:string;status:"DRAFT"|"SUBMITTED"|"APPROVED"|"REJECTED"|"RETURNED";totalAmount:number;submissionComment:string|null;reviewComment:string|null;lines:ExpenseLine[]};
 export type ExpenseRepository={listVisible(t:string,token:string,pending?:boolean):Promise<ExpenseClaim[]>;listOwn(t:string,u:string,token:string):Promise<ExpenseClaim[]>;getVisible(t:string,id:string,token:string):Promise<ExpenseClaim|null>;save(t:string,u:string,executionId:string,input:{operationId:string;currencyCode:string;lines:ExpenseLine[]}):Promise<string>;submit(t:string,u:string,id:string,input:{operationId:string;comment:string|null}):Promise<void>;decide(t:string,a:string,id:string,decision:"APPROVE"|"REJECT"|"RETURN",comment:string|null):Promise<void>};
 export class ExpenseInputError extends Error{};export class ExpenseNotFoundError extends Error{};export class ExpenseConflictError extends Error{};
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
