@@ -343,6 +343,38 @@ function createRequestHandler(env: ApiEnv, deps: Deps) {
         return json(200, { events: await platform.audit(user.id, offset) });
       }
 
+      const customerHistoryMatch=/^\/v1\/customers\/(doctor|chemist|stockist)\/([^/]+)\/history$/.exec(path);
+      if(request.method==="GET"&&customerHistoryMatch){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        const kind=customerHistoryMatch[1] as "doctor"|"chemist"|"stockist",customerId=clmUuid(customerHistoryMatch[2],"customerId");
+        const headers=clmUserHeaders(accessToken);
+        const targetColumn=kind==="doctor"?"doctor_id":kind==="chemist"?"chemist_id":"stockist_id";
+        const sq=new URLSearchParams({select:"id",tenant_id:`eq.${context.tenantId}`,stop_type:`eq.${kind}`,[targetColumn]:`eq.${customerId}`,limit:"1000"});
+        const sr=await fetcher(new URL("/rest/v1/tour_plan_stops?"+sq,config.url).toString(),{headers,cache:"no-store"});
+        if(!sr.ok)throw new ProviderError("Customer history scope read failed",sr.status);
+        const stopIds=(await sr.json() as Array<{id:string}>).map(x=>x.id);
+        if(!stopIds.length)return json(200,{history:[]});
+        const vq=new URLSearchParams({select:"id,checkin_at,checkout_at,status,verification",tenant_id:`eq.${context.tenantId}`,plan_stop_id:`in.(${stopIds.join(",")})`,order:"checkin_at.desc",limit:"1000"});
+        const vr=await fetcher(new URL("/rest/v1/field_visits?"+vq,config.url).toString(),{headers,cache:"no-store"});
+        if(!vr.ok)throw new ProviderError("Customer visit history failed",vr.status);
+        const visits=await vr.json() as Array<Record<string,unknown>>;
+        const visitIds=visits.map(x=>String(x.id));
+        const details=new Map<string,string>();
+        if(visitIds.length){
+          const table=kind==="doctor"?"dcrs":"trade_calls";
+          const select=kind==="doctor"?"visit_id,call_outcome,submitted_at":"visit_id,outcome,updated_at";
+          const q=new URLSearchParams({select,tenant_id:`eq.${context.tenantId}`,visit_id:`in.(${visitIds.join(",")})`,limit:"1000"});
+          const rr=await fetcher(new URL(`/rest/v1/${table}?${q}`,config.url).toString(),{headers,cache:"no-store"});
+          if(!rr.ok)throw new ProviderError("Customer activity history failed",rr.status);
+          for(const row of await rr.json() as Array<Record<string,unknown>>)details.set(String(row.visit_id),String(kind==="doctor"?row.call_outcome:row.outcome));
+        }
+        const history=visits.map(v=>({tenantId:context.tenantId,customerKind:kind,customerId,id:String(v.id),
+          occurredAt:String(v.checkout_at??v.checkin_at),activityType:kind==="doctor"?"Doctor call":"Trade call",
+          summary:details.get(String(v.id))??`${String(v.status)} · ${String(v.verification)}`}))
+          .filter(x=>Number.isFinite(Date.parse(x.occurredAt)));
+        return json(200,{history});
+      }
+
       const customerLinksMatch=new RegExp("^/v1/business/customer-links/([^/]+)$").exec(path);
       if(request.method==="GET"&&customerLinksMatch){
         const {accessToken,user,context}=await resolveTenantRequest(request);
