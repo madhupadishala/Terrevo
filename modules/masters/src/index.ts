@@ -5,6 +5,7 @@ export const MASTER_KINDS = [
   "employees",
   "doctors",
   "products",
+  "competitors",
   "chemists",
   "stockists",
   "samples",
@@ -143,6 +144,16 @@ export function createMastersService(
           input = {
             ...common,
             genericName: text(value.genericName, "genericName", 160, true),
+            divisionId: scopeOrgUnitId,
+          };
+          break;
+        }
+        case "competitors": {
+          scopeOrgUnitId = uuid(value.divisionId, "divisionId")!;
+          await requireScopeType(organization, tenantId, scopeOrgUnitId, accessToken, "division");
+          input = {
+            ...common,
+            manufacturer: text(value.manufacturer, "manufacturer", 160, true),
             divisionId: scopeOrgUnitId,
           };
           break;
