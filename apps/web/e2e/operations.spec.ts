@@ -17,13 +17,10 @@ test("public UI exposes role workspaces without inventing data or performing wri
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Operations, connected." })).toBeVisible();
   await expect(page.getByText("Terrevo is online.")).toHaveCount(0);
-  await page.getByRole("button", { name: "Field execution", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Start My Tour" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start My Tour (GPS)" })).toBeDisabled();
-  await page.getByRole("button", { name: "Manager command" }).click();
-  await expect(page.getByText("Manager workspace is permission-gated")).toBeVisible();
-  await page.getByRole("button", { name: "Platform Super Admin" }).click();
-  await expect(page.getByRole("heading", { name: "Connect an existing authorized account" })).toBeVisible();
+  // Anonymous visitors have only the overview: privileged navigation must not appear.
+  for (const name of ["Field execution","Manager command","Platform Super Admin","Customer 360"]) {
+    await expect(page.getByRole("button",{name,exact:true})).toHaveCount(0);
+  }
   expect(writes).toEqual([]);
 });
 
@@ -122,8 +119,7 @@ test("tenant administrator can open manager and organization administration with
   await expect(page.getByText("3", {exact:true}).first()).toBeVisible();
   await page.getByRole("button",{name:"Organization admin"}).click();
   await expect(page.getByRole("heading",{name:"Manage reporting hierarchy"})).toBeVisible();
-  await page.getByRole("button",{name:"Platform Super Admin"}).click();
-  await expect(page.getByRole("heading", { name: "Platform permissions required" })).toBeVisible();
+  await expect(page.getByRole("button",{name:"Platform Super Admin"})).toHaveCount(0);
 });
 
 test("platform administrator without a tenant can create and manage organizations with authorized platform APIs", async ({ page }) => {
@@ -247,9 +243,10 @@ test("switching tenants clears prior organization data even when next reads fail
   await page.getByRole("button",{name:"Tour planning"}).click();
   await expect(page.locator("#calendar-territory")).toContainText("Territory Alpha");
   await page.getByRole("combobox",{name:"Switch organization"}).selectOption(B);
+  // Tenant B is an MR: the manager workspace is removed, not merely permission-gated.
+  await expect(page.getByRole("button",{name:"Manager command"})).toHaveCount(0);
+  await page.getByRole("button",{name:"Tour planning"}).click();
   await expect(page.locator("#calendar-territory")).not.toContainText("Territory Alpha");
-  await page.getByRole("button",{name:"Manager command"}).click();
-  await expect(page.getByRole("heading",{name:"Manager workspace is permission-gated"})).toBeVisible();
 });
 
 
