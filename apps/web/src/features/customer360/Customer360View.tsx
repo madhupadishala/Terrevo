@@ -3,7 +3,7 @@ import {Button,Tag,TextInput} from "@carbon/react";
 import {authorizedCustomers,filterCustomers,safeText,visibleRelationships,visibleHistory,type Customer360ViewProps,type CustomerFilters,type CustomerKind} from "./model";
 export type {Customer360ViewProps,CustomerRelationship,CustomerActivity,WorkflowRequest} from "./model";
 export {filterCustomers,authorizedCustomers,visibleRelationships,visibleHistory} from "./model";
-export function Customer360View({tenantId,authorizedForTenantId,contextKey,masters,relationships=[],history=[],loading=false,error,onOpenWorkflow}:Customer360ViewProps){
+export function Customer360View({tenantId,authorizedForTenantId,contextKey,masters,relationships=[],history=[],loading=false,error,onSelectCustomer,onOpenWorkflow}:Customer360ViewProps){
  const idPrefix=useId();
  const [selection,setSelection]=useState<{tenantId:string;contextKey:string;id:string}|null>(null);
  const [filters,setFilters]=useState<CustomerFilters>({query:"",kind:"all",status:"",territory:""});
@@ -31,7 +31,7 @@ export function Customer360View({tenantId,authorizedForTenantId,contextKey,maste
  {!loading&&authorized&&!matching.length&&<p role="status">No matching authorized customers.</p>}
  <div className="tr-list-sm">{matching.map(({kind,record})=><div className="tr-history-row" key={kind+":"+record.id}>
  <div><strong>{record.name}</strong><p>{kind} · {record.code||"No code"}</p></div>
- <Button kind="ghost" size="sm" onClick={()=>setSelection({tenantId,contextKey,id:kind+":"+record.id})} aria-label={"View "+kind+" "+record.name}>View profile</Button></div>)}</div>
+ <Button kind="ghost" size="sm" onClick={()=>{setSelection({tenantId,contextKey,id:kind+":"+record.id});onSelectCustomer?.({customerId:record.id,customerType:kind});}} aria-label={"View "+kind+" "+record.name}>View profile</Button></div>)}</div>
  </section>
  <section className="tr-panel"><span className="tr-section-kicker">PROFILE & HISTORY</span>
  {!selected?<p className="tr-detail">Select a customer to review verified information.</p>:<>

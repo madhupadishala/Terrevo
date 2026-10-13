@@ -49,6 +49,7 @@ test("delegated screens render authorized records; empty NCA/CLM/AI contracts do
 
   await page.getByRole("combobox",{name:"Switch organization"}).selectOption(B);
   await expect(page.getByText("Doctor Alpha")).toHaveCount(0);
+  await page.getByRole("button",{name:"Customer 360"}).click();
   await expect(page.getByText("Doctor Beta")).toBeVisible();
   await expect(page.getByRole("heading",{name:"Doctor Alpha"})).toHaveCount(0);
   expect(customerReads).toContain(A);
@@ -84,22 +85,18 @@ test("delegated screens render authorized records; empty NCA/CLM/AI contracts do
   await expect(page.getByRole("heading",{name:"Doctor Beta"})).toBeVisible();
   await page.getByRole("button",{name:"Disconnect",exact:true}).click();
   await expect(page.getByText("Doctor Beta")).toHaveCount(0);
+  // Disconnect revokes all feature navigation and clears the authorized record.
   for(const name of ["Customer 360","NCA & activities","E-detailing / CLM","Today briefing"]){
-    await page.getByRole("button",{name,exact:true}).click();
-    await expect(page.getByText("Doctor Beta")).toHaveCount(0);
+    await expect(page.getByRole("button",{name,exact:true})).toHaveCount(0);
   }
+
 });
 
 test("delegated feature panels cannot disclose records while not connected",async({page})=>{
   await page.goto("/");
-  for(const [button,title] of [
-    ["Customer 360","Authorized customer directory"],
-    ["NCA & activities","Planned, unplanned and non-call activity"],
-    ["E-detailing / CLM","E-detailing / CLM"],
-    ["Today briefing","Field execution briefing"],
-  ]){
-    await page.getByRole("button",{name:button,exact:true}).click();
-    await expect(page.getByRole("heading",{name:title,level:2})).toBeVisible();
+  // The approved role contract exposes overview only without authentication.
+  for(const name of ["Customer 360","NCA & activities","E-detailing / CLM","Today briefing"]){
+    await expect(page.getByRole("button",{name,exact:true})).toHaveCount(0);
   }
-  await expect(page.getByText("No validated suggestions available.")).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Operations, connected."})).toBeVisible();
 });

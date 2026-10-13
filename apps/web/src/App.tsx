@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, InlineNotification, Tag, TextArea, TextInput, Tile } from "@carbon/react";
 import { BusinessWorkspace, type BusinessArea } from "./BusinessWorkspace";
 import { PlatformConsole } from "./PlatformConsole";
@@ -8,11 +8,20 @@ import { Customer360View } from "./features/customer360/Customer360View";
 import { ActivitiesView } from "./features/activities/ActivitiesView";
 import { EDetailingView } from "./features/edetailing/EDetailingView";
 import { TodayIntelligenceView } from "./features/intelligence/TodayIntelligenceView";
+import { ManagerReportingView } from "./features/manager-reporting/ManagerReportingView";
+import { CustomerRelationsView } from "./features/customer-relations/CustomerRelationsView";
+import { WorkforceEvidenceView } from "./features/workforce-evidence/WorkforceEvidenceView";
+import { AgentAssistantPanel } from "./AgentAssistantPanel";
 import { localDate } from "./plan-calendar";
+import { customerRelationships } from "./customer-links-adapter";
+import type { CustomerActivity, CustomerRelationship } from "./features/customer360/model";
+import { allowedWorkspaceIds } from "./role-navigation";
+import { parseMasterCsv } from "./master-import";
+import { authorizedCustomerRefs, patientSafeHistory, relationshipEvidenceWithTargets, workforceEvidenceModels } from "./v32-feature-adapters";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
-  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall,
+  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall, type ClmAsset, type ManagerReportRecord, type WorkforceEvidencePayload, type CustomerLink, type FieldSettings,
 } from "./terrevo-api";
 
 type Area = "overview" | "today" | "customers" | "activities" | "edetailing" | "field" | "plans" | "manager" | "admin" | "platform" | BusinessArea;
@@ -37,7 +46,7 @@ const NAV: Array<{ id: Area; title: string; icon: string; subtitle: string }> = 
 const roles: Record<string, string> = {
   TENANT_ADMIN: "Organization administrator", MANAGER: "Field manager", MR: "Field representative",
 };
-const MASTER_KINDS = ["employees", "doctors", "chemists", "stockists", "products", "samples", "gifts"];
+const MASTER_KINDS = ["employees", "doctors", "chemists", "stockists", "products", "competitors", "samples", "gifts"];
 const dateTime = (value: string | null | undefined) => value ? new Date(value).toLocaleString() : "—";
 const errText = (error: unknown) => error instanceof Error ? error.message : "The operation could not be completed.";
 const fmt = (v: number | string | null | undefined) => v == null ? "—" : String(v);
@@ -95,6 +104,8 @@ export default function App() {
   const [unitName, setUnitName] = useState("");
   const [unitParent, setUnitParent] = useState("");
   const [masterKind, setMasterKind] = useState("doctors");
+  const [masterSearch,setMasterSearch]=useState("");
+  const [masterPage,setMasterPage]=useState(0);
   const [assignmentUser, setAssignmentUser] = useState("");
   const [assignmentRole, setAssignmentRole] = useState<"TENANT_ADMIN" | "MANAGER" | "MR">("MR");
   const [assignmentScope, setAssignmentScope] = useState("");
@@ -108,6 +119,39 @@ export default function App() {
   const [ncaCategoryLabel,setNcaCategoryLabel] = useState("");
   const [ncaTownName,setNcaTownName] = useState("");
   const [ncaTownTerritory,setNcaTownTerritory] = useState("");
+  const [customerRelations,setCustomerRelations] = useState<CustomerRelationship[]>([]);
+  const [customerActivities,setCustomerActivities] = useState<CustomerActivity[]>([]);
+  const [customerProfileLoading,setCustomerProfileLoading] = useState(false);
+  const [customerProfileError,setCustomerProfileError] = useState<string|null>(null);
+  const [customerLinkEvidence,setCustomerLinkEvidence] = useState<CustomerLink[]>([]);
+  const [workforceEvidence,setWorkforceEvidence] = useState<WorkforceEvidencePayload|null>(null);
+  const [workforceEvidenceError,setWorkforceEvidenceError] = useState<string|null>(null);
+  const [clmAssets,setClmAssets] = useState<ClmAsset[]>([]);
+  const [clmTitle,setClmTitle] = useState("");
+  const [clmCategory,setClmCategory] = useState("PRODUCT_DETAIL");
+  const [clmVersion,setClmVersion] = useState("1.0");
+  const [clmProduct,setClmProduct] = useState("");
+  const [clmRegion,setClmRegion] = useState("GLOBAL");
+  const [clmSlideTitle,setClmSlideTitle] = useState("");
+  const [clmSlideBody,setClmSlideBody] = useState("");
+  const [clmEffectiveFrom,setClmEffectiveFrom] = useState("");
+  const [clmExpiresAt,setClmExpiresAt] = useState("");
+  const [clmProvenance,setClmProvenance] = useState("");
+  const [expensePolicyCategory,setExpensePolicyCategory]=useState<"TRAVEL"|"MEAL"|"LODGING"|"LOCAL_CONVEYANCE"|"OTHER">("TRAVEL");
+  const [expensePolicyMax,setExpensePolicyMax]=useState(0);
+  const [expensePolicyCurrency,setExpensePolicyCurrency]=useState("INR");
+  const [expensePolicyFrom,setExpensePolicyFrom]=useState(localDate());
+  const [expensePolicyTo,setExpensePolicyTo]=useState(localDate());
+  const [expensePolicyRef,setExpensePolicyRef]=useState("");
+  const [managerReportRecords,setManagerReportRecords] = useState<ManagerReportRecord[]>([]);
+  const [managerReportAsOf,setManagerReportAsOf] = useState("");
+  const [managerReportError,setManagerReportError] = useState<string|null>(null);
+  const [fieldSettings,setFieldSettings]=useState<FieldSettings|null>(null);
+  const [gpsRadius,setGpsRadius]=useState<50|100|200>(100);
+  const [gpsAccuracy,setGpsAccuracy]=useState(50);
+  const [importKind,setImportKind]=useState("doctors");
+  const [importCsv,setImportCsv]=useState("");
+  const [importPreview,setImportPreview]=useState<Array<Record<string,unknown>>>([]);
 
   function resetTenantState() {
     setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
@@ -115,7 +159,7 @@ export default function App() {
     setSelectedOption(""); setStopId(""); setGpsReason(""); setCallOutcome("");
     setCallRemarks(""); setShortDayReason("");
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
-    setFocusedCustomer(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
+    setFocusedCustomer(null); setCustomerRelations([]); setCustomerActivities([]); setCustomerLinkEvidence([]); setCustomerProfileError(null); setCustomerProfileLoading(false); setWorkforceEvidence(null); setWorkforceEvidenceError(null); setClmAssets([]); setFieldSettings(null); setGpsRadius(100); setGpsAccuracy(50); setManagerReportRecords([]); setManagerReportAsOf(""); setManagerReportError(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
     setOwnUnplanned([]);setPendingUnplanned([]);setUnplannedReviewComment("");
   }
 
@@ -128,7 +172,39 @@ export default function App() {
   const authorizedForTenantId = connected && !loading ? tenantId : "";
   const admin = access?.roles.some(r => r.roleKey === "TENANT_ADMIN") ?? false;
   const manager = admin || (access?.roles.some(r => r.roleKey === "MANAGER") ?? false);
+  const visibleNav = useMemo(() => {
+    const allowed = allowedWorkspaceIds({
+      authenticated: Boolean(session),
+      connected,
+      isPlatformAdmin,
+      roles: access?.roles.map(r => r.roleKey) ?? [],
+    });
+    return NAV.filter(n => allowed.has(n.id));
+  }, [session, connected, isPlatformAdmin, access?.roles]);
+  useEffect(() => {
+    if (!visibleNav.some(n => n.id === view)) setView(visibleNav[0]?.id ?? "overview");
+  }, [visibleNav, view]);
+  const filteredMasterRows=useMemo(()=>{
+    const q=masterSearch.trim().toLowerCase();
+    const rows=masters[masterKind]??[];
+    return q?rows.filter(m=>m.name.toLowerCase().includes(q)||m.code.toLowerCase().includes(q)):rows;
+  },[masters,masterKind,masterSearch]);
+  const masterPageSize=50;
+  const masterPageCount=Math.max(1,Math.ceil(filteredMasterRows.length/masterPageSize));
+  const visibleMasterRows=filteredMasterRows.slice(Math.min(masterPage,masterPageCount-1)*masterPageSize,(Math.min(masterPage,masterPageCount-1)+1)*masterPageSize);
   const activeStop = progress?.stops.find(s => s.planStopId === visit?.planStopId);
+  const customerRefs = useMemo(()=>authorizedCustomerRefs(tenantId,masters),[tenantId,masters]);
+  const focusedCustomerRef = focusedCustomer ? customerRefs.find(c=>c.kind===focusedCustomer.kind&&c.id===focusedCustomer.id&&c.territoryId===focusedCustomer.territoryId)??null : null;
+  const customerTerritories = useMemo(()=>[...new Set(customerRefs.map(c=>c.territoryId))],[customerRefs]);
+  const relationshipEvidenceRows = useMemo(
+    ()=>relationshipEvidenceWithTargets(tenantId,focusedCustomerRef,customerRefs,customerLinkEvidence),
+    [tenantId,focusedCustomerRef,customerRefs,customerLinkEvidence],
+  );
+  const patientSafeHistoryRows = useMemo(
+    ()=>focusedCustomerRef?patientSafeHistory(tenantId,focusedCustomerRef.territoryId,customerActivities):[],
+    [tenantId,focusedCustomerRef,customerActivities],
+  );
+  const workforceModels = useMemo(()=>workforceEvidence?workforceEvidenceModels(tenantId,workforceEvidence):null,[tenantId,workforceEvidence]);
 
   const refresh = useCallback(async (rights: AccessContext | null) => {
     if (!api.connected) return;
@@ -138,7 +214,7 @@ export default function App() {
       const base = await Promise.allSettled([
         api.progress(), api.startOptions(), api.openVisit(), api.plans(), api.orgUnits(),
         ...MASTER_KINDS.map(k=>api.masters(k)),
-        api.ncaOptions(),api.ownNcaRecords(),api.ownUnplannedCalls(),
+        api.ncaOptions(),api.ownNcaRecords(),api.ownUnplannedCalls(),api.clmAssets(),api.workforceEvidence(),api.fieldSettings(),
       ]);
       if (generation !== tenantGeneration.current) return;
       setProgress(base[0].status==="fulfilled"?base[0].value:null);
@@ -157,23 +233,55 @@ export default function App() {
       setNcaRecords(ncaRowsResult.status==="fulfilled"?ncaRowsResult.value as NcaRecord[]:[]);
       const unplannedResult=base[7+MASTER_KINDS.length];
       setOwnUnplanned(unplannedResult.status==="fulfilled"?unplannedResult.value as UnplannedCall[]:[]);
+      const clmResult=base[8+MASTER_KINDS.length];
+      setClmAssets(clmResult.status==="fulfilled"?clmResult.value as ClmAsset[]:[]);
+      const workforceResult=base[9+MASTER_KINDS.length];
+      if(workforceResult.status==="fulfilled"){setWorkforceEvidence(workforceResult.value as WorkforceEvidencePayload);setWorkforceEvidenceError(null);}
+      else {setWorkforceEvidence(null);setWorkforceEvidenceError(errText(workforceResult.reason));}
+      const fieldSettingsResult=base[10+MASTER_KINDS.length];
+      if(fieldSettingsResult.status==="fulfilled"){const value=fieldSettingsResult.value as FieldSettings;setFieldSettings(value);setGpsRadius(value.geofenceRadiusMeters);setGpsAccuracy(value.maxGpsAccuracyMeters);}
+      else setFieldSettings(null);
       const failures=base.filter(result=>result.status==="rejected").length;
       if (failures) setNotice({kind:"info",title:"Partial data access",
         message:String(failures)+" API requests were denied or unavailable; previous tenant records have been cleared."});
       if (rights?.roles.some(r=>r.roleKey==="TENANT_ADMIN"||r.roleKey==="MANAGER")) {
-        const extra=await Promise.allSettled([api.manager(),api.pendingPlans(),api.analytics(),api.pendingUnplannedCalls()]);
+        const extra=await Promise.allSettled([api.manager(),api.pendingPlans(),api.analytics(),api.pendingUnplannedCalls(),api.managerReportRecords()]);
         if (generation !== tenantGeneration.current) return;
         setCommand(extra[0].status==="fulfilled"?extra[0].value:null);
         setPending(extra[1].status==="fulfilled"?extra[1].value:[]);
         setAnalytics(extra[2].status==="fulfilled"?extra[2].value:null);
         setPendingUnplanned(extra[3].status==="fulfilled"?extra[3].value:[]);
+        if(extra[4].status==="fulfilled"){setManagerReportRecords(extra[4].value.records);setManagerReportAsOf(extra[4].value.asOf);setManagerReportError(null);}
+        else {setManagerReportRecords([]);setManagerReportAsOf("");setManagerReportError(errText(extra[4].reason));}
       } else {
-        setCommand(null);setPending([]);setAnalytics(null);setPendingUnplanned([]);
+        setCommand(null);setPending([]);setAnalytics(null);setPendingUnplanned([]);setManagerReportRecords([]);setManagerReportAsOf("");setManagerReportError(null);
       }
     } finally {
       if (generation === tenantGeneration.current) setLoading(false);
     }
   },[api]);
+
+  async function loadCustomerProfile(customerType:"doctor"|"chemist"|"stockist",customerId:string) {
+    if (!connected) return;
+    const generation=tenantGeneration.current;
+    const groups={doctors:masters.doctors??[],chemists:masters.chemists??[],stockists:masters.stockists??[]};
+    const group=groups[customerType==="doctor"?"doctors":customerType==="chemist"?"chemists":"stockists"];
+    const record=group.find(x=>x.id===customerId&&x.status==="active"&&typeof x.territoryId==="string");
+    if(!record)return;
+    setFocusedCustomer({kind:customerType,id:record.id,territoryId:String(record.territoryId),name:record.name});
+    setCustomerRelations([]);setCustomerActivities([]);setCustomerLinkEvidence([]);setCustomerProfileError(null);setCustomerProfileLoading(true);
+    try {
+      const [linksResult,historyResult]=await Promise.allSettled([
+        api.customerLinks(customerId),
+        api.customerHistory(customerType,customerId),
+      ]);
+      if(generation!==tenantGeneration.current)return;
+      if(linksResult.status==="fulfilled"){setCustomerLinkEvidence(linksResult.value);setCustomerRelations(customerRelationships(tenantId,customerId,groups,linksResult.value));}
+      else setCustomerProfileError(errText(linksResult.reason));
+      if(historyResult.status==="fulfilled")setCustomerActivities(historyResult.value);
+      else setCustomerProfileError(previous=>previous??errText(historyResult.reason));
+    } finally { if(generation===tenantGeneration.current)setCustomerProfileLoading(false); }
+  }
 
   async function action(fn: () => Promise<unknown>, title: string, shouldRefresh = true) {
     setBusy(true); setNotice(null);
@@ -241,14 +349,14 @@ export default function App() {
   function requireLocation(): Promise<{latitude: number; longitude:number; accuracyMeters:number}> {
     return freshPosition();
   }
-  const viewName = NAV.find(n => n.id === view)!;
+  const viewName = visibleNav.find(n => n.id === view) ?? NAV[0];
   const selectedTenantName = tenants.find(t => t.id === tenantId)?.name ?? null;
   return <div className="tr-app">
     <aside className="tr-sidebar" aria-label="Terrevo navigation">
       <div className="tr-brand"><div className="tr-mark">T<span>.</span></div><div><strong>terrevo</strong><small>FIELD INTELLIGENCE</small></div></div>
       <div className="tr-workspace"><span className="tr-workspace-dot" /> {selectedTenantName ?? "PRODUCT WORKSPACE"} </div>
       <p className="tr-nav-label">WORKSPACES</p>
-      <nav className="tr-nav" aria-label="Primary">{NAV.map(n=>
+      <nav className="tr-nav" aria-label="Primary">{visibleNav.map(n=>
         <button key={n.id} type="button" className={view===n.id?"tr-nav-item selected":"tr-nav-item"} aria-current={view===n.id?"page":undefined} onClick={()=>{setView(n.id); setNotice(null);}}>
           <span className="tr-nav-glyph" aria-hidden="true">{n.icon}</span>{n.title}</button>)}</nav>
       <div className="tr-sidebar-foot"><div className="tr-foot-pill"><span className="tr-foot-dot" /> {connected?"Server-connected":"No organization connected"}</div><p>Web · Carbon enterprise UI<br/>Live records only</p></div>
@@ -270,7 +378,7 @@ export default function App() {
 
         {!connected && <div className="tr-connect-grid">
           <Panel eyebrow="ACCOUNT CONNECTION" title={session?"Choose your organization":"Connect an existing Terrevo account"}>
-            <p className="tr-detail">You can explore every workspace without credentials. Live company data and mutations remain protected by the existing identity, RBAC and tenant services. No Super Admin email is required to develop the UI.</p>
+            <p className="tr-detail">Sign in to reveal only the workspaces authorized for your role and organization. Live company data and mutations remain protected by the existing identity, RBAC and tenant services.</p>
             {!session ? <form className="tr-form" onSubmit={e=>{e.preventDefault();void connect();}}>
               <TextInput id="account-email" type="email" labelText="Existing account email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username"/>
               <TextInput id="account-password" type="password" labelText="Password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password"/>
@@ -285,7 +393,7 @@ export default function App() {
             <div className="tr-check-row"><span>Server data source</span><Tag type="blue">Supabase API</Tag></div>
             <div className="tr-check-row"><span>Access requirements</span><Tag type="green">Enforced</Tag></div>
             <div className="tr-check-row"><span>Organization boundaries</span><Tag type="green">Existing RLS</Tag></div>
-            <div className="tr-check-row"><span>Super Admin role</span><Tag type="gray">Backend pending</Tag></div>
+            <div className="tr-check-row"><span>Super Admin role</span><Tag type={isPlatformAdmin?"green":"gray"}>{isPlatformAdmin?"Authorized":"Separate authorization"}</Tag></div>
             <p className="tr-detail">This application never exposes a service-role token or impersonates an end user.</p>
           </Panel>
         </div>}
@@ -355,11 +463,15 @@ export default function App() {
           loading={loading} todayLocalDate={localDate()}
           onOpenPlan={()=>setView("plans")}
           onOpenStop={id=>{setStopId(id);setView("field");}} />}
+        {view==="today" && <AgentAssistantPanel api={api} connected={connected} contextKey={contextKey}
+          preferredAgent="AI-01" title="Daily Briefing Agent" />}
 
         {view==="customers" && <Customer360View
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
           contextKey={contextKey} masters={{doctors:masters.doctors??[],chemists:masters.chemists??[],stockists:masters.stockists??[]}}
-          loading={loading}
+          relationships={customerRelations} history={customerActivities}
+          loading={loading||customerProfileLoading} error={customerProfileError}
+          onSelectCustomer={request=>void loadCustomerProfile(request.customerType,request.customerId)}
           onOpenWorkflow={request=>{
             if(!connected)return;
             const group=masters[request.customerType==="doctor"?"doctors":request.customerType==="chemist"?"chemists":"stockists"]??[];
@@ -374,6 +486,15 @@ export default function App() {
             }
             setView("plans");
           }} />}
+        {view==="customers" && focusedCustomerRef && <CustomerRelationsView
+          scope={{tenantId,authorizedForTenantId,contextKey,role:admin?"ADMIN":manager?"MANAGER":"FIELD",
+            permittedTerritoryIds:customerTerritories,mayViewHistory:true,mayOpenSource:false}}
+          subject={focusedCustomerRef} authorizedCustomers={customerRefs}
+          relationships={relationshipEvidenceRows} history={patientSafeHistoryRows}
+          loading={customerProfileLoading} error={customerProfileError} />}
+        {view==="customers" && <AgentAssistantPanel api={api} connected={connected} contextKey={contextKey}
+          preferredAgent="AI-08" title="Customer Relationship Agent"
+          subject={focusedCustomer?{kind:focusedCustomer.kind,id:focusedCustomer.id}:undefined} />}
 
         {view==="activities" && <ActivitiesView
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
@@ -436,16 +557,28 @@ export default function App() {
 
         {view==="edetailing" && <EDetailingView
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
-          contextKey={contextKey} products={masters.products??[]} assets={[]} today={localDate()}
-          linkedVisitId={visit?.id} loading={loading} />}
+          contextKey={contextKey} products={masters.products??[]} assets={clmAssets} today={localDate()}
+          linkedVisitId={visit?.id} loading={loading}
+          onSaveSessionDraft={async draft=>{await api.saveClmSession(draft);}} />}
+        {view==="edetailing" && <AgentAssistantPanel api={api} connected={connected} contextKey={contextKey}
+          preferredAgent="AI-09" title="CLM Intelligence Agent" subject={visit?{kind:"visit",id:visit.id}:undefined} />}
 
         {view==="plans" && <MonthlyPlanner key={[contextKey,focusedCustomer?.kind??"",focusedCustomer?.id??""].join(":")}
           api={api} connected={connected} busy={busy} plans={plans} units={units} masters={masters}
           focusCustomer={focusedCustomer} perform={(fn,title)=>action(fn,title)} />}
 
         {(["trade","inventory","workforce","approvals","reports"] as Area[]).includes(view) &&
-          <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} busy={busy}
-            visit={visit} progress={progress} masters={masters} perform={(fn,title)=>action(fn,title)} />}
+          <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} admin={admin}
+            tenantId={tenantId} contextKey={contextKey} busy={busy} visit={visit} progress={progress} masters={masters} perform={(fn,title)=>action(fn,title)} />}
+
+        {view==="workforce" && connected && workforceModels && <WorkforceEvidenceView
+          scope={{tenantId,authorizedForTenantId,contextKey,viewerUserId:session!.user.id,role:admin?"ADMIN":manager?"MANAGER":"FIELD",
+            permittedUserIds:[...new Set(workforceModels.claims.map(c=>c.ownerUserId))]}}
+          claims={workforceModels.claims} receipts={workforceModels.receipts} travel={workforceModels.travel}
+          attendance={workforceModels.attendance} policies={workforceModels.policies}
+          loading={loading} error={workforceEvidenceError}
+          onVerifyReceipt={manager?async intent=>{const sequence=Number(intent.lineId.split(":").at(-1));if(!Number.isSafeInteger(sequence))throw new Error("Invalid receipt line.");await api.reviewReceipt(intent.claimId,sequence,"VERIFY",null);await refresh(access);}:undefined}
+          onRevokeReceipt={manager?async intent=>{const sequence=Number(intent.lineId.split(":").at(-1));if(!Number.isSafeInteger(sequence))throw new Error("Invalid receipt line.");await api.reviewReceipt(intent.claimId,sequence,"REVOKE",null);await refresh(access);}:undefined} />}
 
         {view==="manager"&&manager&&<Panel eyebrow="MANAGER DECISIONS" title="Unplanned customer-call review">
           {pendingUnplanned.length?pendingUnplanned.map(row=><div className="tr-history-row" key={row.id}>
@@ -485,6 +618,23 @@ export default function App() {
           </div></>:
           <Panel eyebrow="MANAGER ACCESS" title="Manager workspace is permission-gated"><p className="tr-detail">The actual manager command and approval APIs only permit an authorized manager or tenant administrator. No fake results are displayed.</p></Panel>)}
 
+        {view==="manager"&&manager&&<ManagerReportingView
+          scope={{tenantId,authorizedForTenantId:tenantId,contextKey,role:admin?"ADMIN":"MANAGER",
+            permittedTerritoryIds:[...new Set(managerReportRecords.map(r=>r.territoryId))],
+            permittedTeamUserIds:[...new Set(managerReportRecords.map(r=>r.ownerUserId))],
+            asOf:managerReportAsOf||new Date().toISOString()}}
+          records={managerReportRecords} loading={loading} error={managerReportError}
+          onRequestCsv={({filter})=>{void (async()=>{
+            try{
+              const exported=await api.exportManagerReport(filter);
+              const blob=new Blob([exported.csv],{type:"text/csv;charset=utf-8"});
+              const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="terrevo-manager-report-"+exported.snapshotId+".csv";link.click();URL.revokeObjectURL(url);
+              setNotice({kind:"success",title:"Report snapshot created",message:exported.rowCount+" authorized row(s) exported and preserved as immutable snapshot "+exported.snapshotId.slice(0,8)+"."});
+            }catch(error){setNotice({kind:"error",title:"Report export failed",message:errText(error)});}
+          })();}} />}
+        {view==="manager"&&manager&&<AgentAssistantPanel api={api} connected={connected} contextKey={contextKey}
+          preferredAgent="AI-05" title="Manager Intelligence Agent" />}
+
         {view==="admin"&&(admin?<div className="tr-grid-wide">
           <Panel eyebrow="ORGANIZATION STRUCTURE" title="Manage reporting hierarchy">
             <div className="tr-form"><TextInput id="org-code" labelText="Unit code" value={unitCode} onChange={e=>setUnitCode(e.target.value)}/>
@@ -497,10 +647,13 @@ export default function App() {
             <div className="tr-list-sm">{units.map(u=><div className="tr-history-row" key={u.id}><div><strong>{u.name}</strong><p>{u.type} · {u.code}</p></div><Status value={u.status.toUpperCase()}/></div>)}</div>
           </Panel>
           <Panel eyebrow="MASTER DATA & ACCESS" title="Business administration">
-            <label className="tr-select-label" htmlFor="masters-kind">Master type</label><select id="masters-kind" className="tr-select" value={masterKind} onChange={e=>setMasterKind(e.target.value)}>
+            <label className="tr-select-label" htmlFor="masters-kind">Master type</label><select id="masters-kind" className="tr-select" value={masterKind} onChange={e=>{setMasterKind(e.target.value);setMasterSearch("");setMasterPage(0);}}>
               {MASTER_KINDS.map(kind=><option value={kind} key={kind}>{kind}</option>)}</select>
-            <div className="tr-list-sm">{(masters[masterKind]??[]).map(m=><div className="tr-history-row" key={m.id}><div><strong>{m.name}</strong><p>{m.code}</p></div><Status value={m.status.toUpperCase()}/></div>)}</div>
-            <MasterEditor key={tenantId} kind={masterKind} units={units} products={masters.products??[]} disabled={!connected||busy}
+            <TextInput id="master-search" labelText="Search code or name" value={masterSearch} onChange={e=>{setMasterSearch(e.target.value);setMasterPage(0);}}/>
+            <div className="tr-list-sm">{visibleMasterRows.map(m=><div className="tr-history-row" key={m.id}><div><strong>{m.name}</strong><p>{m.code}</p></div><Status value={m.status.toUpperCase()}/></div>)}</div>
+            {filteredMasterRows.length>masterPageSize&&<div className="tr-button-row"><Button kind="ghost" size="sm" disabled={masterPage<=0} onClick={()=>setMasterPage(p=>Math.max(0,p-1))}>Previous</Button>
+              <span>{Math.min(masterPage,masterPageCount-1)+1} / {masterPageCount}</span><Button kind="ghost" size="sm" disabled={masterPage>=masterPageCount-1} onClick={()=>setMasterPage(p=>Math.min(masterPageCount-1,p+1))}>Next</Button></div>}
+            <MasterEditor key={tenantId} kind={masterKind} units={units} products={masters.products??[]} employees={masters.employees??[]} disabled={!connected||busy}
               perform={input=>action(()=>api.createMaster(masterKind,input),"Master record created")}/>
             <h3>Assign an existing user</h3><div className="tr-form"><TextInput id="assign-user" labelText="Existing user UUID" value={assignmentUser} onChange={e=>setAssignmentUser(e.target.value)}/>
               <label className="tr-select-label" htmlFor="assign-role">Role</label><select className="tr-select" id="assign-role" value={assignmentRole} onChange={e=>setAssignmentRole(e.target.value as typeof assignmentRole)}>
@@ -511,6 +664,79 @@ export default function App() {
               <Button disabled={busy||!assignmentUser||(!assignmentScope&&assignmentRole!=="TENANT_ADMIN")} onClick={()=>guarded(()=>api.assignRole(assignmentUser,assignmentRole,assignmentRole==="TENANT_ADMIN"?null:assignmentScope),"Role assignment saved")}>Assign role</Button></div>
           </Panel>
         </div>:<Panel eyebrow="ADMIN PERMISSIONS" title="Tenant administration requires authorization"><p className="tr-detail">This area uses existing real organization and role APIs. It does not grant elevated access to a regular field user.</p></Panel>)}
+
+        {view==="admin"&&admin&&<Panel eyebrow="CONTROLLED IMPORT" title="Preview and atomically import master data">
+          <p className="tr-detail">CSV is parsed locally, then revalidated by the server. Preview never writes. Execute runs one database transaction; any invalid row rolls back the entire batch.</p>
+          <div className="tr-form">
+            <label className="tr-select-label" htmlFor="import-kind">Master type</label>
+            <select id="import-kind" className="tr-select" value={importKind} onChange={e=>{setImportKind(e.target.value);setImportPreview([]);}}>
+              {MASTER_KINDS.map(kind=><option key={kind} value={kind}>{kind}</option>)}
+            </select>
+            <TextArea id="master-import-csv" labelText="CSV (maximum 200 rows / 128 KiB)" value={importCsv}
+              onChange={e=>{setImportCsv(e.target.value);setImportPreview([]);}} maxLength={131072}/>
+            <div className="tr-button-row">
+              <Button kind="secondary" disabled={busy||!importCsv.trim()} onClick={()=>guarded(async()=>{
+                const rows=parseMasterCsv(importCsv);const preview=await api.masterImport(importKind,rows,true);setImportPreview(preview.rows??[]);
+              },"Import preview validated")}>Validate preview</Button>
+              <Button disabled={busy||importPreview.length===0} onClick={()=>guarded(async()=>{
+                const result=await api.masterImport(importKind,importPreview,false);
+                setImportCsv("");setImportPreview([]);setNotice({kind:"success",title:"Master import complete",message:String(result.inserted??0)+" rows committed atomically."});
+              },"Master import complete")}>Execute atomic import</Button>
+            </div>
+          </div>
+          {importPreview.length>0&&<p className="tr-detail">{importPreview.length} validated row(s) ready to execute. Any database constraint failure cancels the whole batch.</p>}
+        </Panel>}
+
+        {view==="admin"&&admin&&<Panel eyebrow="FIELD POLICY" title="GPS and geofence controls">
+          <p className="tr-detail">These server-enforced settings apply to field check-in validation for this tenant. Browser UI cannot bypass them.</p>
+          <div className="tr-form">
+            <label className="tr-select-label" htmlFor="gps-radius">Geofence radius</label>
+            <select id="gps-radius" className="tr-select" value={gpsRadius} onChange={e=>setGpsRadius(Number(e.target.value) as 50|100|200)}>
+              {[50,100,200].map(v=><option key={v} value={v}>{v} meters</option>)}
+            </select>
+            <TextInput id="gps-accuracy" type="number" labelText="Maximum accepted GPS accuracy (meters)" value={String(gpsAccuracy)}
+              onChange={e=>setGpsAccuracy(Number(e.target.value))} />
+            <Button disabled={busy||!Number.isFinite(gpsAccuracy)||gpsAccuracy<5||gpsAccuracy>500}
+              onClick={()=>guarded(async()=>{const saved=await api.updateFieldSettings({geofenceRadiusMeters:gpsRadius,maxGpsAccuracyMeters:gpsAccuracy});setFieldSettings(saved);},"Field GPS policy updated")}>Save field policy</Button>
+          </div>
+          <p className="tr-detail">{fieldSettings?("Active: "+fieldSettings.geofenceRadiusMeters+" m geofence · GPS accuracy ≤ "+fieldSettings.maxGpsAccuracyMeters+" m"):"Current server policy unavailable."}</p>
+        </Panel>}
+
+        {view==="admin"&&admin&&<Panel eyebrow="CONTROLLED CLM" title="Approve detailing content">
+          <p className="tr-detail">Approved metadata and slide content are tenant-scoped. Only authorized organization administrators can publish content through the server.</p>
+          <div className="tr-form">
+            <TextInput id="clm-title" labelText="Content title" value={clmTitle} onChange={e=>setClmTitle(e.target.value)} maxLength={160}/>
+            <TextInput id="clm-category" labelText="Category" value={clmCategory} onChange={e=>setClmCategory(e.target.value)} maxLength={80}/>
+            <TextInput id="clm-version" labelText="Version" value={clmVersion} onChange={e=>setClmVersion(e.target.value)} maxLength={40}/>
+            <label className="tr-select-label" htmlFor="clm-product">Product</label>
+            <select id="clm-product" className="tr-select" value={clmProduct} onChange={e=>setClmProduct(e.target.value)}>
+              <option value="">Select product</option>{(masters.products??[]).filter(x=>x.status==="active").map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+            <TextInput id="clm-region" labelText="Region code" value={clmRegion} onChange={e=>setClmRegion(e.target.value.toUpperCase())} maxLength={20}/>
+            <TextInput id="clm-slide-title" labelText="Slide title" value={clmSlideTitle} onChange={e=>setClmSlideTitle(e.target.value)} maxLength={160}/>
+            <TextArea id="clm-slide-body" labelText="Approved slide body" value={clmSlideBody} onChange={e=>setClmSlideBody(e.target.value)} maxLength={12000}/>
+            <label className="tr-select-label" htmlFor="clm-effective">Effective from</label><input id="clm-effective" className="tr-select" type="date" value={clmEffectiveFrom} onChange={e=>setClmEffectiveFrom(e.target.value)}/>
+            <label className="tr-select-label" htmlFor="clm-expires">Expires at</label><input id="clm-expires" className="tr-select" type="date" value={clmExpiresAt} onChange={e=>setClmExpiresAt(e.target.value)}/>
+            <TextInput id="clm-provenance" labelText="Approval / provenance reference" value={clmProvenance} onChange={e=>setClmProvenance(e.target.value)} maxLength={300}/>
+            <Button disabled={busy||!clmTitle.trim()||!clmCategory.trim()||!clmVersion.trim()||!clmProduct||!clmRegion.trim()||!clmSlideTitle.trim()||!clmSlideBody||!clmProvenance.trim()||Boolean(clmEffectiveFrom&&clmExpiresAt&&clmExpiresAt<clmEffectiveFrom)}
+              onClick={()=>guarded(async()=>{await api.createClmAsset({title:clmTitle,category:clmCategory,version:clmVersion,productIds:[clmProduct],regionCodes:[clmRegion.trim()||"GLOBAL"],slides:[{id:crypto.randomUUID(),title:clmSlideTitle,body:clmSlideBody}],effectiveFrom:clmEffectiveFrom||null,expiresAt:clmExpiresAt||null,provenanceId:clmProvenance});setClmTitle("");setClmSlideTitle("");setClmSlideBody("");setClmProvenance("");},"CLM content approved")}>Approve and publish content</Button>
+          </div>
+          <p className="tr-detail">{clmAssets.length} approved catalog item(s) currently visible.</p>
+        </Panel>}
+
+        {view==="admin"&&admin&&<Panel eyebrow="EXPENSE GOVERNANCE" title="Configure effective-dated expense limits">
+          <p className="tr-detail">Limits are stored in minor currency units and applied only to claims whose work date falls inside the policy period.</p>
+          <div className="tr-form">
+            <label className="tr-select-label" htmlFor="expense-policy-category">Category</label><select id="expense-policy-category" className="tr-select" value={expensePolicyCategory} onChange={e=>setExpensePolicyCategory(e.target.value as typeof expensePolicyCategory)}>{["TRAVEL","MEAL","LODGING","LOCAL_CONVEYANCE","OTHER"].map(x=><option key={x} value={x}>{x.replace("_"," ")}</option>)}</select>
+            <TextInput id="expense-policy-max" type="number" labelText="Maximum amount" value={String(expensePolicyMax)} onChange={e=>setExpensePolicyMax(Number(e.target.value))}/>
+            <TextInput id="expense-policy-currency" labelText="Currency" value={expensePolicyCurrency} maxLength={3} onChange={e=>setExpensePolicyCurrency(e.target.value.toUpperCase())}/>
+            <label className="tr-select-label" htmlFor="expense-policy-from">Effective from</label><input id="expense-policy-from" className="tr-select" type="date" value={expensePolicyFrom} onChange={e=>setExpensePolicyFrom(e.target.value)}/>
+            <label className="tr-select-label" htmlFor="expense-policy-to">Expires at</label><input id="expense-policy-to" className="tr-select" type="date" value={expensePolicyTo} onChange={e=>setExpensePolicyTo(e.target.value)}/>
+            <TextInput id="expense-policy-ref" labelText="Policy reference" value={expensePolicyRef} maxLength={300} onChange={e=>setExpensePolicyRef(e.target.value)}/>
+            <Button disabled={busy||!(expensePolicyMax>=0)||!/^[A-Z]{3}$/.test(expensePolicyCurrency)||!expensePolicyRef.trim()||expensePolicyTo<expensePolicyFrom}
+              onClick={()=>guarded(async()=>{await api.createExpensePolicy({category:expensePolicyCategory,maxMinor:Math.round(expensePolicyMax*100),currency:expensePolicyCurrency,effectiveFrom:expensePolicyFrom,expiresAt:expensePolicyTo,policyRef:expensePolicyRef});setExpensePolicyRef("");},"Expense policy created")}>Create policy limit</Button>
+          </div>
+        </Panel>}
 
         {view==="admin"&&admin&&<Panel eyebrow="CONTROLLED NCA MASTER" title="Manage NCA categories and towns">
           <p className="tr-detail">NCA types and towns are client-controlled records; Terrevo does not invent categories or towns.</p>
@@ -533,6 +759,9 @@ export default function App() {
           </div>
           <p className="tr-detail">{ncaOptions.categories.length} approved NCA categories · {ncaOptions.towns.length} authorized towns</p>
         </Panel>}
+
+        {view==="admin"&&admin&&<AgentAssistantPanel api={api} connected={connected} contextKey={contextKey}
+          preferredAgent="AI-14" title="Field Data Quality Agent" />}
 
         {view==="platform"&&<PlatformConsole api={api} authenticated={Boolean(session)}
           isSuperAdmin={isPlatformAdmin} busy={busy} perform={(fn,title)=>action(fn,title,false)}/>}

@@ -51,14 +51,30 @@ export type ManagerCommand = {
   submittedToursToday: number; shortDaysToday: number; activeJointWork: number;
   pending: { tourApprovals: number; gpsExceptions: number; weeklyTimesheets: number; leaves: number; expenses: number };
 };
+export type ManagerReportRecord={id:string;tenantId:string;territoryId:string;ownerUserId:string;workDate:string;kind:"PLANNED_STOP"|"UNPLANNED_CALL"|"NCA"|"DCR";status:"PLANNED"|"COMPLETED"|"PENDING"|"APPROVED"|"REJECTED"|"SUBMITTED"|"REPORTED";sourceId:string;sourceType:string;observedAt:string};
+export type ManagerReportLedger={asOf:string;records:ManagerReportRecord[]};
+export type WorkforceEvidencePayload={
+  asOf:string;
+  claims:Array<{id:string;executionId:string;employeeId:string;ownerUserId:string;orgUnitId:string;workDate:string;currencyCode:string;status:string;totalAmount:number;lines:Array<{sequence:number;category:string;amount:number;remarks:string|null;receiptReference:string|null}>}>;
+  receipts:Array<{id:string;tenantId:string;claimId:string;lineId:string;status:"VERIFIED"|"PENDING"|"MISSING"|"REVOKED";documentRef:string;verifiedAt?:string}>;
+  travel:Array<{tenantId:string;ownerUserId:string;workDate:string;sourceId:string;distanceMeters:number;method:"SERVER_GPS"|"SERVER_ROUTE"|"UNVERIFIED"}>;
+  attendance:Array<{id:string;tenantId:string;ownerUserId:string;workDate:string;state:"PRESENT"|"LEAVE"|"ABSENT"|"PENDING";dayClosed:boolean;sourceId:string;asOf:string}>;
+  policies:Array<{tenantId:string;category:string;maxMinor:number;currency:string;effectiveFrom:string;expiresAt:string;policyId:string}>;
+};
 export type ManagerAnalytics = {
   period: { days: number; startDate: string; endDate: string };
   tours: { submitted: number; totalWorkedMinutes: number };
   coverage: { plannedStops: number; completedVisits: number; doctorCalls: number; chemistCalls: number; stockistCalls: number };
 };
 export type Coordinates = { latitude: number; longitude: number; accuracyMeters: number };
+export type FieldSettings = { geofenceRadiusMeters:50|100|200; maxGpsAccuracyMeters:number };
+export type ClmAsset = {id:string;tenantId:string;title:string;category:string;version:string;status:"APPROVED"|"DRAFT"|"WITHDRAWN"|"EXPIRED";productIds:string[];regionCodes:string[];contentType:string;objectPath:string|null;slides:Array<{id:string;title:string;body:string}>;effectiveFrom?:string;expiresAt?:string;provenanceId:string;approvedBy:string;approvedAt:string};
+export type ClmSessionDraft = {tenantId:string;assetId:string;productIds:string[];startedAt:string;endedAt:string;slideVisits:Array<{slideId:string;durationMs:number}>;linkedVisitId?:string};
 export type { CustomerLink } from "../../../modules/business-customer-links/src/index.ts";
 import type { CustomerLink } from "../../../modules/business-customer-links/src/index.ts";
+import type { AgentId, AgentOutput } from "../../../modules/ai-agents/src/index.ts";
+export type { AgentId, AgentOutput } from "../../../modules/ai-agents/src/index.ts";
+export type AgentCatalogEntry={id:AgentId;name:string;priority:"P1"|"P2";authoritativeDatasets:readonly string[];resultKeys:readonly string[]};
 
 export class ApiFailure extends Error {
   readonly status: number;
@@ -104,6 +120,7 @@ export class TerrevoWebApi {
   }
   constructor(onUpdate?: (session: Session | null) => void) { this.onUpdate = onUpdate; }
   get connected(): boolean { return Boolean(this.session?.accessToken && this.tenantId); }
+  get currentUserId(): string | null { return this.session?.user.id ?? null; }
   setSession(session: Session | null) { if(this.session?.user.id!==session?.user.id)this.contextVersion++;this.session = session; this.onUpdate?.(session); }
   setTenant(id: string | null) { if(this.tenantId!==id)this.contextVersion++;this.tenantId = id; }
   reset() { this.contextVersion++;this.session = null; this.tenantId = null; this.onUpdate?.(null); }
@@ -168,6 +185,21 @@ export class TerrevoWebApi {
   }
   async tenants(): Promise<Tenant[]> { return (await this.raw("/v1/tenants", "GET", undefined, false) as { tenants: Tenant[] }).tenants; }
   async access(): Promise<AccessContext> { return (await this.raw("/v1/access-context") as { context: AccessContext }).context; }
+  async masterImport(kind:string,rows:Array<Record<string,unknown>>,preview=false):Promise<{kind:string;count?:number;rows?:Array<Record<string,unknown>>;inserted?:number}> {
+    return await this.raw("/v1/admin/master-import","POST",{kind,rows,preview}) as {kind:string;count?:number;rows?:Array<Record<string,unknown>>;inserted?:number};
+  }
+  async fieldSettings():Promise<FieldSettings> {
+    return (await this.raw("/v1/field-settings") as {settings:FieldSettings}).settings;
+  }
+  async updateFieldSettings(settings:FieldSettings):Promise<FieldSettings> {
+    return (await this.raw("/v1/field-settings","PUT",settings) as {settings:FieldSettings}).settings;
+  }
+  async aiAgents():Promise<AgentCatalogEntry[]> {
+    return (await this.raw("/v1/ai/agents") as {agents:AgentCatalogEntry[]}).agents;
+  }
+  async runAgent(agentId:AgentId,subject?:{kind:string;id:string}):Promise<AgentOutput> {
+    return (await this.raw("/v1/ai/agents/"+encodeURIComponent(agentId)+"/run","POST",{requestId:crypto.randomUUID(),...(subject?{subject}:{})}) as {output:AgentOutput}).output;
+  }
   async customerLinks(sourceId:string):Promise<CustomerLink[]> {
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sourceId))throw new ApiFailure(400,"Customer ID must be a UUID.");
     const tenant=this.tenantId;
@@ -277,6 +309,34 @@ export class TerrevoWebApi {
   async createMaster(kind:string,input:Record<string,unknown>):Promise<Master>{
     return (await this.raw("/v1/masters/"+encodeURIComponent(kind),"POST",input) as {item:Master}).item;
   }
+  async customerHistory(kind:"doctor"|"chemist"|"stockist",customerId:string):Promise<Array<{tenantId:string;customerKind:"doctor"|"chemist"|"stockist";customerId:string;id:string;occurredAt:string;activityType:string;summary:string}>> {
+    return (await this.raw("/v1/customers/"+kind+"/"+encodeURIComponent(customerId)+"/history") as {history:Array<{tenantId:string;customerKind:"doctor"|"chemist"|"stockist";customerId:string;id:string;occurredAt:string;activityType:string;summary:string}>}).history;
+  }
+  async exportManagerReport(filter:{from:string;to:string;territoryId:string;ownerUserId:string}):Promise<{snapshotId:string;asOf:string;rowCount:number;contentSha256:string;csv:string}> {
+    return await this.raw("/v1/manager/report-export","POST",filter) as {snapshotId:string;asOf:string;rowCount:number;contentSha256:string;csv:string};
+  }
+  async managerReportRecords():Promise<ManagerReportLedger> {
+    return await this.raw("/v1/manager/report-records") as ManagerReportLedger;
+  }
+  async clmAssets():Promise<ClmAsset[]> {
+    return (await this.raw("/v1/clm/assets") as {assets:ClmAsset[]}).assets;
+  }
+  async createClmAsset(input:{title:string;category:string;version:string;productIds:string[];regionCodes:string[];slides:Array<{id:string;title:string;body:string}>;effectiveFrom:string|null;expiresAt:string|null;provenanceId:string;contentType?:string;fileName?:string;binaryBase64?:string}):Promise<ClmAsset> {
+    return (await this.raw("/v1/clm/assets","POST",input) as {asset:ClmAsset}).asset;
+  }
+  async clmBinaryDownload(assetId:string):Promise<{url:string;expiresIn:number;contentType:string}> {
+    return await this.raw("/v1/clm/assets/"+encodeURIComponent(assetId)+"/download") as {url:string;expiresIn:number;contentType:string};
+  }
+  async setClmAssetStatus(assetId:string,status:"WITHDRAWN"|"EXPIRED"):Promise<ClmAsset> {
+    return (await this.raw("/v1/clm/assets/"+encodeURIComponent(assetId)+"/status","PATCH",{status}) as {asset:ClmAsset}).asset;
+  }
+  async saveClmSession(draft:ClmSessionDraft) {
+    if(!draft.linkedVisitId)throw new ApiFailure(400,"An active checked-in visit is required for detailing.");
+    return this.raw("/v1/clm/sessions","POST",{...draft,operationId:crypto.randomUUID()});
+  }
+  async clmSessions():Promise<Array<{id:string;asset_id:string;visit_id:string;started_at:string;ended_at:string;provenance_id:string}>> {
+    return (await this.raw("/v1/clm/sessions") as {sessions:Array<{id:string;asset_id:string;visit_id:string;started_at:string;ended_at:string;provenance_id:string}>}).sessions;
+  }
   async attendance():Promise<Array<{workDate:string;status:string;workedMinutes:number|null;requiredMinutes:number|null}>> {
     return (await this.raw("/v1/attendance") as {attendance:Array<{workDate:string;status:string;workedMinutes:number|null;requiredMinutes:number|null}>}).attendance;
   }
@@ -330,11 +390,23 @@ export class TerrevoWebApi {
   async requestLeave(leaveType:"FULL_DAY"|"HALF_DAY",startDate:string,endDate:string,reason:string) {
     return this.raw("/v1/leaves","POST",{operationId:crypto.randomUUID(),leaveType,startDate,endDate,reason});
   }
-  async expenses():Promise<Array<{id:string;workDate:string;totalAmount:number;currencyCode:string;status:string;executionId:string}>> {
-    return (await this.raw("/v1/expenses/own") as {claims:Array<{id:string;workDate:string;totalAmount:number;currencyCode:string;status:string;executionId:string}>}).claims;
+  async expenses():Promise<Array<{id:string;executionId:string;employeeId:string;ownerUserId:string;orgUnitId:string;workDate:string;currencyCode:string;status:string;totalAmount:number;lines:Array<{sequence:number;category:string;amount:number;remarks:string|null;receiptReference:string|null}>}>> {
+    return (await this.raw("/v1/expenses/own") as {claims:Array<{id:string;executionId:string;employeeId:string;ownerUserId:string;orgUnitId:string;workDate:string;currencyCode:string;status:string;totalAmount:number;lines:Array<{sequence:number;category:string;amount:number;remarks:string|null;receiptReference:string|null}>}>}).claims;
   }
-  async saveExpense(executionId:string,currencyCode:string,amount:number,category:"TRAVEL"|"MEAL"|"LODGING"|"LOCAL_CONVEYANCE"|"OTHER",remarks:string|null) {
-    return this.raw("/v1/executions/" + encodeURIComponent(executionId) + "/expense","PUT",{operationId:crypto.randomUUID(),currencyCode,lines:[{sequence:1,category,amount,remarks,receiptReference:null}]});
+  async visibleExpenses():Promise<Array<{id:string;executionId:string;employeeId:string;ownerUserId:string;orgUnitId:string;workDate:string;currencyCode:string;status:string;totalAmount:number;lines:Array<{sequence:number;category:string;amount:number;remarks:string|null;receiptReference:string|null}>}>> {
+    return (await this.raw("/v1/expenses") as {claims:Array<{id:string;executionId:string;employeeId:string;ownerUserId:string;orgUnitId:string;workDate:string;currencyCode:string;status:string;totalAmount:number;lines:Array<{sequence:number;category:string;amount:number;remarks:string|null;receiptReference:string|null}>}>}).claims;
+  }
+  async saveExpense(executionId:string,currencyCode:string,amount:number,category:"TRAVEL"|"MEAL"|"LODGING"|"LOCAL_CONVEYANCE"|"OTHER",remarks:string|null,receiptReference:string|null=null) {
+    return this.raw("/v1/executions/" + encodeURIComponent(executionId) + "/expense","PUT",{operationId:crypto.randomUUID(),currencyCode,lines:[{sequence:1,category,amount,remarks,receiptReference}]});
+  }
+  async workforceEvidence():Promise<WorkforceEvidencePayload> {
+    return await this.raw("/v1/workforce/evidence") as WorkforceEvidencePayload;
+  }
+  async reviewReceipt(claimId:string,lineSequence:number,decision:"VERIFY"|"REVOKE",comment:string|null) {
+    return this.raw("/v1/workforce/receipts/"+encodeURIComponent(claimId)+"/"+lineSequence+"/decision","POST",{decision,comment});
+  }
+  async createExpensePolicy(input:{category:"TRAVEL"|"MEAL"|"LODGING"|"LOCAL_CONVEYANCE"|"OTHER";maxMinor:number;currency:string;effectiveFrom:string;expiresAt:string;policyRef:string}) {
+    return this.raw("/v1/workforce/policies","POST",input);
   }
   async submitExpense(id:string, comment:string|null) {
     return this.raw("/v1/expenses/"+encodeURIComponent(id)+"/submit","POST",{operationId:crypto.randomUUID(),comment});

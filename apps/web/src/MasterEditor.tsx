@@ -3,18 +3,20 @@ import { Button, TextInput } from "@carbon/react";
 import type { Master, OrgUnit } from "./terrevo-api";
 
 type Props = {
-  kind:string; units:OrgUnit[]; products:Master[];
+  kind:string; units:OrgUnit[]; products:Master[]; employees?:Master[];
   disabled:boolean; perform:(payload:Record<string,unknown>)=>Promise<void>;
 };
-export function MasterEditor({kind,units,products,disabled,perform}:Props){
+export function MasterEditor({kind,units,products,employees=[],disabled,perform}:Props){
   const [code,setCode]=useState(""); const [name,setName]=useState("");
   const [scope,setScope]=useState(""); const [specialty,setSpecialty]=useState("");
   const [designation,setDesignation]=useState(""); const [productId,setProductId]=useState("");
+  const [userId,setUserId]=useState(""); const [reportingManagerEmployeeId,setReportingManagerEmployeeId]=useState("");
   const [address,setAddress]=useState(""); const [genericName,setGenericName]=useState("");
+  const [manufacturer,setManufacturer]=useState("");
   const [category,setCategory]=useState("");const [unit,setUnit]=useState("");
   const [latitude,setLatitude]=useState("");const [longitude,setLongitude]=useState("");
   const [visitFrequency,setVisitFrequency]=useState(1);
-  const requiredScope=kind==="employees" ? "" : ["products","samples","gifts"].includes(kind)?"division":"territory";
+  const requiredScope=kind==="employees" ? "" : ["products","competitors","samples","gifts"].includes(kind)?"division":"territory";
   const scoped=units.filter(u=>u.status==="active"&&(!requiredScope||u.type===requiredScope));
   const location=()=>({
     latitude:latitude.trim()?Number(latitude):null,
@@ -22,8 +24,9 @@ export function MasterEditor({kind,units,products,disabled,perform}:Props){
   });
   function payload():Record<string,unknown>{
     const base:Record<string,unknown>={code:code.trim().toUpperCase(),name:name.trim()};
-    if(kind==="employees")return {...base,orgUnitId:scope,designation:designation.trim(),userId:null,reportingManagerEmployeeId:null};
+    if(kind==="employees")return {...base,orgUnitId:scope,designation:designation.trim(),userId:userId.trim()||null,reportingManagerEmployeeId:reportingManagerEmployeeId||null};
     if(kind==="products")return {...base,divisionId:scope,genericName:genericName.trim()||null};
+    if(kind==="competitors")return {...base,divisionId:scope,manufacturer:manufacturer.trim()||null};
     if(kind==="samples")return {...base,divisionId:scope,productId,unit:unit.trim()||null};
     if(kind==="gifts")return {...base,divisionId:scope,category:category.trim()||null};
     if(kind==="doctors")return {...base,territoryId:scope,specialty:specialty.trim(),category:category.trim()||null,clinic:null,address:address.trim()||null,...location(),visitFrequency};
@@ -31,6 +34,7 @@ export function MasterEditor({kind,units,products,disabled,perform}:Props){
   }
   const canSave=!disabled&&Boolean(code.trim()&&name.trim()&&scope)&&
     (kind!=="employees"||Boolean(designation.trim()))&&
+    (!userId.trim()||/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId.trim()))&&
     (kind!=="doctors"||Boolean(specialty.trim()))&&
     (kind!=="samples"||Boolean(productId))&&
     (!latitude.trim()||(Number.isFinite(Number(latitude))&&Math.abs(Number(latitude))<=90))&&
@@ -44,9 +48,14 @@ export function MasterEditor({kind,units,products,disabled,perform}:Props){
       <select className="tr-select" id="master-scope" value={scope} onChange={e=>setScope(e.target.value)}>
         <option value="">Select authorized scope</option>{scoped.map(u=><option key={u.id} value={u.id}>{u.name} ({u.type})</option>)}
       </select>
-      {kind==="employees"&&<TextInput id="master-designation" labelText="Designation" value={designation} onChange={e=>setDesignation(e.target.value)}/>}
+      {kind==="employees"&&<><TextInput id="master-designation" labelText="Designation" value={designation} onChange={e=>setDesignation(e.target.value)}/>
+        <TextInput id="master-user-id" labelText="Linked authenticated user UUID (optional)" value={userId} onChange={e=>setUserId(e.target.value)} />
+        <label className="tr-select-label" htmlFor="master-manager">Reporting manager (optional)</label>
+        <select className="tr-select" id="master-manager" value={reportingManagerEmployeeId} onChange={e=>setReportingManagerEmployeeId(e.target.value)}>
+          <option value="">No reporting manager</option>{employees.filter(e=>e.status==="active").map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+        </select></>}
       {kind==="doctors"&&<><TextInput id="master-specialty" labelText="Medical specialty" value={specialty} onChange={e=>setSpecialty(e.target.value)}/><TextInput id="master-category" labelText="Category (optional)" value={category} onChange={e=>setCategory(e.target.value)}/></>}
-      {kind==="products"&&<TextInput id="master-generic" labelText="Generic ingredient (optional)" value={genericName} onChange={e=>setGenericName(e.target.value)}/>}
+      {kind==="products"&&<TextInput id="master-generic" labelText="Generic ingredient (optional)" value={genericName} onChange={e=>setGenericName(e.target.value)}/>}\n      {kind==="competitors"&&<TextInput id="master-manufacturer" labelText="Manufacturer (optional)" value={manufacturer} onChange={e=>setManufacturer(e.target.value)}/>}
       {kind==="samples"&&<><label className="tr-select-label" htmlFor="master-product">Related product</label>
         <select className="tr-select" id="master-product" value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Select product</option>
           {products.filter(p=>p.status==="active").map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>

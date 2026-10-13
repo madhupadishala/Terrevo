@@ -6,7 +6,7 @@ export type CustomerFilters = {query:string;kind:CustomerKind|"all";status:strin
 export type CustomerRelationship = {id:string;tenantId:string;sourceKind:CustomerKind;sourceId:string;targetKind:CustomerKind;targetId:string;relationship:string};
 export type CustomerActivity = {tenantId:string;customerKind:CustomerKind;customerId:string;id:string;occurredAt:string;activityType:string;summary:string};
 export type WorkflowRequest = {customerId:string;customerType:CustomerKind;workflow:"plan"|"field"};
-export type Customer360ViewProps = {tenantId:string;authorizedForTenantId:string;contextKey:string;masters:CustomerGroups;relationships?:CustomerRelationship[];history?:CustomerActivity[];loading?:boolean;error?:string|null;onOpenWorkflow?:(request:WorkflowRequest)=>void};
+export type Customer360ViewProps = {tenantId:string;authorizedForTenantId:string;contextKey:string;masters:CustomerGroups;relationships?:CustomerRelationship[];history?:CustomerActivity[];loading?:boolean;error?:string|null;onSelectCustomer?:(request:{customerId:string;customerType:CustomerKind})=>void;onOpenWorkflow?:(request:WorkflowRequest)=>void};
 export const safeText=(v:unknown):string=>typeof v==="string"||typeof v==="number"?String(v):"";
 export function authorizedCustomers(groups:CustomerGroups):Customer[] {
  return (["doctor","chemist","stockist"] as const).flatMap(kind=> (groups[kind==="doctor"?"doctors":kind==="chemist"?"chemists":"stockists"]??[]).filter(v=>v.id&&v.name).map(record=>({kind,record})));

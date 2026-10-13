@@ -142,3 +142,37 @@ test("TRV-MST-001 rejects unknown master kind", async () => {
   assert.equal(response.status, 404);
   assert.equal(calls.length, 0);
 });
+
+
+test("TRV-MST-008 creates division-scoped competitor only after MASTER_MANAGE", async () => {
+  const { fetcher, calls } = sequenceFetch([
+    ...authResponses(),
+    { body: [{ id: divisionId, tenant_id: tenantId, parent_id: null, type: "division", code: "D1", name: "Division", status: "active" }] },
+    { body: true },
+    { body: [{ id: "c1", tenant_id: tenantId, division_id: divisionId, code: "COMP1", name: "Competitor One", manufacturer: "Maker", status: "active" }] },
+  ]);
+  const response = await createHandler(env, { fetcher })(
+    new Request("https://api.terrevo.test/v1/masters/competitors", {
+      method: "POST", headers: headers(),
+      body: JSON.stringify({ code:"COMP1", name:"Competitor One", manufacturer:"Maker", divisionId }),
+    }),
+  );
+  assert.equal(response.status,201);
+  assert.match(calls[4].url,/\/rest\/v1\/competitors/);
+  assert.equal((calls[4].init?.headers as Record<string,string>).authorization,"Bearer server-only-test-key");
+  assert.match(String(calls[4].init?.body),/"division_id"/);
+});
+
+test("TRV-MST-009 rejects competitor scope that is not a division", async () => {
+  const { fetcher, calls } = sequenceFetch([
+    ...authResponses(),
+    { body: [{ id: divisionId, tenant_id: tenantId, parent_id: null, type: "territory", code: "T1", name: "Territory", status: "active" }] },
+  ]);
+  const response = await createHandler(env, { fetcher })(
+    new Request("https://api.terrevo.test/v1/masters/competitors", {
+      method:"POST", headers:headers(), body:JSON.stringify({code:"COMP1",name:"Competitor One",divisionId}),
+    }),
+  );
+  assert.equal(response.status,400);
+  assert.equal(calls.length,3);
+});
