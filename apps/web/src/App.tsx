@@ -12,7 +12,7 @@ import { localDate } from "./plan-calendar";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
-  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall, type PlanDay,
+  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall, type PlanDay, type CustomerRelationship,
 } from "./terrevo-api";
 
 type Area = "overview" | "today" | "customers" | "activities" | "edetailing" | "field" | "plans" | "manager" | "admin" | "platform" | BusinessArea;
@@ -114,6 +114,7 @@ export default function App() {
   const [agendaDays,setAgendaDays] = useState<Record<string,PlanDay>>({});
   const [fieldDcrs,setFieldDcrs] = useState<Array<{id:string;doctorName:string;doctorCode:string;callOutcome:string;submittedAt:string;doctorId:string}>>([]);
   const [attendanceRows,setAttendanceRows] = useState<Array<{workDate:string;status:string;workedMinutes:number|null;requiredMinutes:number|null}>>([]);
+  const [customerRelationships,setCustomerRelationships] = useState<CustomerRelationship[]>([]);
 
   function resetTenantState() {
     setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
@@ -123,7 +124,7 @@ export default function App() {
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
     setFocusedCustomer(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
     setOwnUnplanned([]);setPendingUnplanned([]);setUnplannedReviewComment("");
-    setAgendaDays({});setFieldDcrs([]);setAttendanceRows([]);setActivityPlanningKind("PLANNED_CALL");setActivityPlanningTerritory("");
+    setAgendaDays({});setFieldDcrs([]);setAttendanceRows([]);setCustomerRelationships([]);setActivityPlanningKind("PLANNED_CALL");setActivityPlanningTerritory("");
   }
 
   const connected = Boolean(session && tenantId && access);
@@ -166,10 +167,11 @@ export default function App() {
       setNcaRecords(ncaRowsResult.status==="fulfilled"?ncaRowsResult.value as NcaRecord[]:[]);
       const unplannedResult=base[7+MASTER_KINDS.length];
       setOwnUnplanned(unplannedResult.status==="fulfilled"?unplannedResult.value as UnplannedCall[]:[]);
-      const aux=await Promise.allSettled([api.dcrs(),api.attendance()]);
+      const aux=await Promise.allSettled([api.dcrs(),api.attendance(),api.customerRelationships()]);
       if (generation !== tenantGeneration.current) return;
       setFieldDcrs(aux[0].status==="fulfilled"?aux[0].value:[]);
       setAttendanceRows(aux[1].status==="fulfilled"?aux[1].value:[]);
+      setCustomerRelationships(aux[2].status==="fulfilled"?aux[2].value:[]);
       const agendaEntries:Record<string,PlanDay>={};
       const uniquePlans=[...new Set(resolvedOptions.map(o=>o.planId))];
       const agendaResults=await Promise.allSettled(uniquePlans.map(id=>api.getPlan(id)));
@@ -465,7 +467,12 @@ export default function App() {
         {view==="customers" && <Customer360View
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
           contextKey={contextKey} masters={{doctors:masters.doctors??[],chemists:masters.chemists??[],stockists:masters.stockists??[]}}
-          loading={loading}
+          relationships={customerRelationships} loading={loading}
+          loadHistory={(kind,id)=>api.customerHistory(kind,id)}
+          onLinkRelationship={async(sourceKind,sourceId,targetKind,targetId)=>{
+            await api.linkCustomer(sourceKind,sourceId,targetKind,targetId);await refresh(access);
+          }}
+          onUnlinkRelationship={async id=>{await api.unlinkCustomer(id);await refresh(access);}}
           onOpenWorkflow={request=>{
             if(!connected)return;
             const group=masters[request.customerType==="doctor"?"doctors":request.customerType==="chemist"?"chemists":"stockists"]??[];
@@ -551,7 +558,7 @@ export default function App() {
 
         {(["trade","inventory","workforce","approvals","reports"] as Area[]).includes(view) &&
           <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} busy={busy}
-            visit={visit} progress={progress} masters={masters} perform={(fn,title)=>action(fn,title)} />}
+            visit={visit} progress={progress} masters={masters} relationships={customerRelationships} perform={(fn,title)=>action(fn,title)} />}
 
         {view==="manager"&&manager&&<Panel eyebrow="MANAGER DECISIONS" title="Unplanned customer-call review">
           {pendingUnplanned.length?pendingUnplanned.map(row=><div className="tr-history-row" key={row.id}>
