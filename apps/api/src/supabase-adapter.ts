@@ -22,6 +22,7 @@ import type { ManagerCommandCenter, ManagerCommandRepository } from "../../../mo
 import type { AnalyticsRepository, ManagerAnalytics } from "../../../modules/analytics/src/index.ts";
 import type { NcaRepository, NcaRecord } from "../../../modules/nca/src/index.ts";
 import type {UnplannedRepository,UnplannedCall} from "../../../modules/unplanned-calls/src/index.ts";
+import type {CustomerNetworkRepository,CustomerRelationship,CustomerActivity,CustomerKind} from "../../../modules/customer-network/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -155,6 +156,7 @@ export function createSupabaseAdapter(
   analytics: AnalyticsRepository;
   nca: NcaRepository;
   unplanned: UnplannedRepository;
+  customerNetwork: CustomerNetworkRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -1126,5 +1128,67 @@ export function createSupabaseAdapter(
       }));
     },
   };
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders, attendanceLeave, expenses, jointWork, managerCommand, analytics, nca, unplanned };
+
+  const customerNetwork:CustomerNetworkRepository={
+    async listRelationships(t,token){
+      const q=new URLSearchParams({select:"id,tenant_id,source_kind,source_id,target_kind,target_id,relationship,created_at",tenant_id:"eq."+t,order:"created_at.asc"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/customer_relationships?${q}`,{headers:authHeaders(config,token)}));
+      return (await r.json() as Array<Record<string,unknown>>).map(row=>({
+        id:String(row.id),tenantId:String(row.tenant_id),sourceKind:row.source_kind as CustomerKind,
+        sourceId:String(row.source_id),targetKind:row.target_kind as CustomerKind,targetId:String(row.target_id),
+        relationship:row.relationship as CustomerRelationship["relationship"],createdAt:String(row.created_at),
+      }));
+    },
+    async link(t,u,sourceKind,sourceId,targetKind,targetId){
+      const r=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_link_customer`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+          p_tenant_id:t,p_user_id:u,p_source_kind:sourceKind,p_source_id:sourceId,p_target_kind:targetKind,p_target_id:targetId,
+        }),
+      }));
+      return await r.json() as string;
+    },
+    async unlink(t,u,id){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_unlink_customer`,{
+        method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_user_id:u,p_relationship_id:id}),
+      }));
+    },
+    async history(t,kind,id,token){
+      const out:CustomerActivity[]=[];
+      if(kind==="doctor"){
+        const q=new URLSearchParams({select:"id,doctor_id,call_outcome,submitted_at",tenant_id:"eq."+t,doctor_id:"eq."+id,order:"submitted_at.desc",limit:"100"});
+        const r=await expectOk(await fetcher(`${base}/rest/v1/dcrs?${q}`,{headers:authHeaders(config,token)}));
+        for(const row of await r.json() as Array<Record<string,unknown>>)out.push({
+          tenantId:t,customerKind:"doctor",customerId:id,id:String(row.id),occurredAt:String(row.submitted_at),
+          activityType:"DCR",summary:"Doctor call · "+String(row.call_outcome),
+        });
+      }
+      if(kind==="chemist"){
+        const rq=new URLSearchParams({select:"id,chemist_id,updated_at",tenant_id:"eq."+t,chemist_id:"eq."+id,order:"updated_at.desc",limit:"100"});
+        const oq=new URLSearchParams({select:"id,chemist_id,customer_name,status,updated_at",tenant_id:"eq."+t,chemist_id:"eq."+id,order:"updated_at.desc",limit:"100"});
+        const [rr,or]=await Promise.all([
+          expectOk(await fetcher(`${base}/rest/v1/rcpa_reports?${rq}`,{headers:authHeaders(config,token)})),
+          expectOk(await fetcher(`${base}/rest/v1/sales_orders?${oq}`,{headers:authHeaders(config,token)})),
+        ]);
+        for(const row of await rr.json() as Array<Record<string,unknown>>)out.push({
+          tenantId:t,customerKind:"chemist",customerId:id,id:"rcpa:"+String(row.id),occurredAt:String(row.updated_at),
+          activityType:"RCPA",summary:"RCPA captured for linked chemist",
+        });
+        for(const row of await or.json() as Array<Record<string,unknown>>)out.push({
+          tenantId:t,customerKind:"chemist",customerId:id,id:"pob:"+String(row.id),occurredAt:String(row.updated_at),
+          activityType:"POB",summary:"POB "+String(row.status).toLowerCase()+" · "+String(row.customer_name),
+        });
+      }
+      if(kind==="stockist"){
+        const q=new URLSearchParams({select:"id,stockist_id,customer_name,status,updated_at",tenant_id:"eq."+t,stockist_id:"eq."+id,order:"updated_at.desc",limit:"100"});
+        const r=await expectOk(await fetcher(`${base}/rest/v1/sales_orders?${q}`,{headers:authHeaders(config,token)}));
+        for(const row of await r.json() as Array<Record<string,unknown>>)out.push({
+          tenantId:t,customerKind:"stockist",customerId:id,id:"pob:"+String(row.id),occurredAt:String(row.updated_at),
+          activityType:"POB",summary:"POB "+String(row.status).toLowerCase()+" · "+String(row.customer_name),
+        });
+      }
+      return out.sort((a,b)=>new Date(b.occurredAt).getTime()-new Date(a.occurredAt).getTime()).slice(0,100);
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders, attendanceLeave, expenses, jointWork, managerCommand, analytics, nca, unplanned, customerNetwork };
 }
