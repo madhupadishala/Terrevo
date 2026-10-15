@@ -268,6 +268,12 @@ export default function App() {
   }
   const viewName = NAV.find(n => n.id === view)!;
   const selectedTenantName = tenants.find(t => t.id === tenantId)?.name ?? null;
+  const selectedAgendaDay = selectedOption ? agendaDays[selectedOption] ?? null : null;
+  const todayAttendance = progress ? attendanceRows.find(row=>row.workDate===progress.workDate) ?? null : null;
+  const fieldNca = progress ? ncaRecords.filter(row=>row.workDate===progress.workDate) : [];
+  const fieldUnplanned = progress ? ownUnplanned.filter(row=>row.workDate===progress.workDate) : [];
+  const requiresShortDayReason = Boolean(progress && progress.remainingMinutes>0);
+  const canEndDay = Boolean(progress && !visit && (!requiresShortDayReason || shortDayReason.trim()));
   return <div className="tr-app">
     <aside className="tr-sidebar" aria-label="Terrevo navigation">
       <div className="tr-brand"><div className="tr-mark">T<span>.</span></div><div><strong>terrevo</strong><small>FIELD INTELLIGENCE</small></div></div>
@@ -338,40 +344,115 @@ export default function App() {
           </div>
         </>}
 
-        {view==="field" && focusedCustomer && <p className="tr-detail" role="status">Customer 360 selection: <strong>{focusedCustomer.name}</strong>. Only an authorized pending stop from the approved tour can be checked in.</p>}
-        {view==="field" && <div className="tr-grid-wide">
-          <Panel eyebrow="FIELD EXECUTION / REAL API" title={progress?"Tour in progress":"Start My Tour"}>
-            {progress?<><div className="tr-section-line"><p>{progress.workDate} · {dateTime(progress.startedAt)}</p><Tag type="green">ACTIVE</Tag></div>
-              <div className="tr-tour-stats"><div><span>COMPLETED</span><strong>{progress.completedCount}/{progress.plannedCount}</strong></div><div><span>REMAINING</span><strong>{progress.remainingMinutes} minutes</strong></div></div>
-              {visit?<><h3>On-site visit</h3><p className="tr-detail">{activeStop?.targetName??visit.planStopId} · {visit.verification}</p>
-                <Status value={visit.exceptionStatus}/>
-                <div className="tr-form"><TextInput id="call-outcome" labelText="Call outcome" value={callOutcome} onChange={e=>setCallOutcome(e.target.value)} maxLength={120}/>
-                  <TextArea id="call-remarks" labelText="Remarks" value={callRemarks} onChange={e=>setCallRemarks(e.target.value)} maxLength={2000}/>
-                  <Button kind="secondary" disabled={!connected||busy||!callOutcome.trim()||!activeStop} onClick={()=>guarded(()=>activeStop?.type==="doctor"?api.doctorCall(visit.id,callOutcome,callRemarks||null):api.tradeCall(visit.id,callOutcome,callRemarks||null),"Call outcome saved")}>Save call outcome</Button>
-                  <Button disabled={!connected||busy} onClick={()=>guarded(async()=>api.checkOut(visit.id,await requireLocation()),"Checked out of field visit")}>Check out with location</Button></div>
-              </>:<><p className="tr-detail">Select an approved stop; check-in captures a fresh device location.</p>
-                <div className="tr-form"><label className="tr-select-label" htmlFor="stop-select">Next stop</label>
-                  <select className="tr-select" id="stop-select" value={stopId} onChange={e=>setStopId(e.target.value)}>
-                    <option value="">Select pending stop</option>{progress.stops.filter(s=>s.status!=="COMPLETED").map(s=><option key={s.planStopId} value={s.planStopId}>{s.sequence}. {s.targetName} ({s.type})</option>)}
+        {view==="field" && focusedCustomer && <p className="tr-detail" role="status">Customer 360 selection: <strong>{focusedCustomer.name}</strong>. Only an authorized pending stop from the approved DTP can be checked in.</p>}
+        {view==="field" && <div className="tr-business">
+          <div className="tr-grid-wide">
+            <Panel eyebrow="FIELD EXECUTION / CONTROLLED WORKDAY" title={progress?"Workday in progress":"Start My Day"}>
+              {progress?<>
+                <div className="tr-section-line"><p>{progress.workDate} · started {dateTime(progress.startedAt)}</p><Tag type="green">ACTIVE</Tag></div>
+                <div className="tr-tour-stats">
+                  <div><span>COMPLETED</span><strong>{progress.completedCount}/{progress.plannedCount}</strong></div>
+                  <div><span>PENDING</span><strong>{progress.pendingCount}</strong></div>
+                  <div><span>REMAINING</span><strong>{progress.remainingMinutes} min</strong></div>
+                </div>
+                <div className="tr-check-row"><span>Attendance</span><strong>{todayAttendance?.status??"ACTIVE WORKDAY"}</strong></div>
+                <div className="tr-button-row">
+                  <Button size="sm" kind="secondary" disabled={busy||Boolean(visit)}
+                    onClick={()=>{setNcaPlanningDate(progress.workDate);setActivityPlanningKind("UNPLANNED_CALL");setActivityPlanningTerritory(progress.territoryId);setView("activities");}}>Add unplanned call</Button>
+                  <Button size="sm" kind="secondary" disabled={busy||Boolean(visit)}
+                    onClick={()=>{setNcaPlanningDate(progress.workDate);setActivityPlanningKind("NON_CALL_ACTIVITY");setActivityPlanningTerritory(progress.territoryId);setView("activities");}}>Plan / report NCA</Button>
+                </div>
+                {visit?<>
+                  <h3>On-site visit</h3>
+                  <p className="tr-detail">{activeStop?.targetName??visit.planStopId} · {activeStop?.type??"visit"} · {visit.verification}</p>
+                  <Status value={visit.exceptionStatus}/>
+                  <div className="tr-form">
+                    <TextInput id="call-outcome" labelText="Call outcome" value={callOutcome} onChange={e=>setCallOutcome(e.target.value)} maxLength={120}/>
+                    <TextArea id="call-remarks" labelText="Remarks" value={callRemarks} onChange={e=>setCallRemarks(e.target.value)} maxLength={2000}/>
+                    <Button kind="secondary" disabled={!connected||busy||!callOutcome.trim()||!activeStop}
+                      onClick={()=>guarded(()=>activeStop?.type==="doctor"?api.doctorCall(visit.id,callOutcome,callRemarks||null):api.tradeCall(visit.id,callOutcome,callRemarks||null),"Call outcome saved")}>Save call outcome</Button>
+                    <Button disabled={!connected||busy}
+                      onClick={()=>guarded(async()=>api.checkOut(visit.id,await requireLocation()),activeStop?.type==="doctor"?"Checked out; DCR generated":"Checked out of field visit")}>Check out with location</Button>
+                  </div>
+                </>:<>
+                  <p className="tr-detail">Select a pending approved DTP stop. Check-in captures fresh device GPS and preserves the planned sequence.</p>
+                  <div className="tr-form">
+                    <label className="tr-select-label" htmlFor="stop-select">Next planned stop</label>
+                    <select className="tr-select" id="stop-select" value={stopId} onChange={e=>setStopId(e.target.value)}>
+                      <option value="">Select pending stop</option>
+                      {progress.stops.filter(row=>row.status!=="COMPLETED").map(row=><option key={row.planStopId} value={row.planStopId}>{row.sequence}. {row.targetName} ({row.type}) · {row.status}</option>)}
+                    </select>
+                    <TextInput id="gps-reason" labelText="GPS exception reason (only when applicable)" value={gpsReason} onChange={e=>setGpsReason(e.target.value)} maxLength={1000}/>
+                    <Button disabled={!connected||busy||!stopId}
+                      onClick={()=>guarded(async()=>api.checkIn(stopId,await requireLocation(),gpsReason||null),"Field check-in saved")}>Check in using device GPS</Button>
+                  </div>
+                </>}
+                <div className="tr-form">
+                  <h3>End My Day</h3>
+                  <p className="tr-detail">Terrevo blocks closure when a visit is still open, unresolved GPS evidence exists, or a doctor checkout lacks its immutable DCR. Server rules are authoritative.</p>
+                  <TextInput id="short-reason" labelText={requiresShortDayReason?"Short-day explanation (required before minimum duration)":"Short-day explanation (optional)"} value={shortDayReason} onChange={e=>setShortDayReason(e.target.value)} maxLength={1000}/>
+                  {visit&&<p role="status">Check out of the current visit before ending the day.</p>}
+                  {requiresShortDayReason&&!shortDayReason.trim()&&<p role="status">A short-day explanation is required because {progress.remainingMinutes} required minutes remain.</p>}
+                  <Button kind="tertiary" disabled={!connected||busy||!canEndDay}
+                    onClick={()=>guarded(()=>api.submitTour(shortDayReason||null),"Workday submitted")}>End My Day</Button>
+                </div>
+              </>:<>
+                <p className="tr-detail">{connected?"Only an approved DTP assigned to this employee and valid for the tenant-local work date can start the workday.":"Connect an account to retrieve approved daily plans."}</p>
+                <div className="tr-form">
+                  <label className="tr-select-label" htmlFor="approved-day">Approved Daily Tour Plan</label>
+                  <select className="tr-select" id="approved-day" value={selectedOption} onChange={e=>setSelectedOption(e.target.value)} disabled={!connected}>
+                    <option value="">Select approved work date</option>
+                    {options.map(option=><option value={option.planDayId} key={option.planDayId}>{option.workDate} · {units.find(u=>u.id===option.territoryId)?.name??option.territoryId}</option>)}
                   </select>
-                  <TextInput id="gps-reason" labelText="GPS exception reason (only if applicable)" value={gpsReason} onChange={e=>setGpsReason(e.target.value)} maxLength={1000}/>
-                  <Button disabled={!connected||busy||!stopId} onClick={()=>guarded(async()=>api.checkIn(stopId,await requireLocation(),gpsReason||null),"Field check-in saved")}>Check in using device GPS</Button></div></>}
-              <div className="tr-form"><TextInput id="short-reason" labelText="Short-day explanation (if required)" value={shortDayReason} onChange={e=>setShortDayReason(e.target.value)} maxLength={1000}/>
-                <Button kind="tertiary" disabled={!connected||busy||Boolean(visit)} onClick={()=>guarded(()=>api.submitTour(shortDayReason||null),"Tour submitted")}>Submit My Tour</Button></div>
-            </>:<><p className="tr-detail">{connected?"Only approved, assigned tour days can be started.":"Connect an account to retrieve approved tour days."}</p>
-              <div className="tr-form"><label className="tr-select-label" htmlFor="approved-day">Approved work date</label>
-                <select className="tr-select" id="approved-day" value={selectedOption} onChange={e=>setSelectedOption(e.target.value)} disabled={!connected}>
-                  <option value="">Select approved tour day</option>{options.map(o=><option value={o.planDayId} key={o.planDayId}>{o.workDate} · {units.find(u=>u.id===o.territoryId)?.name??o.territoryId}</option>)}
-                </select>
-                <Button disabled={!connected||busy||!selectedOption} onClick={()=>guarded(async()=>api.startTour(selectedOption,await requireLocation()),"Tour started")}>Start My Tour (GPS)</Button></div>
-              {connected&&options.length===0&&<Empty title="No approved tour day" detail="Create a weekly tour plan and have an authorized manager approve it first."/>}
-            </>}
-          </Panel>
-          <Panel eyebrow="TOUR WORKLIST" title="Visit execution queue">
-            {progress?.stops.length? <div className="tr-visit-list">{progress.stops.map(s=><div className="tr-visit-row" key={s.planStopId}>
-              <span className="tr-row-icon">{s.sequence}</span><div><strong>{s.targetName}</strong><p>{s.type}</p></div><Status value={s.status}/></div>)}</div>:
-              <Empty title="No active route" detail="The visit worklist is populated from the authorized tour-progress API."/>}
-          </Panel>
+                  {selectedAgendaDay&&<div className="tr-list-sm" aria-label="Approved DTP preview">
+                    <strong>{selectedAgendaDay.date} · {selectedAgendaDay.stops.length} planned calls</strong>
+                    {selectedAgendaDay.stops.map(stop=><div className="tr-history-row" key={stop.type+stop.targetId}>
+                      <div><strong>{stop.sequence}. {masters[stop.type==="doctor"?"doctors":stop.type==="chemist"?"chemists":"stockists"]?.find(x=>x.id===stop.targetId)?.name??stop.targetId.slice(0,8)}</strong><p>{stop.type} · {stop.remarks??"No stop remarks"}</p></div>
+                    </div>)}
+                  </div>}
+                  <Button disabled={!connected||busy||!selectedOption}
+                    onClick={()=>guarded(async()=>api.startTour(selectedOption,await requireLocation()),"Workday started")}>Start My Day (GPS)</Button>
+                </div>
+                {connected&&options.length===0&&<Empty title="No approved DTP for today" detail="Create the daily plan through MTP/WTP/DTP and obtain manager approval before field execution."/>}
+              </>}
+            </Panel>
+
+            <Panel eyebrow="DAILY AGENDA" title={progress?"Today's execution queue":"Approved DTP preview"}>
+              {progress?.stops.length?<div className="tr-visit-list">
+                {progress.stops.map(row=><div className="tr-visit-row" key={row.planStopId}>
+                  <span className="tr-row-icon">{row.sequence}</span>
+                  <div><strong>{row.targetName}</strong><p>{row.type} · planned call</p></div><Status value={row.status}/>
+                </div>)}
+              </div>:selectedAgendaDay?.stops.length?<div className="tr-visit-list">
+                {selectedAgendaDay.stops.map(row=><div className="tr-visit-row" key={row.type+row.targetId}>
+                  <span className="tr-row-icon">{row.sequence}</span>
+                  <div><strong>{masters[row.type==="doctor"?"doctors":row.type==="chemist"?"chemists":"stockists"]?.find(x=>x.id===row.targetId)?.name??row.targetId.slice(0,8)}</strong><p>{row.type} · approved DTP</p></div><Tag type="blue">PLANNED</Tag>
+                </div>)}
+              </div>:<Empty title="No daily agenda loaded" detail="Choose an approved DTP or start the workday to retrieve the authoritative execution queue."/>}
+
+              {progress&&<>
+                <h3>Non-call activities</h3>
+                {fieldNca.length?fieldNca.map(row=><div className="tr-history-row" key={row.id}><div><strong>{row.categoryCode}</strong><p>{row.phase} · {row.durationMinutes} minutes · {row.reason}</p></div><Status value={row.status}/></div>):<p className="tr-detail">No NCA recorded for this workday.</p>}
+                <h3>Unplanned calls</h3>
+                {fieldUnplanned.length?fieldUnplanned.map(row=><div className="tr-history-row" key={row.id}><div><strong>{row.customerType} · {row.customerId.slice(0,8)}</strong><p>{row.durationMinutes} minutes · {row.reason}</p></div><Status value={row.status}/></div>):<p className="tr-detail">No unplanned calls recorded for this workday.</p>}
+              </>}
+            </Panel>
+          </div>
+
+          <div className="tr-grid-wide">
+            <Panel eyebrow="AUTOMATIC REPORTING" title="DCR evidence">
+              <p className="tr-detail">Doctor checkout creates the immutable submitted DCR on the server; this screen never recreates the report from client-side notes.</p>
+              {fieldDcrs.length?fieldDcrs.slice(0,5).map(d=><div className="tr-history-row" key={d.id}><div><strong>{d.doctorName}</strong><p>{d.doctorCode} · {d.callOutcome} · {dateTime(d.submittedAt)}</p></div><Tag type="green">SUBMITTED</Tag></div>):<p className="tr-detail">No authorized DCRs returned yet.</p>}
+              <Button kind="ghost" size="sm" onClick={()=>setView("reports")}>Open Daily Call Reports</Button>
+            </Panel>
+            <Panel eyebrow="WORKDAY CONTROLS" title="Execution safeguards">
+              <div className="tr-check-row"><span>Approved DTP required</span><Tag type="green">SERVER ENFORCED</Tag></div>
+              <div className="tr-check-row"><span>Single active workday</span><Tag type="green">SERVER ENFORCED</Tag></div>
+              <div className="tr-check-row"><span>Fresh GPS check-in/out</span><Tag type="green">SERVER ENFORCED</Tag></div>
+              <div className="tr-check-row"><span>Doctor DCR on checkout</span><Tag type="green">ATOMIC</Tag></div>
+              <div className="tr-check-row"><span>Tenant / role isolation</span><Tag type="green">RLS + RBAC</Tag></div>
+            </Panel>
+          </div>
         </div>}
 
         {view==="today" && <TodayIntelligenceView
