@@ -9,7 +9,7 @@ export type PlannedCallOption = {planStopId:string;label:string;territoryId:stri
 export type NcaSubtype = {code:string;label:string};
 export type ActivitiesViewProps = {tenantId:string;authorizedForTenantId:string;contextKey:string;territories:TerritoryOption[];
  customers?:{doctors?:Master[];chemists?:Master[];stockists?:Master[]};plannedCalls?:PlannedCallOption[];
- ncaSubtypes?:NcaSubtype[];towns?:TerritoryOption[];onSaveDraft?:(draft:ActivityDraft)=>void|Promise<void>;onOpenPlannedCall?:(planStopId:string)=>void;defaultWorkDate?:string;saveMode?:"SERVER_NCA"|"SERVER_FIELD"|"HANDOFF";loading?:boolean};
+ ncaSubtypes?:NcaSubtype[];towns?:TerritoryOption[];onSaveDraft?:(draft:ActivityDraft)=>void|Promise<void>;onOpenPlannedCall?:(planStopId:string)=>void;defaultWorkDate?:string;defaultKind?:ActivityKind;defaultTerritoryId?:string;saveMode?:"SERVER_NCA"|"SERVER_FIELD"|"HANDOFF";loading?:boolean};
 export type ActivityValidationContext = {territories:TerritoryOption[];customers:NonNullable<ActivitiesViewProps["customers"]>;plannedCalls:PlannedCallOption[];ncaSubtypes:NcaSubtype[];towns?:TerritoryOption[]};
 export function validateActivityDraft(d:ActivityDraft,ctx:ActivityValidationContext):string[]{
  const e:string[]=[];
@@ -36,6 +36,6 @@ export function validateActivityDraft(d:ActivityDraft,ctx:ActivityValidationCont
  }else e.push("Activity kind is invalid.");
  return e;
 }
-export function emptyActivityDraft(tenantId:string,date:string):ActivityDraft{
- return {operationId:crypto.randomUUID(),kind:"PLANNED_CALL",tenantId,workDate:date,territoryId:"",reason:"",durationMinutes:0,remarks:""};
+export function emptyActivityDraft(tenantId:string,date:string,kind:ActivityKind="PLANNED_CALL",territoryId=""):ActivityDraft{
+ return {operationId:crypto.randomUUID(),kind,tenantId,workDate:date,territoryId,reason:"",durationMinutes:0,remarks:"",ncaPhase:kind==="NON_CALL_ACTIVITY"?"REPORT":undefined};
 }
