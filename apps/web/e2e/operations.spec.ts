@@ -245,6 +245,7 @@ test("switching tenants clears prior organization data even when next reads fail
   await page.locator("#org-select").selectOption(A);
   await expect(page.getByText("Territory Alpha")).toHaveCount(0);
   await page.getByRole("button",{name:"Tour planning"}).click();
+  await page.getByRole("button",{name:"Daily Tour Plan"}).click();
   await expect(page.locator("#calendar-territory")).toContainText("Territory Alpha");
   await page.getByRole("combobox",{name:"Switch organization"}).selectOption(B);
   await expect(page.locator("#calendar-territory")).not.toContainText("Territory Alpha");
@@ -290,6 +291,7 @@ test("monthly planner persists multiple planned calls to the real weekly tour AP
   await page.getByRole("button",{name:"Connect to live workflows"}).click();
   await page.getByRole("button",{name:"Tour planning"}).click();
   await expect(page.getByRole("group",{name:"Monthly tour plan calendar"})).toBeVisible();
+  await page.getByRole("button",{name:"Daily Tour Plan"}).click();
   await page.locator("#calendar-territory").selectOption(territory);
   await page.locator("#calendar-account").selectOption(doctorA);
   await page.getByRole("button",{name:"Add planned call"}).click();
