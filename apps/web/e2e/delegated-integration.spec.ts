@@ -57,7 +57,7 @@ test("delegated screens render authorized records; empty NCA/CLM/AI contracts do
 
   await page.getByRole("button",{name:"View doctor Doctor Beta"}).click();
   await page.getByRole("button",{name:"Open plan"}).click();
-  await expect(page.getByRole("group",{name:"Monthly tour plan calendar"})).toBeVisible();
+  await expect(page.getByText("DAILY TOUR PLAN",{exact:true})).toBeVisible();
   await expect(page.locator("#calendar-territory")).toHaveValue(TERRITORY);
   await expect(page.locator("#calendar-account")).toHaveValue(CUSTOMER_B);
   await expect(page.getByText("Selected from Customer 360:")).toBeVisible();
