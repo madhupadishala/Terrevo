@@ -12,7 +12,7 @@ import { localDate } from "./plan-calendar";
 import {
   TerrevoWebApi, freshPosition, type AccessContext, type FieldVisit, type ManagerAnalytics,
   type ManagerCommand, type Master, type OrgUnit, type Plan, type Progress,
-  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall,
+  type Session, type StartOption, type Tenant, type NcaOptions, type NcaRecord, type UnplannedCall, type PlanDay,
 } from "./terrevo-api";
 
 type Area = "overview" | "today" | "customers" | "activities" | "edetailing" | "field" | "plans" | "manager" | "admin" | "platform" | BusinessArea;
@@ -109,6 +109,11 @@ export default function App() {
   const [ncaTownName,setNcaTownName] = useState("");
   const [ncaTownTerritory,setNcaTownTerritory] = useState("");
   const [ncaPlanningDate,setNcaPlanningDate] = useState("");
+  const [activityPlanningKind,setActivityPlanningKind] = useState<"PLANNED_CALL"|"UNPLANNED_CALL"|"NON_CALL_ACTIVITY">("PLANNED_CALL");
+  const [activityPlanningTerritory,setActivityPlanningTerritory] = useState("");
+  const [agendaDays,setAgendaDays] = useState<Record<string,PlanDay>>({});
+  const [fieldDcrs,setFieldDcrs] = useState<Array<{id:string;doctorName:string;doctorCode:string;callOutcome:string;submittedAt:string;doctorId:string}>>([]);
+  const [attendanceRows,setAttendanceRows] = useState<Array<{workDate:string;status:string;workedMinutes:number|null;requiredMinutes:number|null}>>([]);
 
   function resetTenantState() {
     setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
@@ -118,6 +123,7 @@ export default function App() {
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
     setFocusedCustomer(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
     setOwnUnplanned([]);setPendingUnplanned([]);setUnplannedReviewComment("");
+    setAgendaDays({});setFieldDcrs([]);setAttendanceRows([]);setActivityPlanningKind("PLANNED_CALL");setActivityPlanningTerritory("");
   }
 
   const connected = Boolean(session && tenantId && access);
@@ -143,7 +149,9 @@ export default function App() {
       ]);
       if (generation !== tenantGeneration.current) return;
       setProgress(base[0].status==="fulfilled"?base[0].value:null);
-      setOptions(base[1].status==="fulfilled"?base[1].value:[]);
+      const resolvedOptions=base[1].status==="fulfilled"?base[1].value:[];
+      setOptions(resolvedOptions);
+      if(resolvedOptions.length===1)setSelectedOption(current=>current||resolvedOptions[0].planDayId);
       setVisit(base[2].status==="fulfilled"?base[2].value:null);
       setPlans(base[3].status==="fulfilled"?base[3].value:[]);
       setUnits(base[4].status==="fulfilled"?base[4].value:[]);
@@ -158,6 +166,22 @@ export default function App() {
       setNcaRecords(ncaRowsResult.status==="fulfilled"?ncaRowsResult.value as NcaRecord[]:[]);
       const unplannedResult=base[7+MASTER_KINDS.length];
       setOwnUnplanned(unplannedResult.status==="fulfilled"?unplannedResult.value as UnplannedCall[]:[]);
+      const aux=await Promise.allSettled([api.dcrs(),api.attendance()]);
+      if (generation !== tenantGeneration.current) return;
+      setFieldDcrs(aux[0].status==="fulfilled"?aux[0].value:[]);
+      setAttendanceRows(aux[1].status==="fulfilled"?aux[1].value:[]);
+      const agendaEntries:Record<string,PlanDay>={};
+      const uniquePlans=[...new Set(resolvedOptions.map(o=>o.planId))];
+      const agendaResults=await Promise.allSettled(uniquePlans.map(id=>api.getPlan(id)));
+      if (generation !== tenantGeneration.current) return;
+      agendaResults.forEach(result=>{
+        if(result.status!=="fulfilled"||!result.value)return;
+        for(const option of resolvedOptions.filter(o=>o.planId===result.value!.id)){
+          const day=result.value.days?.find(d=>d.date===option.workDate);
+          if(day)agendaEntries[option.planDayId]=day;
+        }
+      });
+      setAgendaDays(agendaEntries);
       const failures=base.filter(result=>result.status==="rejected").length;
       if (failures) setNotice({kind:"info",title:"Partial data access",
         message:String(failures)+" API requests were denied or unavailable; previous tenant records have been cleared."});
@@ -250,7 +274,7 @@ export default function App() {
       <div className="tr-workspace"><span className="tr-workspace-dot" /> {selectedTenantName ?? "PRODUCT WORKSPACE"} </div>
       <p className="tr-nav-label">WORKSPACES</p>
       <nav className="tr-nav" aria-label="Primary">{NAV.map(n=>
-        <button key={n.id} type="button" className={view===n.id?"tr-nav-item selected":"tr-nav-item"} aria-current={view===n.id?"page":undefined} onClick={()=>{if(n.id==="activities")setNcaPlanningDate("");setView(n.id); setNotice(null);}}>
+        <button key={n.id} type="button" className={view===n.id?"tr-nav-item selected":"tr-nav-item"} aria-current={view===n.id?"page":undefined} onClick={()=>{if(n.id==="activities"){setNcaPlanningDate("");setActivityPlanningKind("PLANNED_CALL");setActivityPlanningTerritory("");}setView(n.id); setNotice(null);}}>
           <span className="tr-nav-glyph" aria-hidden="true">{n.icon}</span>{n.title}</button>)}</nav>
       <div className="tr-sidebar-foot"><div className="tr-foot-pill"><span className="tr-foot-dot" /> {connected?"Server-connected":"No organization connected"}</div><p>Web · Carbon enterprise UI<br/>Live records only</p></div>
     </aside>
@@ -377,7 +401,7 @@ export default function App() {
           }} />}
 
         {view==="activities" && <ActivitiesView
-          key={(contextKey || "disconnected")+"|"+ncaPlanningDate} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
+          key={(contextKey || "disconnected")+"|"+ncaPlanningDate+"|"+activityPlanningKind+"|"+activityPlanningTerritory} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
           contextKey={contextKey}
           territories={units.filter(u=>u.type==="territory"&&u.status==="active").map(u=>({id:u.id,name:u.name}))}
           customers={{doctors:masters.doctors??[],chemists:masters.chemists??[],stockists:masters.stockists??[]}}
@@ -385,7 +409,7 @@ export default function App() {
             planStopId:stop.planStopId, label:stop.targetName, territoryId:progress.territoryId, workDate:progress.workDate,
           }))??[]}
           saveMode="SERVER_FIELD"
-          defaultWorkDate={ncaPlanningDate||progress?.workDate||localDate()}
+          defaultWorkDate={ncaPlanningDate||progress?.workDate||localDate()} defaultKind={activityPlanningKind} defaultTerritoryId={activityPlanningTerritory||progress?.territoryId||""}
           onOpenPlannedCall={planStopId=>{
             const selected=progress?.stops.find(x=>x.planStopId===planStopId&&x.status!=="COMPLETED");
             if(!connected||!selected||visit?.status==="CHECKED_IN")return;
@@ -442,7 +466,7 @@ export default function App() {
 
         {view==="plans" && <MonthlyPlanner key={[contextKey,focusedCustomer?.kind??"",focusedCustomer?.id??""].join(":")}
           api={api} connected={connected} busy={busy} plans={plans} units={units} masters={masters}
-          focusCustomer={focusedCustomer} perform={(fn,title)=>action(fn,title)} onPlanNca={(date)=>{setNcaPlanningDate(date);setFocusedCustomer(null);setView("activities");}} />}
+          focusCustomer={focusedCustomer} perform={(fn,title)=>action(fn,title)} onPlanNca={(date,territory)=>{setNcaPlanningDate(date);setActivityPlanningKind("NON_CALL_ACTIVITY");setActivityPlanningTerritory(territory||"");setFocusedCustomer(null);setView("activities");}} />}
 
         {(["trade","inventory","workforce","approvals","reports"] as Area[]).includes(view) &&
           <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} busy={busy}
