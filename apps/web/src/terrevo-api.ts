@@ -57,6 +57,9 @@ export type ManagerAnalytics = {
   coverage: { plannedStops: number; completedVisits: number; doctorCalls: number; chemistCalls: number; stockistCalls: number };
 };
 export type Coordinates = { latitude: number; longitude: number; accuracyMeters: number };
+export type CustomerKind = "doctor"|"chemist"|"stockist";
+export type CustomerRelationship = {id:string;tenantId:string;sourceKind:CustomerKind;sourceId:string;targetKind:CustomerKind;targetId:string;relationship:"DOCTOR_CHEMIST"|"CHEMIST_STOCKIST";createdAt:string};
+export type CustomerActivity = {tenantId:string;customerKind:CustomerKind;customerId:string;id:string;occurredAt:string;activityType:"DCR"|"RCPA"|"POB";summary:string};
 
 export class ApiFailure extends Error {
   readonly status: number;
@@ -267,6 +270,19 @@ export class TerrevoWebApi {
   }
   async dcrs(): Promise<Array<{ id: string; doctorName: string; doctorCode: string; callOutcome: string; submittedAt: string; doctorId: string }>> {
     return (await this.raw("/v1/dcrs") as {dcrs: Array<{id:string;doctorName:string;doctorCode:string;callOutcome:string;submittedAt:string;doctorId:string}>}).dcrs;
+  }
+  async customerRelationships():Promise<CustomerRelationship[]> {
+    return (await this.raw("/v1/customer-relationships") as {relationships:CustomerRelationship[]}).relationships;
+  }
+  async linkCustomer(sourceKind:CustomerKind,sourceId:string,targetKind:CustomerKind,targetId:string):Promise<CustomerRelationship> {
+    return (await this.raw("/v1/customer-relationships","POST",{sourceKind,sourceId,targetKind,targetId}) as {relationship:CustomerRelationship}).relationship;
+  }
+  async unlinkCustomer(id:string):Promise<void> {
+    await this.raw("/v1/customer-relationships/"+encodeURIComponent(id),"DELETE");
+  }
+  async customerHistory(kind:CustomerKind,id:string):Promise<CustomerActivity[]> {
+    const query=new URLSearchParams({kind,id});
+    return (await this.raw("/v1/customer-history?"+query.toString()) as {history:CustomerActivity[]}).history;
   }
   async rcpa(visitId: string): Promise<{lines: Array<{sequence:number;productId:string|null;competitorBrand:string|null;prescriptionCount:number;stockQuantity:number;salesQuantity:number}>} | null> {
     try { return (await this.raw("/v1/visits/" + encodeURIComponent(visitId) + "/rcpa") as {rcpa: {lines: Array<{sequence:number;productId:string|null;competitorBrand:string|null;prescriptionCount:number;stockQuantity:number;salesQuantity:number}>}}).rcpa; }
