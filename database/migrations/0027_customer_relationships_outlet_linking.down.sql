@@ -1,0 +1,12 @@
+begin;
+drop trigger if exists sales_order_outlet_link_guard on public.sales_orders;
+drop function if exists public.require_pob_outlet_link();
+drop trigger if exists rcpa_outlet_link_guard on public.rcpa_reports;
+drop function if exists public.require_rcpa_outlet_link();
+drop function if exists public.admin_unlink_customer(uuid,uuid,uuid);
+drop function if exists public.admin_link_customer(uuid,uuid,text,uuid,text,uuid);
+drop function if exists public.can_read_customer_relationship(uuid,text,uuid,text,uuid);
+drop function if exists public.customer_kind_territory(uuid,text,uuid);
+drop table if exists public.customer_relationship_audit;
+drop table if exists public.customer_relationships;
+commit;
