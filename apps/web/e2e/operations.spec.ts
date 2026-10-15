@@ -82,7 +82,8 @@ test("authorized field user can use real API endpoints for tour and visit lifecy
   await page.getByRole("button", { name: "Save call outcome" }).click();
   await expect(page.getByText("Call outcome saved")).toBeVisible();
   await page.getByRole("button", { name: "Check out with location" }).click();
-  await expect(page.getByText("Checked out of field visit")).toBeVisible();
+  await expect(page.getByText("Checked out; DCR generated")).toBeVisible();
+  await page.locator("#short-reason").fill("Authorized short-day test");
   await page.getByRole("button", { name: "End My Day" }).click();
   await expect(page.getByText("Workday submitted", { exact: true })).toBeVisible();
   expect(mutations.map(item=>item.path)).toEqual([
