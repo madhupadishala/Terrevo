@@ -15,6 +15,7 @@ type Props = {
 };
 
 export function MonthlyPlanner({ api, connected, busy, plans, units, masters, focusCustomer, perform }: Props) {
+  const [level, setLevel] = useState<"monthly"|"weekly"|"daily">("monthly");
   const [month, setMonth] = useState(localDate());
   const [selected, setSelected] = useState(localDate());
   const [details, setDetails] = useState<Record<string, Plan>>({});
@@ -47,6 +48,8 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
   }, [connected, api, plans]);
 
   const selectedWeek = weekStart(selected);
+  const weekDays = useMemo(() => Array.from({length:7},(_,i)=>{const d=new Date(Number(selectedWeek.slice(0,4)),Number(selectedWeek.slice(5,7))-1,Number(selectedWeek.slice(8)),12);d.setDate(d.getDate()+i);return localDate(d);}),[selectedWeek]);
+  const monthWeeks = useMemo(()=>[...new Set(grid.filter(d=>d.inMonth).map(d=>weekStart(d.date)))],[grid]);
   const plan = plans.find(p => p.weekStart === selectedWeek);
 
   // The list can contain more than 100 weeks. Fetch a later selected week on
@@ -102,6 +105,13 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
     }]);
     setTargetId("");setStopRemark("");
   }
+  function moveStop(index:number, direction:-1|1) {
+    setStops(rows=>{const next=[...rows], destination=index+direction;
+      if(destination<0||destination>=next.length)return rows;
+      [next[index],next[destination]]=[next[destination],next[index]];
+      return next.map((stop,i)=>({...stop,sequence:i+1}));
+    });
+  }
   async function saveDay() {
     if (!connected || busy || !modifiable || detailFailed || !territoryId || !stops.length) return;
     const entry: PlanDay = { date: selected, territoryId, remarks: dayRemark.trim()||null,
@@ -112,8 +122,17 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
       api.savePlan(selectedWeek, combined), "Weekly tour plan saved");
   }
 
-  return <div className="tr-grid-wide tr-monthly-layout">
-    <section className="tr-panel">
+  const totalMonthDays=Object.values(details).flatMap(p=>p.days?.map(d=>({...d,status:p.status}))??[]).filter(d=>d.date.slice(0,7)===month.slice(0,7));
+  const weeklyDays=detail?.days??[];
+  const monthlySummary = {plannedDays:totalMonthDays.length, plannedCalls:totalMonthDays.reduce((sum,d)=>sum+d.stops.length,0),approvedDays:totalMonthDays.filter(d=>d.status==="APPROVED").length};
+  return <div className="tr-planning-root">
+    <div className="tr-panel" role="group" aria-label="Tour planning levels">
+      <div className="tr-section-line"><h2>Tour planning</h2><Tag type="blue">Server-backed weekly source of truth</Tag></div>
+      <div className="tr-month-controls">{(["monthly","weekly","daily"] as const).map(mode=><Button key={mode} kind={level===mode?"primary":"secondary"} size="sm" onClick={()=>setLevel(mode)} aria-pressed={level===mode}>{mode==="monthly"?"Monthly Tour Plan":mode==="weekly"?"Weekly Tour Plan":"Daily Tour Plan"}</Button>)}</div>
+      <p className="tr-detail">Monthly summaries and daily plans derive from the same authorized weekly records. Submitted and approved weeks remain read-only.</p>
+    </div>
+    <div className="tr-grid-wide tr-monthly-layout">
+    {level==="monthly"&&<section className="tr-panel">
       <div className="tr-section-line">
         <span className="tr-section-kicker">MONTHLY FIELD PLANNING</span>
         <Tag type="blue">Existing weekly plan API</Tag>
@@ -140,7 +159,8 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
           </button>;
         })}
       </div>
-      <p className="tr-detail">Monthly navigation aggregates existing approved, submitted and draft weekly plans. No synthetic plans are displayed.</p>
+      <div className="tr-month-summary" aria-label="Monthly coverage"><strong>{monthlySummary.plannedDays} planned days · {monthlySummary.plannedCalls} calls · {monthlySummary.approvedDays} approved days</strong></div>
+      <p className="tr-detail">Monthly coverage aggregates authorized weekly plans, including weeks spanning month boundaries.</p>
       {readFailures.length>0&&<p className="tr-business-error" role="status">{readFailures.length} plan details could not be loaded. Editing affected weeks is disabled until data is available.</p>}
       <div className="tr-month-summary">
         <strong>Existing plans</strong>
@@ -149,10 +169,22 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
           <Tag type={p.status==="APPROVED"?"green":p.status==="RETURNED"?"purple":"blue"}>{p.status}</Tag>
         </div>):<p className="tr-detail">No plans returned by the organization.</p>}
       </div>
-    </section>
-    <section className="tr-panel">
-      <span className="tr-section-kicker">DAY PLANNING</span>
+    </section>}
+    {level==="weekly"&&<section className="tr-panel">
+      <span className="tr-section-kicker">WEEKLY TOUR PLAN</span>
+      <h2>Week of {selectedWeek}</h2>
+      <Tag type={selectedStatus==="APPROVED"?"green":"blue"}>{selectedStatus}</Tag>
+      <div className="tr-month-controls"><Button kind="ghost" size="sm" onClick={()=>{const d=new Date(Number(selected.slice(0,4)),Number(selected.slice(5,7))-1,Number(selected.slice(8)),12);d.setDate(d.getDate()-7);setSelected(localDate(d));}}>← Previous week</Button><Button kind="ghost" size="sm" onClick={()=>{const d=new Date(Number(selected.slice(0,4)),Number(selected.slice(5,7))-1,Number(selected.slice(8)),12);d.setDate(d.getDate()+7);setSelected(localDate(d));}}>Next week →</Button></div>
+      {weekDays.map(date=>{const day=weeklyDays.find(d=>d.date===date);return <div key={date} className="tr-history-row"><div><strong>{date}</strong><p>{day?`${day.stops.length} planned calls · ${units.find(u=>u.id===day.territoryId)?.name??day.territoryId}`:"No scheduled calls"}</p></div><Button kind="ghost" size="sm" onClick={()=>{setSelected(date);setLevel("daily");}}>View / plan day</Button></div>})}
+      {plan&&!detail&&<p role="status">Weekly details loading or unavailable. Submission is disabled.</p>}
+      <Button disabled={!connected||busy||!plan||!detail||!modifiable||weeklyDays.length===0} onClick={()=>plan&&void perform(()=>api.submitPlan(plan.id),"Weekly tour plan submitted for manager approval")}>Submit weekly plan for approval</Button>
+      <p className="tr-detail">All dates and call sequences are saved in the existing weekly plan. Manager approval applies to the submitted week.</p>
+    </section>}
+    {level==="monthly"&&<section className="tr-panel"><span className="tr-section-kicker">MONTH WEEKS</span><h2>Weekly breakdown</h2>{monthWeeks.map(week=>{const p=plans.find(x=>x.weekStart===week);const d=p?details[p.id]?.days??[]:[];return <div key={week} className="tr-history-row"><div><strong>Week of {week}</strong><p>{d.length} planned days · {d.reduce((n,x)=>n+x.stops.length,0)} calls · {p?.status??"UNPLANNED"}</p></div><Button kind="ghost" size="sm" onClick={()=>{setSelected(week);setLevel("weekly");}}>Open week</Button></div>})}</section>}
+    {level==="daily"&&<section className="tr-panel">
+      <span className="tr-section-kicker">DAILY TOUR PLAN</span>
       <h2>{new Intl.DateTimeFormat(undefined,{weekday:"long",day:"numeric",month:"short"}).format(new Date(Number(selected.slice(0,4)),Number(selected.slice(5,7))-1,Number(selected.slice(8))))}</h2>
+      <div className="tr-month-controls"><Button kind="ghost" size="sm" onClick={()=>{const d=new Date(Number(selected.slice(0,4)),Number(selected.slice(5,7))-1,Number(selected.slice(8)),12);d.setDate(d.getDate()-1);setSelected(localDate(d));}}>← Previous day</Button><input type="date" aria-label="Selected daily tour date" value={selected} onChange={e=>{if(e.target.value){setSelected(e.target.value);setMonth(e.target.value);}}}/><Button kind="ghost" size="sm" onClick={()=>{const d=new Date(Number(selected.slice(0,4)),Number(selected.slice(5,7))-1,Number(selected.slice(8)),12);d.setDate(d.getDate()+1);setSelected(localDate(d));}}>Next day →</Button></div>
       <Tag type={selectedStatus==="APPROVED"?"green":"gray"}>{selectedStatus}</Tag>
       {plan&&!modifiable&&<p className="tr-detail">This week is submitted or approved. Read-only: return the plan through the manager workflow before editing.</p>}
       {plan&&!detail&&<p className="tr-detail">Loading authorized weekly plan details…</p>}
@@ -183,7 +215,7 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
       {stops.map((s,i)=><div key={s.type+":"+s.targetId} className="tr-history-row">
         <div><strong>{i+1}. {masters[s.type==="doctor"?"doctors":s.type==="chemist"?"chemists":"stockists"]?.find(t=>t.id===s.targetId)?.name??s.targetId}</strong>
           <p>{s.type} · {s.remarks??"No remarks"}</p></div>
-        {modifiable&&<Button kind="ghost" size="sm" onClick={()=>setStops(rows=>rows.filter((_,j)=>i!==j))}>Remove</Button>}
+        {modifiable&&<div className="tr-month-controls"><Button kind="ghost" size="sm" disabled={i===0} aria-label={`Move visit ${i+1} earlier`} onClick={()=>moveStop(i,-1)}>↑</Button><Button kind="ghost" size="sm" disabled={i===stops.length-1} aria-label={`Move visit ${i+1} later`} onClick={()=>moveStop(i,1)}>↓</Button><Button kind="ghost" size="sm" onClick={()=>setStops(rows=>rows.filter((_,j)=>i!==j))}>Remove</Button></div>}
       </div>)}
       <div className="tr-form">
         <TextInput id="calendar-day-remark" labelText="Day remarks (optional)" maxLength={1000}
@@ -191,7 +223,8 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
         <Button disabled={!connected||busy||!modifiable||!territoryId||!stops.length||Boolean(plan&&!detail)}
           onClick={()=>void saveDay()}>Save {plan?"updated":"new"} weekly plan</Button>
       </div>
-      <p className="tr-detail">Non-call activities require a dedicated backend activity type and approval rules; they are not silently saved as doctor calls.</p>
-    </section>
-  </div>;
+      <p className="tr-detail">To plan NCA, use the existing NCA & activities workspace. NCA records are not disguised as customer visits.</p>
+      <Button kind="ghost" size="sm" onClick={()=>setLevel("weekly")}>Return to weekly plan</Button>
+    </section>}
+  </div></div>;
 }
