@@ -3,10 +3,10 @@ import {Button,Tag,TextArea,TextInput} from "@carbon/react";
 import {emptyActivityDraft,validateActivityDraft,type ActivitiesViewProps,type ActivityDraft,type ActivityKind,type ActivityCustomerKind} from "./model";
 export type {ActivitiesViewProps,ActivityDraft,ActivityEvidence,NcaSubtype,PlannedCallOption} from "./model";
 export {validateActivityDraft,emptyActivityDraft} from "./model";
-export function ActivitiesView({tenantId,authorizedForTenantId,contextKey,territories,customers={},plannedCalls=[],ncaSubtypes=[],towns=[],onSaveDraft,onOpenPlannedCall,defaultWorkDate="",saveMode="HANDOFF",loading=false}:ActivitiesViewProps){
- const [state,setState]=useState<{tenantId:string;contextKey:string;draft:ActivityDraft}>({tenantId,contextKey,draft:emptyActivityDraft(tenantId,defaultWorkDate)});
+export function ActivitiesView({tenantId,authorizedForTenantId,contextKey,territories,customers={},plannedCalls=[],ncaSubtypes=[],towns=[],onSaveDraft,onOpenPlannedCall,defaultWorkDate="",defaultKind="PLANNED_CALL",defaultTerritoryId="",saveMode="HANDOFF",loading=false}:ActivitiesViewProps){
+ const [state,setState]=useState<{tenantId:string;contextKey:string;draft:ActivityDraft}>({tenantId,contextKey,draft:emptyActivityDraft(tenantId,defaultWorkDate,defaultKind,defaultTerritoryId)});
  const [review,setReview]=useState(false),[message,setMessage]=useState(""),[busy,setBusy]=useState(false),[saved,setSaved]=useState(false);
- useEffect(()=>{setState({tenantId,contextKey,draft:emptyActivityDraft(tenantId,defaultWorkDate)});setReview(false);setMessage("");setSaved(false);},[tenantId,contextKey]);
+ useEffect(()=>{setState({tenantId,contextKey,draft:emptyActivityDraft(tenantId,defaultWorkDate,defaultKind,defaultTerritoryId)});setReview(false);setMessage("");setSaved(false);},[tenantId,contextKey,defaultWorkDate,defaultKind,defaultTerritoryId]);
  const authorized=Boolean(tenantId&&contextKey&&authorizedForTenantId===tenantId);
  const draft=state.tenantId===tenantId&&state.contextKey===contextKey?state.draft:emptyActivityDraft(tenantId,"");
  const context=useMemo(()=>({territories,customers,plannedCalls,ncaSubtypes,towns}),[territories,customers,plannedCalls,ncaSubtypes,towns]);
@@ -67,5 +67,5 @@ export function ActivitiesView({tenantId,authorizedForTenantId,contextKey,territ
  <Button disabled={!canSave||busy||errors.length>0} onClick={()=>void save()}>{saveMode==="SERVER_FIELD"&&draft.kind==="UNPLANNED_CALL"?"Submit unplanned call for review":saveMode==="SERVER_NCA"||saveMode==="SERVER_FIELD"?"Save NCA draft":"Hand off draft"}</Button>
  {!canSave&&<p role="status">No server save contract is available for this activity type. Nothing will be submitted.</p>}</div>}
  {message&&<p role="status">{message}</p>}
- {saved&&<Button kind="ghost" size="sm" disabled={busy} onClick={()=>{setState({tenantId,contextKey,draft:emptyActivityDraft(tenantId,defaultWorkDate)});setReview(false);setSaved(false);setMessage("");}}>Start another activity</Button>}</section>;
+ {saved&&<Button kind="ghost" size="sm" disabled={busy} onClick={()=>{setState({tenantId,contextKey,draft:emptyActivityDraft(tenantId,defaultWorkDate,defaultKind,defaultTerritoryId)});setReview(false);setSaved(false);setMessage("");}}>Start another activity</Button>}</section>;
 }
