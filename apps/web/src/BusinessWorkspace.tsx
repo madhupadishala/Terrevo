@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Tag, TextArea, TextInput } from "@carbon/react";
-import { freshPosition, type FieldVisit, type Master, type Progress, type TerrevoWebApi } from "./terrevo-api";
+import { freshPosition, type CustomerRelationship, type FieldVisit, type Master, type Progress, type TerrevoWebApi } from "./terrevo-api";
 
 export type BusinessArea = "trade" | "inventory" | "workforce" | "approvals" | "reports";
 
@@ -13,6 +13,7 @@ type Props = {
   visit: FieldVisit | null;
   progress: Progress | null;
   masters: Record<string, Master[]>;
+  relationships: CustomerRelationship[];
   perform: (fn: () => Promise<unknown>, title: string) => Promise<void>;
 };
 type Dcr = { id: string; doctorName: string; doctorCode: string; callOutcome: string; submittedAt: string; doctorId: string };
@@ -35,7 +36,7 @@ const thisMonday = () => { const d = new Date();d.setDate(d.getDate() - ((d.getD
 const thisDate = () => localDate(new Date());
 const empty = <p className="tr-detail">No authorized records were returned for this workspace.</p>;
 
-export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, progress, masters, perform }: Props) {
+export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, progress, masters, relationships, perform }: Props) {
   const [revision, setRevision] = useState(0);
   const [message, setMessage] = useState("");
   const [dcrs, setDcrs] = useState<Dcr[]>([]);
@@ -71,8 +72,17 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
   const [comment, setComment] = useState("");
 
   const activeStop = progress?.stops.find(s=>s.planStopId === visit?.planStopId);
-  const tradeVisit = Boolean(visit && (activeStop?.type==="chemist" || activeStop?.type==="stockist"));
+  const chemistVisit = Boolean(visit && activeStop?.type==="chemist");
+  const stockistVisit = Boolean(visit && activeStop?.type==="stockist");
+  const tradeVisit = chemistVisit||stockistVisit;
   const doctorVisit = Boolean(visit && activeStop?.type==="doctor");
+  const activeCustomerId=activeStop?.targetId??"";
+  const rcpaOutletLinked=chemistVisit&&relationships.some(r=>r.relationship==="DOCTOR_CHEMIST"&&r.targetKind==="chemist"&&r.targetId===activeCustomerId);
+  const pobOutletLinked=chemistVisit
+    ?relationships.some(r=>r.relationship==="CHEMIST_STOCKIST"&&r.sourceKind==="chemist"&&r.sourceId===activeCustomerId)
+    :stockistVisit
+      ?relationships.some(r=>r.relationship==="CHEMIST_STOCKIST"&&r.targetKind==="stockist"&&r.targetId===activeCustomerId)
+      :false;
   const canAct = connected&&!busy;
 
   useEffect(() => {
@@ -88,8 +98,16 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
         if (mode==="trade" || mode==="reports") {
           const data = await api.dcrs();if(live)setDcrs(data);
           if (mode==="trade" && tradeVisit && visit) {
-            const [rcpa, order] = await Promise.all([api.rcpa(visit.id),api.order(visit.id)]);
-            if(live){setCurrentRcpa(rcpa ? String(rcpa.lines.length)+" line(s) recorded" : "No RCPA recorded");setCurrentOrder(order ? String(order.lines.length)+" order line(s) recorded" : "No order recorded");}
+            const [rcpaResult,orderResult]=await Promise.allSettled([
+              chemistVisit?api.rcpa(visit.id):Promise.resolve(null),
+              api.order(visit.id),
+            ]);
+            if(live){
+              const rcpa=rcpaResult.status==="fulfilled"?rcpaResult.value:null;
+              const order=orderResult.status==="fulfilled"?orderResult.value:null;
+              setCurrentRcpa(chemistVisit?(rcpa?String(rcpa.lines.length)+" line(s) recorded":"No RCPA recorded"):"RCPA is chemist-only");
+              setCurrentOrder(order?String(order.lines.length)+" POB line(s) recorded":"No POB recorded");
+            }
           }
         }
         if(mode==="inventory") {
@@ -124,7 +142,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
       }
     })();
     return () => { live=false; };
-  }, [api, connected, mode, manager, visit?.id, revision, tradeVisit]);
+  }, [api, connected, mode, manager, visit?.id, revision, tradeVisit, chemistVisit]);
 
   async function act(fn: () => Promise<unknown>, label: string) {
     await perform(fn,label);
@@ -139,25 +157,43 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
     {message && <p className="tr-business-error" role="status">{message}</p>}
 
     {mode==="trade"&&<div className="tr-grid-wide">
+      <Box title="Outlet relationship prerequisites">
+        <p className="tr-detail">Terrevo enforces the controlled outlet chain before trade capture: Doctor → Chemist for RCPA, and Chemist → Stockist for POB.</p>
+        {!tradeVisit?<p className="tr-detail">Check in to a planned chemist or stockist visit to continue.</p>:<>
+          <Entry heading={activeStop?.targetName??"Trade account"} detail={activeStop?.type==="chemist"?"Chemist visit":"Stockist visit"} status="ACTIVE"/>
+          {chemistVisit&&<div className="tr-check-row"><span>Doctor → Chemist link for RCPA</span><Tag type={rcpaOutletLinked?"green":"red"}>{rcpaOutletLinked?"LINKED":"REQUIRED"}</Tag></div>}
+          <div className="tr-check-row"><span>Chemist → Stockist link for POB</span><Tag type={pobOutletLinked?"green":"red"}>{pobOutletLinked?"LINKED":"REQUIRED"}</Tag></div>
+          {((chemistVisit&&!rcpaOutletLinked)||!pobOutletLinked)&&<p className="tr-detail">Open Customer 360 and complete outlet linking first. The database also rejects unlinked RCPA/POB writes.</p>}
+        </>}
+      </Box>
+
       <Box title="RCPA & prescription intelligence">
-        <p className="tr-detail">Record actual chemist prescription movement while checked in. {currentRcpa}</p>
+        <p className="tr-detail">Capture own-product or competitor prescription movement only during a checked-in chemist visit. {currentRcpa}</p>
         <div className="tr-form">
-          <label className="tr-select-label" htmlFor="rcpa-product">Product (or competitor below)</label>
+          <label className="tr-select-label" htmlFor="rcpa-product">Own product (or use competitor brand)</label>
           <select id="rcpa-product" className="tr-select" value={productId} onChange={e=>setProductId(e.target.value)}>
             <option value="">Competitor / choose brand below</option>{productOptions.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-          <TextInput id="rcpa-competitor" labelText="Competitor brand (leave empty when product selected)" value={competitorBrand} onChange={e=>setCompetitorBrand(e.target.value)} maxLength={160}/>
-          <div className="tr-form-three"><TextInput id="rcpa-rx" type="number" labelText="Prescriptions" value={String(prescriptions)} onChange={e=>setPrescriptions(Number(e.target.value))}/><TextInput id="rcpa-stock" type="number" labelText="Stock" value={String(stock)} onChange={e=>setStock(Number(e.target.value))}/><TextInput id="rcpa-sales" type="number" labelText="Sales" value={String(sales)} onChange={e=>setSales(Number(e.target.value))}/></div>
-          <Button disabled={!canAct||!tradeVisit||Boolean(productId)===Boolean(competitorBrand.trim())||prescriptions+stock+sales<=0} onClick={()=>visit&&void act(()=>api.saveRcpa(visit.id,[{sequence:1,productId:productId||null,competitorBrand:competitorBrand.trim()||null,prescriptionCount:prescriptions,stockQuantity:stock,salesQuantity:sales}]),"RCPA saved")}>Save RCPA</Button>
+          <TextInput id="rcpa-competitor" labelText="Competitor brand" value={competitorBrand} onChange={e=>setCompetitorBrand(e.target.value)} maxLength={160}/>
+          <div className="tr-form-three">
+            <TextInput id="rcpa-rx" type="number" labelText="Prescriptions" value={String(prescriptions)} onChange={e=>setPrescriptions(Number(e.target.value))}/>
+            <TextInput id="rcpa-stock" type="number" labelText="Stock" value={String(stock)} onChange={e=>setStock(Number(e.target.value))}/>
+            <TextInput id="rcpa-sales" type="number" labelText="Sales" value={String(sales)} onChange={e=>setSales(Number(e.target.value))}/>
+          </div>
+          <Button disabled={!canAct||!chemistVisit||!rcpaOutletLinked||Boolean(productId)===Boolean(competitorBrand.trim())||prescriptions+stock+sales<=0}
+            onClick={()=>visit&&void act(()=>api.saveRcpa(visit.id,[{sequence:1,productId:productId||null,competitorBrand:competitorBrand.trim()||null,prescriptionCount:prescriptions,stockQuantity:stock,salesQuantity:sales}]),"RCPA saved")}>Save RCPA</Button>
         </div>
-        {!tradeVisit&&<p className="tr-detail">Check in to a planned chemist or stockist visit first.</p>}
+        {!chemistVisit&&<p className="tr-detail">RCPA is available only for a checked-in planned chemist visit.</p>}
       </Box>
-      <Box title="Stockist / chemist orders">
-        <p className="tr-detail">Book server-side orders against the checked-in trade account. {currentOrder}</p>
-        <div className="tr-form"><label className="tr-select-label" htmlFor="order-product">Product</label>
+
+      <Box title="POB / product order booking">
+        <p className="tr-detail">Book product orders against the checked-in chemist or stockist after the controlled Chemist → Stockist relationship is present. {currentOrder}</p>
+        <div className="tr-form">
+          <label className="tr-select-label" htmlFor="order-product">Product</label>
           <select id="order-product" className="tr-select" value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Choose product</option>{productOptions.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>
           <TextInput id="order-quantity" type="number" labelText="Order quantity" value={String(orderQty)} onChange={e=>setOrderQty(Number(e.target.value))}/>
-          <Button disabled={!canAct||!tradeVisit||!productId||!Number.isInteger(orderQty)||orderQty<1} onClick={()=>visit&&void act(()=>api.saveOrder(visit.id,[{sequence:1,productId,quantity:orderQty,remarks:null}]),"Order recorded")}>Book order</Button>
+          <Button disabled={!canAct||!tradeVisit||!pobOutletLinked||!productId||!Number.isInteger(orderQty)||orderQty<1}
+            onClick={()=>visit&&void act(()=>api.saveOrder(visit.id,[{sequence:1,productId,quantity:orderQty,remarks:null}]),"POB recorded")}>Book POB</Button>
         </div>
       </Box>
     </div>}
