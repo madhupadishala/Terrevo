@@ -68,7 +68,7 @@ test("approved DTP drives Start My Day, agenda, planned call, automatic DCR and 
   await page.getByRole("button",{name:"Start My Day (GPS)"}).click();
   await expect(page.getByText("Workday started",{exact:true})).toBeVisible();
   await expect(page.getByRole("heading",{name:"Today's execution queue"})).toBeVisible();
-  await expect(page.getByText("Dr Field")).toBeVisible();
+  await expect(page.getByText("Dr Field",{exact:true})).toBeVisible();
 
   await page.getByRole("button",{name:"Add unplanned call"}).click();
   await expect(page.locator("#activity-kind")).toHaveValue("UNPLANNED_CALL");
