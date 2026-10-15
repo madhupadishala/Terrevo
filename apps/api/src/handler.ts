@@ -23,6 +23,7 @@ import { createExpenseService, ExpenseConflictError, ExpenseInputError, ExpenseN
 import { createJointWorkService, JointWorkConflictError, JointWorkInputError, JointWorkNotFoundError } from "../../../modules/joint-work/src/index.ts";
 import { createManagerCommandService } from "../../../modules/manager-command/src/index.ts";
 import { AnalyticsInputError, createAnalyticsService } from "../../../modules/analytics/src/index.ts";
+import {createCustomerNetworkService,CustomerNetworkInputError,CustomerNetworkNotFoundError,CustomerNetworkConflictError} from "../../../modules/customer-network/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 import { createPlatformAdminService, PlatformForbiddenError, PlatformValidationError, PlatformNotFoundError } from "./platform-admin.ts";
 import { readBoundedJsonObject, RequestBodyError } from "../../../modules/security/src/index.ts";
@@ -100,11 +101,11 @@ function mapError(error: unknown): Response {
   if (error instanceof AuthorizationError || error instanceof PlatformForbiddenError) return json(403, { error: "Permission denied" });
   if (error instanceof PlatformValidationError) return json(400, { error: error.message });
   if (error instanceof PlatformNotFoundError) return json(404, { error: error.message });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError || error instanceof NcaInputError || error instanceof UnplannedInputError || error instanceof ExpenseInputError || error instanceof JointWorkInputError || error instanceof AnalyticsInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError || error instanceof NcaInputError || error instanceof UnplannedInputError || error instanceof ExpenseInputError || error instanceof JointWorkInputError || error instanceof AnalyticsInputError || error instanceof CustomerNetworkInputError) {
     return json(400, { error: error.message });
   }
-  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError || error instanceof TradeCallNotFoundError || error instanceof RcpaNotFoundError || error instanceof OrderNotFoundError || error instanceof LeaveNotFoundError || error instanceof NcaNotFoundError || error instanceof UnplannedNotFoundError || error instanceof ExpenseNotFoundError || error instanceof JointWorkNotFoundError) return json(404, { error: error.message });
-  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError || error instanceof LeaveConflictError || error instanceof NcaConflictError || error instanceof UnplannedConflictError || error instanceof ExpenseConflictError || error instanceof JointWorkConflictError) return json(409, { error: error.message });
+  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError || error instanceof TradeCallNotFoundError || error instanceof RcpaNotFoundError || error instanceof OrderNotFoundError || error instanceof LeaveNotFoundError || error instanceof NcaNotFoundError || error instanceof UnplannedNotFoundError || error instanceof ExpenseNotFoundError || error instanceof JointWorkNotFoundError || error instanceof CustomerNetworkNotFoundError) return json(404, { error: error.message });
+  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError || error instanceof LeaveConflictError || error instanceof NcaConflictError || error instanceof UnplannedConflictError || error instanceof ExpenseConflictError || error instanceof JointWorkConflictError || error instanceof CustomerNetworkConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
     if (error.status === 400) return json(400, { error: "Provider rejected request" });
@@ -143,6 +144,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const jointWork = createJointWorkService(adapter.jointWork, rbac);
   const managerCommand = createManagerCommandService(adapter.managerCommand);
   const analytics = createAnalyticsService(adapter.analytics);
+  const customerNetwork = createCustomerNetworkService(adapter.customerNetwork,adapter.masters);
   const platform = createPlatformAdminService(requireConfig(env), deps.fetcher);
 
   /** Authenticates the caller and resolves the active tenant context for a tenant-scoped request. */
@@ -478,6 +480,26 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         const {accessToken,user,context}=await resolveTenantRequest(request);
         await visits.decideException(context.tenantId,user.id,accessToken,exceptionDecision[1],await readJsonObject(request));
         return new Response(null,{status:204});
+      }
+
+      if(request.method==="GET"&&path==="/v1/customer-relationships"){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{relationships:await customerNetwork.listRelationships(context.tenantId,accessToken)});
+      }
+      if(request.method==="POST"&&path==="/v1/customer-relationships"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(201,{relationship:await customerNetwork.link(context.tenantId,user.id,accessToken,await readJsonObject(request))});
+      }
+      const relationshipDelete=/^\/v1\/customer-relationships\/([^/]+)$/.exec(path);
+      if(request.method==="DELETE"&&relationshipDelete){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        await customerNetwork.unlink(context.tenantId,user.id,accessToken,relationshipDelete[1]);
+        return new Response(null,{status:204});
+      }
+      if(request.method==="GET"&&path==="/v1/customer-history"){
+        const url=new URL(request.url);
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{history:await customerNetwork.history(context.tenantId,accessToken,url.searchParams.get("kind"),url.searchParams.get("id"))});
       }
 
       if (request.method === "GET" && path === "/v1/tour-executions/progress") {
