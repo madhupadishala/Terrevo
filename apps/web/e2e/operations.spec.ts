@@ -248,7 +248,7 @@ test("switching tenants clears prior organization data even when next reads fail
   await page.getByRole("button",{name:"Daily Tour Plan"}).click();
   await expect(page.locator("#calendar-territory")).toContainText("Territory Alpha");
   await page.getByRole("combobox",{name:"Switch organization"}).selectOption(B);
-  await expect(page.locator("#calendar-territory")).not.toContainText("Territory Alpha");
+  await expect(page.getByText("Territory Alpha")).toHaveCount(0);
   await page.getByRole("button",{name:"Manager command"}).click();
   await expect(page.getByRole("heading",{name:"Manager workspace is permission-gated"})).toBeVisible();
 });
