@@ -12,9 +12,10 @@ type Props = {
   masters: Record<string, Master[]>;
   focusCustomer?: { kind: "doctor" | "chemist" | "stockist"; id: string; territoryId: string; name: string } | null;
   perform: (fn: () => Promise<unknown>, label: string) => Promise<void>;
+  onPlanNca?: (date: string, territoryId: string | null) => void;
 };
 
-export function MonthlyPlanner({ api, connected, busy, plans, units, masters, focusCustomer, perform }: Props) {
+export function MonthlyPlanner({ api, connected, busy, plans, units, masters, focusCustomer, perform, onPlanNca }: Props) {
   const [level, setLevel] = useState<"monthly"|"weekly"|"daily">("monthly");
   const [month, setMonth] = useState(localDate());
   const [selected, setSelected] = useState(localDate());
@@ -94,6 +95,7 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
     setStopType(focusCustomer.kind);
     setTerritoryId(focusCustomer.territoryId);
     setTargetId(focusCustomer.id);
+    setLevel("daily");
   }, [connected, focusCustomer, masters, units]);
 
   function addStop() {
@@ -223,8 +225,8 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
         <Button disabled={!connected||busy||!modifiable||!territoryId||!stops.length||Boolean(plan&&!detail)}
           onClick={()=>void saveDay()}>Save {plan?"updated":"new"} weekly plan</Button>
       </div>
-      <p className="tr-detail">To plan NCA, use the existing NCA & activities workspace. NCA records are not disguised as customer visits.</p>
-      <Button kind="ghost" size="sm" onClick={()=>setLevel("weekly")}>Return to weekly plan</Button>
+      <div className="tr-month-controls"><Button kind="secondary" size="sm" disabled={!connected||!onPlanNca} onClick={()=>onPlanNca?.(selected,territoryId||existingDay?.territoryId||null)}>Plan NCA for this day</Button><Button kind="ghost" size="sm" onClick={()=>setLevel("weekly")}>Return to weekly plan</Button></div>
+      <p className="tr-detail">NCA uses the controlled NCA workflow and remains a distinct activity record; it is never saved as a customer visit.</p>
     </section>}
   </div></div>;
 }
