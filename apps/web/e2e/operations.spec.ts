@@ -18,8 +18,8 @@ test("public UI exposes role workspaces without inventing data or performing wri
   await expect(page.getByRole("heading", { name: "Operations, connected." })).toBeVisible();
   await expect(page.getByText("Terrevo is online.")).toHaveCount(0);
   await page.getByRole("button", { name: "Field execution", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Start My Tour" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start My Tour (GPS)" })).toBeDisabled();
+  await expect(page.getByRole("heading", { name: "Start My Day" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start My Day (GPS)" })).toBeDisabled();
   await page.getByRole("button", { name: "Manager command" }).click();
   await expect(page.getByText("Manager workspace is permission-gated")).toBeVisible();
   await page.getByRole("button", { name: "Platform Super Admin" }).click();
@@ -73,8 +73,8 @@ test("authorized field user can use real API endpoints for tour and visit lifecy
   await expect(page.getByRole("complementary", { name: "Terrevo navigation" }).getByText("Test Organization")).toBeVisible();
   await page.getByRole("button", { name: "Field execution", exact: true }).click();
   await page.locator("#approved-day").selectOption(PLAN_DAY);
-  await page.getByRole("button", { name: "Start My Tour (GPS)" }).click();
-  await expect(page.getByText("Tour started", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Start My Day (GPS)" }).click();
+  await expect(page.getByText("Workday started", { exact: true })).toBeVisible();
   await page.locator("#stop-select").selectOption(STOP);
   await page.getByRole("button", { name: "Check in using device GPS" }).click();
   await expect(page.getByText("Field check-in saved")).toBeVisible();
@@ -83,8 +83,8 @@ test("authorized field user can use real API endpoints for tour and visit lifecy
   await expect(page.getByText("Call outcome saved")).toBeVisible();
   await page.getByRole("button", { name: "Check out with location" }).click();
   await expect(page.getByText("Checked out of field visit")).toBeVisible();
-  await page.getByRole("button", { name: "Submit My Tour" }).click();
-  await expect(page.getByText("Tour submitted", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "End My Day" }).click();
+  await expect(page.getByText("Workday submitted", { exact: true })).toBeVisible();
   expect(mutations.map(item=>item.path)).toEqual([
     "/api/v1/auth/login", "/api/v1/tour-executions/start", "/api/v1/visits/check-in",
     `/api/v1/visits/${VISIT}/doctor-call`, `/api/v1/visits/${VISIT}/check-out`,
