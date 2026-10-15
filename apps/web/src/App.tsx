@@ -108,6 +108,7 @@ export default function App() {
   const [ncaCategoryLabel,setNcaCategoryLabel] = useState("");
   const [ncaTownName,setNcaTownName] = useState("");
   const [ncaTownTerritory,setNcaTownTerritory] = useState("");
+  const [ncaPlanningDate,setNcaPlanningDate] = useState("");
 
   function resetTenantState() {
     setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
@@ -249,7 +250,7 @@ export default function App() {
       <div className="tr-workspace"><span className="tr-workspace-dot" /> {selectedTenantName ?? "PRODUCT WORKSPACE"} </div>
       <p className="tr-nav-label">WORKSPACES</p>
       <nav className="tr-nav" aria-label="Primary">{NAV.map(n=>
-        <button key={n.id} type="button" className={view===n.id?"tr-nav-item selected":"tr-nav-item"} aria-current={view===n.id?"page":undefined} onClick={()=>{setView(n.id); setNotice(null);}}>
+        <button key={n.id} type="button" className={view===n.id?"tr-nav-item selected":"tr-nav-item"} aria-current={view===n.id?"page":undefined} onClick={()=>{if(n.id==="activities")setNcaPlanningDate("");setView(n.id); setNotice(null);}}>
           <span className="tr-nav-glyph" aria-hidden="true">{n.icon}</span>{n.title}</button>)}</nav>
       <div className="tr-sidebar-foot"><div className="tr-foot-pill"><span className="tr-foot-dot" /> {connected?"Server-connected":"No organization connected"}</div><p>Web · Carbon enterprise UI<br/>Live records only</p></div>
     </aside>
@@ -376,7 +377,7 @@ export default function App() {
           }} />}
 
         {view==="activities" && <ActivitiesView
-          key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
+          key={(contextKey || "disconnected")+"|"+ncaPlanningDate} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
           contextKey={contextKey}
           territories={units.filter(u=>u.type==="territory"&&u.status==="active").map(u=>({id:u.id,name:u.name}))}
           customers={{doctors:masters.doctors??[],chemists:masters.chemists??[],stockists:masters.stockists??[]}}
@@ -384,7 +385,7 @@ export default function App() {
             planStopId:stop.planStopId, label:stop.targetName, territoryId:progress.territoryId, workDate:progress.workDate,
           }))??[]}
           saveMode="SERVER_FIELD"
-          defaultWorkDate={progress?.workDate??localDate()}
+          defaultWorkDate={ncaPlanningDate||progress?.workDate||localDate()}
           onOpenPlannedCall={planStopId=>{
             const selected=progress?.stops.find(x=>x.planStopId===planStopId&&x.status!=="COMPLETED");
             if(!connected||!selected||visit?.status==="CHECKED_IN")return;
@@ -441,7 +442,7 @@ export default function App() {
 
         {view==="plans" && <MonthlyPlanner key={[contextKey,focusedCustomer?.kind??"",focusedCustomer?.id??""].join(":")}
           api={api} connected={connected} busy={busy} plans={plans} units={units} masters={masters}
-          focusCustomer={focusedCustomer} perform={(fn,title)=>action(fn,title)} />}
+          focusCustomer={focusedCustomer} perform={(fn,title)=>action(fn,title)} onPlanNca={(date)=>{setNcaPlanningDate(date);setFocusedCustomer(null);setView("activities");}} />}
 
         {(["trade","inventory","workforce","approvals","reports"] as Area[]).includes(view) &&
           <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} busy={busy}
