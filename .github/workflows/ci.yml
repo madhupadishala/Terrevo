@@ -102,6 +102,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/ci/unplanned-call-policy-tests.sql
       - name: Unplanned call PostgreSQL persistence and manager-review integration tests
         run: psql -v ON_ERROR_STOP=1 -f database/ci/unplanned-call-integration-tests.sql
+      - name: Full field execution persistence, DCR and scoped manager visibility
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/field-execution-integration-tests.sql
       - name: Apply all rollback migrations in reverse
         run: |
           set -euo pipefail
