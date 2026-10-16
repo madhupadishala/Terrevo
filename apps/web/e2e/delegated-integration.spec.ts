@@ -37,7 +37,7 @@ test("delegated screens render authorized records; empty NCA/CLM/AI contracts do
     if(path.startsWith("/api/v1/masters/"))return reply({items:[]});
     return reply({error:"Unexpected route "+path},404);
   });
-  await page.goto("/");
+  await page.goto("/?auth-test=1");
   await page.locator("#account-email").fill("user@example.invalid");
   await page.locator("#account-password").fill("password");
   await page.getByRole("button",{name:"Connect to live workflows"}).click();
