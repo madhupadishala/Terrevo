@@ -38,51 +38,6 @@ const roles: Record<string, string> = {
   TENANT_ADMIN: "Organization administrator", MANAGER: "Field manager", MR: "Field representative",
 };
 const MASTER_KINDS = ["employees", "doctors", "chemists", "stockists", "products", "samples", "gifts"];
-const FUNCTIONAL_QA_MODE = typeof window==="undefined" ? true : new URLSearchParams(window.location.search).get("auth-test")!=="1";
-const QA_TENANT_ID = "qa-functional-tenant";
-const QA_CONTEXT_KEY = "qa-functional-context";
-
-const QA_TERRITORY_ID = "11111111-1111-4111-8111-111111111111";
-const QA_DOCTOR_ID = "22222222-2222-4222-8222-222222222222";
-const QA_CHEMIST_ID = "33333333-3333-4333-8333-333333333333";
-const QA_STOCKIST_ID = "44444444-4444-4444-8444-444444444444";
-const QA_PRODUCT_ID = "55555555-5555-4555-8555-555555555555";
-const QA_SAMPLE_ID = "66666666-6666-4666-8666-666666666666";
-const QA_GIFT_ID = "77777777-7777-4777-8777-777777777777";
-const QA_UNITS:OrgUnit[]=[{id:QA_TERRITORY_ID,parentId:null,type:"territory",code:"QA-HYD",name:"Hyderabad Central",status:"active"}];
-const QA_MASTERS:Record<string,Master[]>={
-  employees:[{id:"88888888-8888-4888-8888-888888888888",code:"MR-QA-01",name:"QA Medical Representative",status:"active",territoryId:QA_TERRITORY_ID}],
-  doctors:[{id:QA_DOCTOR_ID,code:"DR-QA-01",name:"Dr. Ananya Rao",status:"active",specialty:"Cardiology",qualification:"MD",territoryId:QA_TERRITORY_ID,address:"Banjara Hills, Hyderabad"}],
-  chemists:[{id:QA_CHEMIST_ID,code:"CH-QA-01",name:"Central Care Pharmacy",status:"active",territoryId:QA_TERRITORY_ID,address:"Jubilee Hills, Hyderabad"}],
-  stockists:[{id:QA_STOCKIST_ID,code:"ST-QA-01",name:"Metro Pharma Distributors",status:"active",territoryId:QA_TERRITORY_ID,address:"Ameerpet, Hyderabad"}],
-  products:[{id:QA_PRODUCT_ID,code:"PR-QA-01",name:"Terrevo Test Brand",status:"active",divisionId:"qa-division"}],
-  samples:[{id:QA_SAMPLE_ID,code:"SM-QA-01",name:"Terrevo Test Sample",status:"active",productId:QA_PRODUCT_ID}],
-  gifts:[{id:QA_GIFT_ID,code:"GF-QA-01",name:"Patient Education Kit",status:"active"}],
-};
-
-const QA_PLAN_ID = "99999999-9999-4999-8999-999999999999";
-const QA_DAY_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const QA_PLAN_DAY:PlanDay={
-  date:localDate(),territoryId:QA_TERRITORY_ID,remarks:"Functional QA daily plan",
-  stops:[
-    {sequence:1,type:"doctor",targetId:QA_DOCTOR_ID,remarks:"Doctor detailing"},
-    {sequence:2,type:"chemist",targetId:QA_CHEMIST_ID,remarks:"RCPA / POB"},
-    {sequence:3,type:"stockist",targetId:QA_STOCKIST_ID,remarks:"POB"},
-  ],
-};
-const QA_PLAN:Plan={id:QA_PLAN_ID,weekStart:(()=>{const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));return localDate(d)})(),status:"APPROVED",submittedAt:new Date().toISOString(),days:[QA_PLAN_DAY]};
-const QA_START_OPTION:StartOption={planId:QA_PLAN_ID,planDayId:QA_DAY_ID,workDate:QA_PLAN_DAY.date,territoryId:QA_TERRITORY_ID};
-
-const QA_ACCESS:AccessContext={
-  roles:[
-    {roleKey:"MR",scopeOrgUnitId:QA_TERRITORY_ID},
-    {roleKey:"MANAGER",scopeOrgUnitId:QA_TERRITORY_ID},
-    {roleKey:"TENANT_ADMIN",scopeOrgUnitId:QA_TERRITORY_ID},
-  ],
-  permissions:["TOUR_PLAN_OWN","TOUR_VIEW_TEAM","TOUR_APPROVE","MASTER_VIEW","MASTER_ADMIN"],
-  orgAssignments:[{orgUnitId:QA_TERRITORY_ID,isPrimary:true}],
-};
-
 const dateTime = (value: string | null | undefined) => value ? new Date(value).toLocaleString() : "—";
 const errText = (error: unknown) => error instanceof Error ? error.message : "The operation could not be completed.";
 const fmt = (v: number | string | null | undefined) => v == null ? "—" : String(v);
@@ -104,38 +59,14 @@ function Panel({ eyebrow, title, children }: { eyebrow: string; title?: string; 
 function Empty({ title, detail }: { title: string; detail: string }) {
   return <div className="tr-empty"><div className="tr-empty-icon" aria-hidden="true">⌖</div><strong>{title}</strong><p>{detail}</p></div>;
 }
-function PlatformQaPreview(){
-  const [name,setName]=useState("QA Pharma Organization");
-  const [slug,setSlug]=useState("qa-pharma");
-  const [status,setStatus]=useState("active");
-  return <div className="tr-grid-wide">
-    <Panel eyebrow="FUNCTIONAL QA / PLATFORM CONTROL" title="Organization lifecycle fields">
-      <p className="tr-detail">Authentication is intentionally deferred. These controls are local-only and never call the platform administration API.</p>
-      <div className="tr-form">
-        <TextInput id="qa-platform-name" labelText="Organization name" value={name} onChange={e=>setName(e.target.value)}/>
-        <TextInput id="qa-platform-slug" labelText="Organization code" value={slug} onChange={e=>setSlug(e.target.value.toLowerCase())}/>
-        <label className="tr-select-label" htmlFor="qa-platform-status">Organization status</label>
-        <select id="qa-platform-status" className="tr-select" value={status} onChange={e=>setStatus(e.target.value)}>
-          <option value="active">active</option><option value="inactive">inactive</option>
-        </select>
-        <Button disabled={!name.trim()||slug.trim().length<3} onClick={()=>void 0}>Validate organization fields</Button>
-      </div>
-    </Panel>
-    <Panel eyebrow="FUNCTIONAL QA / AUDIT" title="Administration audit fields">
-      <div className="tr-check-row"><span>Cross-tenant access</span><Tag type="blue">AUTH SPRINT DEFERRED</Tag></div>
-      <div className="tr-check-row"><span>Audit trail</span><Tag type="green">FIELD MODEL VISIBLE</Tag></div>
-      <div className="tr-check-row"><span>User provisioning</span><Tag type="gray">FINAL AUTH SPRINT</Tag></div>
-    </Panel>
-  </div>;
-}
 
 export default function App() {
   const [view, setView] = useState<Area>("overview");
   const [session, setSession] = useState<Session | null>(null);
   const api = useMemo(() => new TerrevoWebApi(setSession), []);
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [tenantId, setTenantId] = useState(FUNCTIONAL_QA_MODE?QA_TENANT_ID:"");
-  const [access, setAccess] = useState<AccessContext | null>(FUNCTIONAL_QA_MODE?QA_ACCESS:null);
+  const [tenantId, setTenantId] = useState("");
+  const [access, setAccess] = useState<AccessContext | null>(null);
   const tenantGeneration = useRef(0);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [email, setEmail] = useState("");
@@ -144,15 +75,15 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
-  const [options, setOptions] = useState<StartOption[]>(FUNCTIONAL_QA_MODE?[QA_START_OPTION]:[]);
+  const [options, setOptions] = useState<StartOption[]>([]);
   const [visit, setVisit] = useState<FieldVisit | null>(null);
-  const [plans, setPlans] = useState<Plan[]>(FUNCTIONAL_QA_MODE?[QA_PLAN]:[]);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [pending, setPending] = useState<Plan[]>([]);
   const [command, setCommand] = useState<ManagerCommand | null>(null);
   const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
-  const [units, setUnits] = useState<OrgUnit[]>(FUNCTIONAL_QA_MODE?QA_UNITS:[]);
-  const [masters, setMasters] = useState<Record<string, Master[]>>(FUNCTIONAL_QA_MODE?QA_MASTERS:{});
-  const [selectedOption, setSelectedOption] = useState(FUNCTIONAL_QA_MODE?QA_DAY_ID:"");
+  const [units, setUnits] = useState<OrgUnit[]>([]);
+  const [masters, setMasters] = useState<Record<string, Master[]>>({});
+  const [selectedOption, setSelectedOption] = useState("");
   const [stopId, setStopId] = useState("");
   const [gpsReason, setGpsReason] = useState("");
   const [callOutcome, setCallOutcome] = useState("");
@@ -180,29 +111,29 @@ export default function App() {
   const [ncaPlanningDate,setNcaPlanningDate] = useState("");
   const [activityPlanningKind,setActivityPlanningKind] = useState<"PLANNED_CALL"|"UNPLANNED_CALL"|"NON_CALL_ACTIVITY">("PLANNED_CALL");
   const [activityPlanningTerritory,setActivityPlanningTerritory] = useState("");
-  const [agendaDays,setAgendaDays] = useState<Record<string,PlanDay>>(FUNCTIONAL_QA_MODE?{[QA_DAY_ID]:QA_PLAN_DAY}:{});
+  const [agendaDays,setAgendaDays] = useState<Record<string,PlanDay>>({});
   const [fieldDcrs,setFieldDcrs] = useState<Array<{id:string;doctorName:string;doctorCode:string;callOutcome:string;submittedAt:string;doctorId:string}>>([]);
   const [attendanceRows,setAttendanceRows] = useState<Array<{workDate:string;status:string;workedMinutes:number|null;requiredMinutes:number|null}>>([]);
   const [customerRelationships,setCustomerRelationships] = useState<CustomerRelationship[]>([]);
 
   function resetTenantState() {
-    setProgress(null); setOptions(FUNCTIONAL_QA_MODE?[QA_START_OPTION]:[]); setVisit(null); setPlans(FUNCTIONAL_QA_MODE?[QA_PLAN]:[]); setPending([]);
-    setCommand(null); setAnalytics(null); setUnits(FUNCTIONAL_QA_MODE?QA_UNITS:[]); setMasters(FUNCTIONAL_QA_MODE?QA_MASTERS:{});
-    setSelectedOption(FUNCTIONAL_QA_MODE?QA_DAY_ID:""); setStopId(""); setGpsReason(""); setCallOutcome("");
+    setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
+    setCommand(null); setAnalytics(null); setUnits([]); setMasters({});
+    setSelectedOption(""); setStopId(""); setGpsReason(""); setCallOutcome("");
     setCallRemarks(""); setShortDayReason("");
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
     setFocusedCustomer(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
     setOwnUnplanned([]);setPendingUnplanned([]);setUnplannedReviewComment("");
-    setAgendaDays(FUNCTIONAL_QA_MODE?{[QA_DAY_ID]:QA_PLAN_DAY}:{});setFieldDcrs([]);setAttendanceRows([]);setCustomerRelationships([]);setActivityPlanningKind("PLANNED_CALL");setActivityPlanningTerritory("");
+    setAgendaDays({});setFieldDcrs([]);setAttendanceRows([]);setCustomerRelationships([]);setActivityPlanningKind("PLANNED_CALL");setActivityPlanningTerritory("");
   }
 
-  const connected = FUNCTIONAL_QA_MODE || Boolean(session && tenantId && access);
+  const connected = Boolean(session && tenantId && access);
   // Independent authorization/role/session epochs ensure feature-local state cannot cross accounts.
-  const contextKey = FUNCTIONAL_QA_MODE ? QA_CONTEXT_KEY : connected
+  const contextKey = connected
     ? [session!.user.id, tenantId, tenantGeneration.current,
        JSON.stringify(access!.roles), JSON.stringify(access!.permissions)].join("|")
     : "";
-  const authorizedForTenantId = FUNCTIONAL_QA_MODE ? (tenantId||QA_TENANT_ID) : connected && !loading ? tenantId : "";
+  const authorizedForTenantId = connected && !loading ? tenantId : "";
   const admin = access?.roles.some(r => r.roleKey === "TENANT_ADMIN") ?? false;
   const manager = admin || (access?.roles.some(r => r.roleKey === "MANAGER") ?? false);
   const activeStop = progress?.stops.find(s => s.planStopId === visit?.planStopId);
@@ -274,14 +205,8 @@ export default function App() {
   async function action(fn: () => Promise<unknown>, title: string, shouldRefresh = true) {
     setBusy(true); setNotice(null);
     try {
-      if (!FUNCTIONAL_QA_MODE) {
-        await fn();
-        if (shouldRefresh) await refresh(access);
-      }
-      if (FUNCTIONAL_QA_MODE) {
-        setNotice({kind:"success",title,message:"Functional QA interaction accepted locally. No authenticated server mutation was attempted."});
-        return;
-      }
+      await fn();
+      if (shouldRefresh) await refresh(access);
       // Keep the confirmed result visible: a partial-refresh warning must not
       // incorrectly replace an accepted business transaction.
       setNotice({ kind: "success", title, message: "The operation was accepted by the Terrevo API." });
@@ -338,38 +263,9 @@ export default function App() {
   }
   function guarded(actionFn: () => Promise<unknown>, title: string) {
     if (!connected || busy) return;
-    if(FUNCTIONAL_QA_MODE){
-      if(title==="Workday started"){
-        setProgress({
-          executionId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",workDate:localDate(),territoryId:QA_TERRITORY_ID,
-          startedAt:new Date().toISOString(),serverNow:new Date().toISOString(),requiredMinutes:480,elapsedMinutes:60,remainingMinutes:420,
-          plannedCount:3,completedCount:0,inProgressCount:0,pendingCount:3,
-          stops:[
-            {planStopId:"cccccccc-cccc-4ccc-8ccc-ccccccccccc1",sequence:1,type:"doctor",targetId:QA_DOCTOR_ID,targetName:"Dr. Ananya Rao",status:"PENDING"},
-            {planStopId:"cccccccc-cccc-4ccc-8ccc-ccccccccccc2",sequence:2,type:"chemist",targetId:QA_CHEMIST_ID,targetName:"Central Care Pharmacy",status:"PENDING"},
-            {planStopId:"cccccccc-cccc-4ccc-8ccc-ccccccccccc3",sequence:3,type:"stockist",targetId:QA_STOCKIST_ID,targetName:"Metro Pharma Distributors",status:"PENDING"},
-          ]
-        });
-        setAttendanceRows([{workDate:localDate(),status:"PRESENT",workedMinutes:60,requiredMinutes:480}]);
-      }else if(title==="Field check-in saved"&&stopId&&progress){
-        const stop=progress.stops.find(x=>x.planStopId===stopId);
-        setVisit({id:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",executionId:progress.executionId,planStopId:stopId,territoryId:progress.territoryId,status:"CHECKED_IN",verification:"QA_VERIFIED",exceptionStatus:"NOT_REQUIRED",distanceMeters:8,geofenceRadiusMeters:100,checkinAt:new Date().toISOString(),checkoutAt:null});
-        if(stop)setProgress({...progress,inProgressCount:1,pendingCount:Math.max(0,progress.pendingCount-1),stops:progress.stops.map(x=>x.planStopId===stopId?{...x,status:"IN_PROGRESS"}:x)});
-      }else if((title==="Checked out; DCR generated"||title==="Checked out of field visit")&&visit&&progress){
-        const stop=progress.stops.find(x=>x.planStopId===visit.planStopId);
-        setProgress({...progress,completedCount:progress.completedCount+1,inProgressCount:0,stops:progress.stops.map(x=>x.planStopId===visit.planStopId?{...x,status:"COMPLETED"}:x)});
-        if(stop?.type==="doctor")setFieldDcrs(rows=>[{id:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",doctorName:stop.targetName,doctorCode:"DR-QA-01",callOutcome:callOutcome||"Detailed",submittedAt:new Date().toISOString(),doctorId:stop.targetId},...rows]);
-        setVisit(null);setStopId("");setCallOutcome("");setCallRemarks("");
-      }else if(title==="Workday submitted"){
-        setProgress(null);setVisit(null);setAttendanceRows([{workDate:localDate(),status:"SUBMITTED",workedMinutes:60,requiredMinutes:480}]);
-      }
-      setNotice({kind:"success",title,message:"Functional QA interaction completed locally. Authentication is intentionally not active."});
-      return;
-    }
     void action(actionFn, title);
   }
   function requireLocation(): Promise<{latitude: number; longitude:number; accuracyMeters:number}> {
-    if(FUNCTIONAL_QA_MODE)return Promise.resolve({latitude:17.385,longitude:78.4867,accuracyMeters:8});
     return freshPosition();
   }
   const viewName = NAV.find(n => n.id === view)!;
@@ -388,24 +284,24 @@ export default function App() {
       <nav className="tr-nav" aria-label="Primary">{NAV.map(n=>
         <button key={n.id} type="button" className={view===n.id?"tr-nav-item selected":"tr-nav-item"} aria-current={view===n.id?"page":undefined} onClick={()=>{if(n.id==="activities"){setNcaPlanningDate("");setActivityPlanningKind("PLANNED_CALL");setActivityPlanningTerritory("");}setView(n.id); setNotice(null);}}>
           <span className="tr-nav-glyph" aria-hidden="true">{n.icon}</span>{n.title}</button>)}</nav>
-      <div className="tr-sidebar-foot"><div className="tr-foot-pill"><span className="tr-foot-dot" /> {FUNCTIONAL_QA_MODE?"Functional QA mode":connected?"Server-connected":"No organization connected"}</div><p>Web · Carbon enterprise UI<br/>Live records only</p></div>
+      <div className="tr-sidebar-foot"><div className="tr-foot-pill"><span className="tr-foot-dot" /> {connected?"Server-connected":"No organization connected"}</div><p>Web · Carbon enterprise UI<br/>Live records only</p></div>
     </aside>
     <div className="tr-main">
       <header className="tr-topbar"><div className="tr-breadcrumb">TERREVO <span>/</span> OPERATIONS <span>/</span> <b>{viewName.title}</b></div>
         <div className="tr-header-right">
           {connected && <Button size="sm" kind="ghost" disabled={busy||loading} onClick={()=>void refresh(access)}>Refresh data</Button>}
-          <span className="tr-live"><span />{FUNCTIONAL_QA_MODE?"QA WORKSPACE":connected?"LIVE API":"SECURE CONNECTION"}</span>
+          <span className="tr-live"><span />{connected?"LIVE API":"SECURE CONNECTION"}</span>
           <span className="tr-avatar" aria-hidden="true">TR</span>
         </div></header>
       <main className="tr-content" id="main-content">
         <div className="tr-page-heading"><div><p className="tr-eyebrow">TERREVO / PHARMA FIELD OPERATIONS</p>
           <h1>{view==="overview"?"Operations, connected.":viewName.title}</h1><p className="tr-intro">{viewName.subtitle}. No simulated company, employee or transaction data.</p></div>
-          <Tag type={connected?"green":"blue"}>{FUNCTIONAL_QA_MODE?"FUNCTIONAL QA":"AUTHORIZED WORKSPACE"}</Tag>
+          <Tag type={connected?"green":"blue"}>{connected?"AUTHORIZED WORKSPACE":"UI / API INTEGRATION"}</Tag>
         </div>
         {notice && <div className="tr-notice" role="status"><InlineNotification lowContrast hideCloseButton kind={notice.kind} title={notice.title} subtitle={notice.message}/></div>}
         {loading && <p className="tr-loading" role="status">Loading authorized Terrevo records…</p>}
 
-        {!FUNCTIONAL_QA_MODE && !connected && <div className="tr-connect-grid">
+        {!connected && <div className="tr-connect-grid">
           <Panel eyebrow="ACCOUNT CONNECTION" title={session?"Choose your organization":"Connect an existing Terrevo account"}>
             <p className="tr-detail">You can explore every workspace without credentials. Live company data and mutations remain protected by the existing identity, RBAC and tenant services. No Super Admin email is required to develop the UI.</p>
             {!session ? <form className="tr-form" onSubmit={e=>{e.preventDefault();void connect();}}>
@@ -422,7 +318,7 @@ export default function App() {
             <div className="tr-check-row"><span>Server data source</span><Tag type="blue">Supabase API</Tag></div>
             <div className="tr-check-row"><span>Access requirements</span><Tag type="green">Enforced</Tag></div>
             <div className="tr-check-row"><span>Organization boundaries</span><Tag type="green">Existing RLS</Tag></div>
-            <div className="tr-check-row"><span>Super Admin role</span><Tag type="blue">Deferred to final auth sprint</Tag></div>
+            <div className="tr-check-row"><span>Super Admin role</span><Tag type="gray">Backend pending</Tag></div>
             <p className="tr-detail">This application never exposes a service-role token or impersonates an end user.</p>
           </Panel>
         </div>}
@@ -572,30 +468,13 @@ export default function App() {
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
           contextKey={contextKey} masters={{doctors:masters.doctors??[],chemists:masters.chemists??[],stockists:masters.stockists??[]}}
           relationships={customerRelationships} loading={loading}
-          loadHistory={async(kind,id)=>{
-            if(FUNCTIONAL_QA_MODE){
-              if(kind==="doctor")return [{tenantId:QA_TENANT_ID,customerKind:"doctor",customerId:id,id:"qa-dcr",occurredAt:new Date().toISOString(),activityType:"DCR",summary:"QA doctor call · Detailed"}];
-              if(kind==="chemist")return [{tenantId:QA_TENANT_ID,customerKind:"chemist",customerId:id,id:"qa-rcpa",occurredAt:new Date().toISOString(),activityType:"RCPA",summary:"QA RCPA captured"}];
-              return [{tenantId:QA_TENANT_ID,customerKind:"stockist",customerId:id,id:"qa-pob",occurredAt:new Date().toISOString(),activityType:"POB",summary:"QA POB booked"}];
-            }
-            return api.customerHistory(kind,id);
-          }}
+          loadHistory={(kind,id)=>api.customerHistory(kind,id)}
           onLinkRelationship={async(sourceKind,sourceId,targetKind,targetId)=>{
-            if(FUNCTIONAL_QA_MODE){
-              setCustomerRelationships(rows=>{
-                const exists=rows.some(r=>r.sourceKind===sourceKind&&r.sourceId===sourceId&&r.targetKind===targetKind&&r.targetId===targetId);
-                if(exists)return rows;
-                return [...rows,{id:crypto.randomUUID(),tenantId:QA_TENANT_ID,sourceKind,sourceId,targetKind,targetId,relationship:sourceKind==="doctor"?"DOCTOR_CHEMIST":"CHEMIST_STOCKIST",createdAt:new Date().toISOString()}];
-              });return;
-            }
             await api.linkCustomer(sourceKind,sourceId,targetKind,targetId);await refresh(access);
           }}
-          onUnlinkRelationship={async id=>{
-            if(FUNCTIONAL_QA_MODE){setCustomerRelationships(rows=>rows.filter(r=>r.id!==id));return;}
-            await api.unlinkCustomer(id);await refresh(access);
-          }}
+          onUnlinkRelationship={async id=>{await api.unlinkCustomer(id);await refresh(access);}}
           onOpenWorkflow={request=>{
-            if(!connected&&!FUNCTIONAL_QA_MODE)return;
+            if(!connected)return;
             const group=masters[request.customerType==="doctor"?"doctors":request.customerType==="chemist"?"chemists":"stockists"]??[];
             const record=group.find(m=>m.id===request.customerId&&m.status==="active"&&typeof m.territoryId==="string");
             if(!record)return;
@@ -621,34 +500,15 @@ export default function App() {
           defaultWorkDate={ncaPlanningDate||progress?.workDate||localDate()} defaultKind={activityPlanningKind} defaultTerritoryId={activityPlanningTerritory||progress?.territoryId||""}
           onOpenPlannedCall={planStopId=>{
             const selected=progress?.stops.find(x=>x.planStopId===planStopId&&x.status!=="COMPLETED");
-            if((!connected&&!FUNCTIONAL_QA_MODE)||!selected||visit?.status==="CHECKED_IN")return;
+            if(!connected||!selected||visit?.status==="CHECKED_IN")return;
             setStopId(planStopId);setView("field");
           }}
           ncaSubtypes={ncaOptions.categories.map(x=>({code:x.code,label:x.label}))}
           towns={ncaOptions.towns.map(x=>({id:x.id,name:x.name}))}
           onSaveDraft={async draft=>{
-            if((!connected&&!FUNCTIONAL_QA_MODE)||draft.tenantId!==tenantId)throw new Error("The organization changed; start a new authorized draft.");
+            if(!connected||draft.tenantId!==tenantId)throw new Error("The organization changed; start a new authorized draft.");
             if(draft.kind==="PLANNED_CALL")throw new Error("Use the approved planned stop and GPS field execution workflow.");
             if(draft.evidence)throw new Error("Evidence uploads are not yet supported; remove the unverified attachment reference.");
-            if(FUNCTIONAL_QA_MODE){
-              if(draft.kind==="UNPLANNED_CALL"){
-                setOwnUnplanned(rows=>[...rows,{
-                  id:crypto.randomUUID(),actorUserId:"qa-user",executionId:progress?.executionId??"qa-execution",
-                  workDate:draft.workDate,territoryId:draft.territoryId,customerType:draft.customerType!,
-                  customerId:draft.customerId!,reason:draft.reason,remarks:draft.remarks,durationMinutes:draft.durationMinutes,
-                  latitude:17.385,longitude:78.4867,accuracyMeters:8,status:"SUBMITTED",managerComment:null,
-                  submittedAt:new Date().toISOString(),reviewedAt:null,
-                }]);
-              }else{
-                setNcaRecords(rows=>[...rows,{
-                  id:crypto.randomUUID(),workDate:draft.workDate,territoryId:draft.territoryId,
-                  phase:draft.ncaPhase==="PLAN"?"PLAN":"REPORT",categoryCode:draft.ncaSubtype??"QA_NCA",
-                  townId:draft.townId??null,reason:draft.reason,remarks:draft.remarks,durationMinutes:draft.durationMinutes,
-                  status:"DRAFT",createdAt:new Date().toISOString(),
-                }]);
-              }
-              return;
-            }
             if(draft.kind==="UNPLANNED_CALL"){
               if(!progress||draft.workDate!==progress.workDate||draft.territoryId!==progress.territoryId)
                 throw new Error("Start an approved tour in this territory and date before submitting an unplanned call.");
@@ -693,11 +553,11 @@ export default function App() {
           linkedVisitId={visit?.id} loading={loading} />}
 
         {view==="plans" && <MonthlyPlanner key={[contextKey,focusedCustomer?.kind??"",focusedCustomer?.id??""].join(":")}
-          api={api} connected={connected} functionalQa={FUNCTIONAL_QA_MODE} busy={busy} plans={plans} units={units} masters={masters}
+          api={api} connected={connected} busy={busy} plans={plans} units={units} masters={masters}
           focusCustomer={focusedCustomer} perform={(fn,title)=>action(fn,title)} onPlanNca={(date,territory)=>{setNcaPlanningDate(date);setActivityPlanningKind("NON_CALL_ACTIVITY");setActivityPlanningTerritory(territory||"");setFocusedCustomer(null);setView("activities");}} />}
 
         {(["trade","inventory","workforce","approvals","reports"] as Area[]).includes(view) &&
-          <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} functionalQa={FUNCTIONAL_QA_MODE} manager={manager} busy={busy}
+          <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} busy={busy}
             visit={visit} progress={progress} masters={masters} relationships={customerRelationships} perform={(fn,title)=>action(fn,title)} />}
 
         {view==="manager"&&manager&&<Panel eyebrow="MANAGER DECISIONS" title="Unplanned customer-call review">
@@ -787,10 +647,10 @@ export default function App() {
           <p className="tr-detail">{ncaOptions.categories.length} approved NCA categories · {ncaOptions.towns.length} authorized towns</p>
         </Panel>}
 
-        {view==="platform"&&(FUNCTIONAL_QA_MODE?<PlatformQaPreview/>:<PlatformConsole api={api} authenticated={Boolean(session)}
-          isSuperAdmin={isPlatformAdmin} busy={busy} perform={(fn,title)=>action(fn,title,false)}/>)}
+        {view==="platform"&&<PlatformConsole api={api} authenticated={Boolean(session)}
+          isSuperAdmin={isPlatformAdmin} busy={busy} perform={(fn,title)=>action(fn,title,false)}/>}
 
-        {(connected||FUNCTIONAL_QA_MODE)&&<div className="tr-footer-actions"><div><strong>{selectedTenantName}</strong>
+        {connected&&<div className="tr-footer-actions"><div><strong>{selectedTenantName}</strong>
           <p>{access?.roles.map(r=>roles[r.roleKey]??r.roleKey).join(" · ")||"No assigned roles"}</p></div>
           {tenants.length>1&&<select className="tr-select" aria-label="Switch organization" value={tenantId} disabled={busy||loading} onChange={e=>void chooseTenant(e.target.value)}>{tenants.map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select>}
           <Button kind="ghost" onClick={()=>void disconnect()} disabled={busy}>Disconnect</Button></div>}
