@@ -8,6 +8,7 @@ type Props = {
   mode: BusinessArea;
   api: TerrevoWebApi;
   connected: boolean;
+  functionalQa?: boolean;
   manager: boolean;
   busy: boolean;
   visit: FieldVisit | null;
@@ -36,7 +37,7 @@ const thisMonday = () => { const d = new Date();d.setDate(d.getDate() - ((d.getD
 const thisDate = () => localDate(new Date());
 const empty = <p className="tr-detail">No authorized records were returned for this workspace.</p>;
 
-export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, progress, masters, relationships, perform }: Props) {
+export function BusinessWorkspace({ mode, api, connected, functionalQa=false, manager, busy, visit, progress, masters, relationships, perform }: Props) {
   const [revision, setRevision] = useState(0);
   const [message, setMessage] = useState("");
   const [dcrs, setDcrs] = useState<Dcr[]>([]);
@@ -83,16 +84,17 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
     :stockistVisit
       ?relationships.some(r=>r.relationship==="CHEMIST_STOCKIST"&&r.targetKind==="stockist"&&r.targetId===activeCustomerId)
       :false;
-  const canAct = connected&&!busy;
+  const canAct = (connected||functionalQa)&&!busy;
 
   useEffect(() => {
-    if (!connected) {
+    if (!connected&&!functionalQa) {
       setDcrs([]);setBalances([]);setDistributions([]);setDays([]);setWeeks([]);setAttendance([]);setGpsExceptions([]);
       setLeaves([]);setExpenses([]);setJoint([]);setApprovals({leaves:[],expenses:[],timesheets:[]});
       return;
     }
     let live = true;
     setMessage("");
+    if(functionalQa)return()=>{live=false;};
     void (async () => {
       try {
         if (mode==="trade" || mode==="reports") {
@@ -142,7 +144,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
       }
     })();
     return () => { live=false; };
-  }, [api, connected, mode, manager, visit?.id, revision, tradeVisit, chemistVisit]);
+  }, [api, connected, functionalQa, mode, manager, visit?.id, revision, tradeVisit, chemistVisit]);
 
   async function act(fn: () => Promise<unknown>, label: string) {
     await perform(fn,label);
@@ -152,7 +154,7 @@ export function BusinessWorkspace({ mode, api, connected, manager, busy, visit, 
   const stockItems=(masters[itemType==="sample"?"samples":"gifts"]??[]).filter(x=>x.status==="active");
   const itemName=(type:string,id:string)=>masters[type==="sample"?"samples":"gifts"]?.find(x=>x.id===id)?.name??id.slice(0,8);
 
-  if (!connected) return <Box title="Connect to view real business activity"><p className="tr-detail">This module uses Terrevo server data and does not create local demonstration records. Connect an existing authorized organization to transact.</p></Box>;
+  if (!connected&&!functionalQa) return <Box title="Connect to view real business activity"><p className="tr-detail">This module uses Terrevo server data and does not create local demonstration records. Connect an existing authorized organization to transact.</p></Box>;
   return <div className="tr-business">
     {message && <p className="tr-business-error" role="status">{message}</p>}
 
