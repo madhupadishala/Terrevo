@@ -38,7 +38,7 @@ const roles: Record<string, string> = {
   TENANT_ADMIN: "Organization administrator", MANAGER: "Field manager", MR: "Field representative",
 };
 const MASTER_KINDS = ["employees", "doctors", "chemists", "stockists", "products", "samples", "gifts"];
-const FUNCTIONAL_QA_MODE = true;
+const FUNCTIONAL_QA_MODE = typeof window==="undefined" ? true : new URLSearchParams(window.location.search).get("auth-test")!=="1";
 const QA_TENANT_ID = "qa-functional-tenant";
 const QA_CONTEXT_KEY = "qa-functional-context";
 
