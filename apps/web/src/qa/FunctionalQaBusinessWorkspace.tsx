@@ -1,4 +1,4 @@
-import {useMemo,useState} from "react";
+import {useEffect,useMemo,useState} from "react";
 import {Button,Tag,TextArea,TextInput} from "@carbon/react";
 import {useDcr,useInventory,useManagerCommand,useTerrevoData,useTrade,useVisit,useWorkforce} from "./TerrevoDataProvider";
 import type {ExpenseRecord} from "./types";
@@ -14,6 +14,10 @@ export function FunctionalQaBusinessWorkspace({mode}:{mode:Mode}){
  const [leaveReason,setLeaveReason]=useState("");const [leaveFrom,setLeaveFrom]=useState("2026-10-20");const [leaveTo,setLeaveTo]=useState("2026-10-20");
  const [expenseAmount,setExpenseAmount]=useState(0);const [expenseCategory,setExpenseCategory]=useState<ExpenseRecord["category"]>("TRAVEL");
  const [comment,setComment]=useState("");const [message,setMessage]=useState("");
+ useEffect(()=>{
+  setProductId(data.state.products[0]?.id??"");setCompetitor("");setBrandQty(0);setCompetitorQty(0);setRx(0);setOrderQty(1);
+  setInventoryId(data.state.inventory[0]?.id??"");setInventoryQty(1);setLeaveReason("");setExpenseAmount(0);setComment("");setMessage("");
+ },[data.scenario]);
  const act=(fn:()=>void,ok:string)=>{setMessage("");try{fn();setMessage(ok)}catch(e){setMessage(e instanceof Error?e.message:"Operation failed")}};
  const active=visit.activeVisit;
  const activeName=active?active.customerType==="DOCTOR"?data.state.doctors.find(x=>x.id===active.customerId)?.name:active.customerType==="CHEMIST"?data.state.chemists.find(x=>x.id===active.customerId)?.name:data.state.stockists.find(x=>x.id===active.customerId)?.name:null;
