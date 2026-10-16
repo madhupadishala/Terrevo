@@ -95,10 +95,11 @@ export function requestLeave(s:QaState,input:Omit<LeaveRecord,"id"|"status">):Qa
  return {...s,leaves:[...s.leaves,{...input,id:`leave-${s.leaves.length+1}`,status:"SUBMITTED"}]};
 }
 export function saveExpense(s:QaState,input:Omit<ExpenseRecord,"id"|"status">):QaState{
+ ensureUnlocked(s,input.date);
  if(input.amount<=0)throw new Error("Expense amount must be greater than zero.");
  return {...s,expenses:[...s.expenses,{...input,id:`exp-${s.expenses.length+1}`,status:"DRAFT"}]};
 }
-export function submitExpense(s:QaState,id:string):QaState{return{...s,expenses:moveStatus(s.expenses,id,"SUBMITTED")}}
+export function submitExpense(s:QaState,id:string):QaState{const row=s.expenses.find(x=>x.id===id);if(!row)throw new Error("Expense not found.");ensureUnlocked(s,row.date);return{...s,expenses:moveStatus(s.expenses,id,"SUBMITTED")}}
 export function submitTimesheet(s:QaState,id:string):QaState{return{...s,timesheets:moveStatus(s.timesheets,id,"SUBMITTED")}}
 export function decideWorkforce(s:QaState,kind:"LEAVE"|"EXPENSE"|"TIMESHEET",id:string,decision:"APPROVED"|"REJECTED"|"RETURNED",comment?:string):QaState{
  if(kind==="LEAVE")return{...s,leaves:moveStatus(s.leaves,id,decision,comment)};
