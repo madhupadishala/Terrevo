@@ -66,7 +66,7 @@ test("authorized field user can use real API endpoints for tour and visit lifecy
     if (path === "/api/v1/tour-executions/submit") { submitted = true; return answer({ execution: { id: EXECUTION, status: "SUBMITTED" } }); }
     return answer({ error: `Unexpected ${method} ${path}` }, 404);
   });
-  await page.goto("/");
+  await page.goto("/?auth-test=1");
   await page.getByRole("textbox", { name: "Existing account email" }).fill("test@example.invalid");
   await page.getByRole("textbox", { name: "Password" }).fill("test-pass");
   await page.getByRole("button", { name: "Connect to live workflows" }).click();
@@ -114,7 +114,7 @@ test("tenant administrator can open manager and organization administration with
     if (path.endsWith("/auth/logout")) return reply({}, 200);
     return reply({error:"Unhandled"},404);
   });
-  await page.goto("/");
+  await page.goto("/?auth-test=1");
   await page.locator("#account-email").fill("admin@example.invalid");
   await page.locator("#account-password").fill("password");
   await page.getByRole("button",{name:"Connect to live workflows"}).click();
@@ -152,7 +152,7 @@ test("platform administrator without a tenant can create and manage organization
     }
     return json({error:"Unexpected request"},404);
   });
-  await page.goto("/");
+  await page.goto("/?auth-test=1");
   await page.locator("#account-email").fill("existing@example.invalid");
   await page.locator("#account-password").fill("existing-password");
   await page.getByRole("button",{name:"Connect to live workflows"}).click();
@@ -198,7 +198,7 @@ test("business workspaces load real API records and expose submission actions", 
     if(path==="/api/v1/manager/analytics")return respond({analytics:{tours:{submitted:0},coverage:{plannedStops:0,completedVisits:0,doctorCalls:0}}});
     return respond({error:"Unexpected path"},404);
   });
-  await page.goto("/");
+  await page.goto("/?auth-test=1");
   await page.locator("#account-email").fill("existing@example.invalid");
   await page.locator("#account-password").fill("test-password");
   await page.getByRole("button",{name:"Connect to live workflows"}).click();
@@ -239,7 +239,7 @@ test("switching tenants clears prior organization data even when next reads fail
     if(path==="/api/v1/manager/analytics")return ok({analytics:{tours:{submitted:0},coverage:{plannedStops:1,completedVisits:0,doctorCalls:0}}});
     return ok({error:"Unexpected route"},404);
   });
-  await page.goto("/");
+  await page.goto("/?auth-test=1");
   await page.locator("#account-email").fill("existing@example.invalid");
   await page.locator("#account-password").fill("pw");
   await page.getByRole("button",{name:"Connect to live workflows"}).click();
@@ -286,7 +286,7 @@ test("monthly planner persists multiple planned calls to the real weekly tour AP
     if(path.includes("/api/v1/masters/"))return ok({items:[]});
     return ok({error:"Unmocked endpoint: "+path},404);
   });
-  await page.goto("/");
+  await page.goto("/?auth-test=1");
   await page.locator("#account-email").fill("test@example.invalid");
   await page.locator("#account-password").fill("test-secret");
   await page.getByRole("button",{name:"Connect to live workflows"}).click();
