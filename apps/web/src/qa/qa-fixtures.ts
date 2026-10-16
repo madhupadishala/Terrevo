@@ -46,12 +46,24 @@ export function createBaseQaState():QaState{
   ],
   clmSessions:[],
   inventory:[
-   {id:"SMP-01",code:"SMP-01",name:"Test Sample",kind:"SAMPLE",productId:"prod-01",allocatedQty:100,distributedQty:22,availableQty:78,lot:"LOT-A",expiresAt:"2027-06-30"},
-   {id:"SMP-02",code:"SMP-02",name:"Brand-B Sample",kind:"SAMPLE",productId:"prod-02",allocatedQty:50,distributedQty:10,availableQty:40,lot:"LOT-B",expiresAt:"2027-03-31"},
+   {id:"SMP-01",code:"SMP-01",name:"Test Sample",kind:"SAMPLE",productId:"prod-01",allocatedQty:100,distributedQty:22,availableQty:78,lot:"LOT-A",expiresAt:"2027-06-30",lots:[{lot:"LOT-A",expiresAt:"2027-06-30",quantity:78}]},
+   {id:"SMP-02",code:"SMP-02",name:"Brand-B Sample",kind:"SAMPLE",productId:"prod-02",allocatedQty:50,distributedQty:10,availableQty:40,lot:"LOT-B",expiresAt:"2027-03-31",lots:[{lot:"LOT-B",expiresAt:"2027-03-31",quantity:40}]},
    {id:"KIT-01",code:"KIT-01",name:"Education Kit",kind:"INPUT",allocatedQty:20,distributedQty:4,availableQty:16},
    {id:"PAD-01",code:"PAD-01",name:"Reminder Pad",kind:"GIFT",allocatedQty:30,distributedQty:12,availableQty:18},
   ],
   distributions:[],
+  ncaCategories:[
+   {code:"MEETING",label:"Meeting",active:true},{code:"TRAINING",label:"Training",active:true},
+   {code:"ADMIN_WORK",label:"Administrative work",active:true},{code:"CAMP",label:"Camp",active:true},
+   {code:"TRAVEL",label:"Travel",active:true},{code:"LEAVE",label:"Leave",active:true},
+  ],
+  ncaTowns:[
+   {id:"town-hyd",name:"Hyderabad",territoryId:IDS.territory,active:true},
+   {id:"town-sec",name:"Secunderabad",territoryId:IDS.territory,active:true},
+   {id:"town-kuk",name:"Kukatpally",territoryId:IDS.territory,active:true},
+   {id:"town-bhj",name:"Banjara Hills",territoryId:IDS.territory,active:true},
+   {id:"town-mdp",name:"Madhapur",territoryId:IDS.territory,active:true},
+  ],
   visits:[
    {id:"visit-doc-01",repId:"rep-hyd-01",customerType:"DOCTOR",customerId:"doc-01",territoryId:IDS.territory,plannedAt:QA_DATE+"T09:00:00+05:30",status:"PLANNED",clmSessionIds:[],sampleDistributionIds:[],rcpaIds:[],pobIds:[]},
    {id:"visit-chem-01",repId:"rep-hyd-01",customerType:"CHEMIST",customerId:"chem-01",territoryId:IDS.territory,plannedAt:QA_DATE+"T11:00:00+05:30",status:"PLANNED",clmSessionIds:[],sampleDistributionIds:[],rcpaIds:[],pobIds:[]},
