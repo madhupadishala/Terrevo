@@ -66,17 +66,17 @@ export function Customer360View({
  {!authorized&&<p role="status">Select an authorized organization to view customers.</p>}
  {error&&<p role="alert">{error}</p>}{loading&&<p role="status">Loading authorized customers…</p>}
  <div className="tr-form">
- <TextInput id={idPrefix+"-c360-search"} labelText="Search name, code or territory" value={filters.query} onChange={e=>change({query:e.target.value})}/>
- <label htmlFor={idPrefix+"-c360-type"}>Customer type</label><select className="tr-select" id={idPrefix+"-c360-type"} value={filters.kind} onChange={e=>change({kind:e.target.value as CustomerKind|"all"})}>
+ <TextInput id={idPrefix+"-c360-search"} data-testid="customer360-search" labelText="Search name, code or territory" value={filters.query} onChange={e=>change({query:e.target.value})}/>
+ <label htmlFor={idPrefix+"-c360-type"}>Customer type</label><select className="tr-select" id={idPrefix+"-c360-type"} data-testid="customer360-type" value={filters.kind} onChange={e=>change({kind:e.target.value as CustomerKind|"all"})}>
  <option value="all">All types</option><option value="doctor">Doctor</option><option value="chemist">Chemist</option><option value="stockist">Stockist</option></select>
- <label htmlFor={idPrefix+"-c360-status"}>Status</label><select className="tr-select" id={idPrefix+"-c360-status"} value={filters.status} onChange={e=>change({status:e.target.value})}>
+ <label htmlFor={idPrefix+"-c360-status"}>Status</label><select className="tr-select" id={idPrefix+"-c360-status"} data-testid="customer360-status" value={filters.status} onChange={e=>change({status:e.target.value})}>
  <option value="">All statuses</option>{[...new Set(customers.map(x=>x.record.status))].sort().map(v=><option key={v} value={v}>{v}</option>)}</select>
- <label htmlFor={idPrefix+"-c360-territory"}>Territory</label><select className="tr-select" id={idPrefix+"-c360-territory"} value={filters.territory} onChange={e=>change({territory:e.target.value})}>
+ <label htmlFor={idPrefix+"-c360-territory"}>Territory</label><select className="tr-select" id={idPrefix+"-c360-territory"} data-testid="customer360-territory" value={filters.territory} onChange={e=>change({territory:e.target.value})}>
  <option value="">All authorized territories</option>{territories.map(v=><option key={v} value={v}>{v}</option>)}</select></div>
  {!loading&&authorized&&!matching.length&&<p role="status">No matching authorized customers.</p>}
  <div className="tr-list-sm">{matching.map(({kind,record})=><div className="tr-history-row" key={kind+":"+record.id}>
  <div><strong>{record.name}</strong><p>{kind} · {record.code||"No code"}</p></div>
- <Button kind="ghost" size="sm" onClick={()=>void selectCustomer(kind,record.id)} aria-label={"View "+kind+" "+record.name}>View profile</Button></div>)}</div>
+ <Button kind="ghost" size="sm" onClick={()=>void selectCustomer(kind,record.id)} data-testid={"customer-view-"+kind+"-"+record.id} aria-label={"View "+kind+" "+record.name}>View profile</Button></div>)}</div>
  </section>
 
  <section className="tr-panel"><span className="tr-section-kicker">PROFILE, OUTLETS & HISTORY</span>
@@ -88,15 +88,15 @@ export function Customer360View({
  <p className="tr-detail">Controlled chain: Doctor → Chemist → Stockist. RCPA and POB use these verified links as prerequisites.</p>
  {links.length?links.map(x=><div className="tr-history-row" key={x.id}>
    <div><strong>{x.target.record.name}</strong><p>{x.relationship.replace("_"," ↔ ")} · {x.targetKind.toLowerCase()}</p></div>
-   {onUnlinkRelationship&&<Button kind="ghost" size="sm" disabled={relationshipBusy} onClick={()=>void removeLink(x.id)}>Unlink</Button>}
+   {onUnlinkRelationship&&<Button kind="ghost" size="sm" disabled={relationshipBusy} data-testid={"customer-unlink-"+x.id} onClick={()=>void removeLink(x.id)}>Unlink</Button>}
  </div>):<p>No authorized relationships supplied.</p>}
  {targetKind&&onLinkRelationship&&<div className="tr-form">
    <label htmlFor={idPrefix+"-c360-link"}>Link {targetKind}</label>
-   <select className="tr-select" id={idPrefix+"-c360-link"} value={linkTarget} onChange={e=>setLinkTarget(e.target.value)}>
+   <select className="tr-select" id={idPrefix+"-c360-link"} data-testid="customer-link-target" value={linkTarget} onChange={e=>setLinkTarget(e.target.value)}>
      <option value="">Select authorized {targetKind}</option>
      {targetOptions.map(x=><option key={x.record.id} value={x.record.id}>{x.record.name} · {x.record.code}</option>)}
    </select>
-   <Button size="sm" disabled={relationshipBusy||!linkTarget} onClick={()=>void createLink()}>Link outlet</Button>
+   <Button size="sm" data-testid="customer-link-submit" disabled={relationshipBusy||!linkTarget} onClick={()=>void createLink()}>Link outlet</Button>
  </div>}
  {selected.kind==="stockist"&&<p className="tr-detail">Stockists receive chemist links from the Chemist profile to preserve the controlled Doctor → Chemist → Stockist direction.</p>}
 
@@ -104,7 +104,7 @@ export function Customer360View({
  {historyBusy?<p role="status">Loading verified customer history…</p>:entries.length?entries.map(x=><div className="tr-history-row" key={x.id}><strong>{x.activityType}</strong><p>{new Date(x.occurredAt).toLocaleString()} · {x.summary}</p></div>):<p>No verified history supplied.</p>}
  {message&&<p role="status">{message}</p>}
 
- {onOpenWorkflow&&<div className="tr-form"><Button kind="secondary" onClick={()=>onOpenWorkflow({customerId:selected.record.id,customerType:selected.kind,workflow:"plan"})}>Open plan</Button>
- <Button kind="ghost" onClick={()=>onOpenWorkflow({customerId:selected.record.id,customerType:selected.kind,workflow:"field"})}>Open field workflow</Button></div>}
+ {onOpenWorkflow&&<div className="tr-form"><Button kind="secondary" data-testid="customer-open-plan" onClick={()=>onOpenWorkflow({customerId:selected.record.id,customerType:selected.kind,workflow:"plan"})}>Open plan</Button>
+ <Button kind="ghost" data-testid="customer-open-field" onClick={()=>onOpenWorkflow({customerId:selected.record.id,customerType:selected.kind,workflow:"field"})}>Open field workflow</Button></div>}
  </>}</section></div>;
 }
