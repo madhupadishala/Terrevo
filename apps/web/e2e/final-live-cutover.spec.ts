@@ -8,7 +8,7 @@ const MANAGER_EMP="a1000000-0000-4000-8000-000000000004";
 
 type BaselineOptions={platformAdmin?:boolean;permissions?:string[];refreshOnce?:boolean};
 async function installBaseline(page:Page,opts:BaselineOptions={}){
- let refreshed=false;let units:any[]=[{id:COMPANY,parentId:null,type:"company",code:"QA-PHARMA",name:"QA Pharma",status:"active"},{id:TERRITORY,parentId:COMPANY,type:"territory",code:"HYD-C",name:"Hyderabad Central Territory",status:"active"}];
+ let refreshed=false;let platformTenants:any[]=[];let units:any[]=[{id:COMPANY,parentId:null,type:"company",code:"QA-PHARMA",name:"QA Pharma",status:"active"},{id:TERRITORY,parentId:COMPANY,type:"territory",code:"HYD-C",name:"Hyderabad Central Territory",status:"active"}];
  let employees:any[]=[{id:MANAGER_EMP,code:"MGR-01",name:"Meera Sharma",designation:"Manager",status:"active",orgUnitId:TERRITORY}];
  const mutations:Array<{path:string;body:any;auth?:string}>=[];
  await page.route("**/api/v1/**",async(route:Route)=>{
@@ -20,6 +20,10 @@ async function installBaseline(page:Page,opts:BaselineOptions={}){
   if(path==="/api/v1/auth/logout")return route.fulfill({status:204,body:""});
   if(path==="/api/v1/platform/context")return json({isSuperAdmin:Boolean(opts.platformAdmin)});
   if(path==="/api/v1/tenants")return json({tenants:opts.platformAdmin?[]:[{id:TENANT,name:"QA Pharma Live",slug:"qa-pharma-live",status:"active"}]});
+  if(path==="/api/v1/platform/tenants"&&method==="GET")return json({tenants:platformTenants});
+  if(path==="/api/v1/platform/tenants"&&method==="POST"){const b=req.postDataJSON() as any;const t={id:TENANT,name:b.name,slug:b.slug,status:"active"};platformTenants=[t];return json({tenant:t},201)}
+  if(path==="/api/v1/platform/audit")return json({events:[]});
+  if(path===`/api/v1/platform/tenants/${TENANT}/users`&&method==="POST"){const b=req.postDataJSON() as any;return json({user:{userId:crypto.randomUUID(),email:b.email,role:"TENANT_ADMIN",orgUnitId:null}},201)}
   if(path==="/api/v1/access-context"){
    if(opts.refreshOnce&&!refreshed)return json({error:"expired"},401);
    return json({context:{roles:[{roleKey:"TENANT_ADMIN",scopeOrgUnitId:null}],permissions:opts.permissions??["ORG_MANAGE","RBAC_MANAGE","MASTER_VIEW"],orgAssignments:[{orgUnitId:TERRITORY,isPrimary:true}]}});
@@ -113,4 +117,28 @@ test("tenant admin creates hierarchy and provisions scoped Manager then MR throu
  expect(provision).toHaveLength(2);
  expect(provision[0]).toMatchObject({role:"MANAGER",orgUnitId:TERRITORY});
  expect(provision[1]).toMatchObject({role:"MR",orgUnitId:TERRITORY,reportingManagerEmployeeId:"a1000000-0000-4000-8000-000000000088"});
+});
+
+
+test("platform Super Admin creates a tenant and provisions the initial Tenant Admin in the default live shell",async({page})=>{
+ const state=await installBaseline(page,{platformAdmin:true});
+ await page.goto("/");
+ await page.getByTestId("live-email").fill("superadmin@example.invalid");
+ await page.getByTestId("live-password").fill("Temporary!123");
+ await page.getByTestId("live-login-submit").click();
+ await expect(page.getByTestId("live-session-bar")).toBeVisible();
+ await page.getByTestId("nav-platform").click();
+ await expect(page.getByTestId("live-platform-admin")).toBeVisible();
+ await page.getByTestId("live-tenant-name").fill("New Pharma");
+ await page.getByTestId("live-tenant-slug").fill("new-pharma");
+ await page.getByTestId("live-tenant-create").click();
+ await expect(page.getByText("Organization created")).toBeVisible();
+ await page.getByTestId("tenant-admin-name").fill("Tenant Administrator");
+ await page.getByTestId("tenant-admin-email").fill("tenant-admin@example.invalid");
+ await page.getByTestId("tenant-admin-provision").click();
+ await expect(page.getByText("Tenant administrator provisioned")).toBeVisible();
+ const create=state.mutations.find(x=>x.path==="/api/v1/platform/tenants");
+ const provision=state.mutations.find(x=>x.path===`/api/v1/platform/tenants/${TENANT}/users`);
+ expect(create?.body).toMatchObject({name:"New Pharma",slug:"new-pharma"});
+ expect(provision?.body).toMatchObject({email:"tenant-admin@example.invalid",role:"TENANT_ADMIN"});
 });
