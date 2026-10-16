@@ -4,7 +4,7 @@ test("functional QA provider exposes operational fields without login",async({pa
   const writes:string[]=[];const consoleErrors:string[]=[];
   page.on("console",msg=>{if(msg.type()==="error")consoleErrors.push(msg.text())});page.on("pageerror",err=>consoleErrors.push(err.message));
   page.on("request",request=>{if(["POST","PUT","PATCH","DELETE"].includes(request.method()))writes.push(request.url());});
-  await page.goto("/");
+  await page.goto("/?qa=1");
   await expect(page.locator("#account-email")).toHaveCount(0);
   await expect(page.getByText("QA DATA PROVIDER",{exact:true})).toBeVisible();
   await expect(page.getByTestId("qa-scenario-toggle")).toBeVisible();
