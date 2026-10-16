@@ -1,6 +1,6 @@
 import {createContext,useContext,useMemo,useReducer,type ReactNode} from "react";
 import {QA_SCENARIOS} from "./qa-scenarios";
-import {approvalQueue,activeVisit,bookPob,buildDcr,checkInVisit,closeVisit,decideNca,decideQueue,decideWorkforce,distributeInventory,finishClm,initialQaState,managerMetrics,pobEligibility,qaReducer,rcpaEligibility,requestLeave,saveExpense,saveNca,saveRcpa,startClm,submitDcr,submitExpense,submitNca,submitTimesheet} from "./qa-store";
+import {approvalQueue,activeVisit,bookPob,buildDcr,checkInVisit,closeVisit,decideNca,decideQueue,decideWorkforce,distributeInventory,finishClm,initialQaState,linkCustomers,managerMetrics,pobEligibility,qaReducer,rcpaEligibility,requestLeave,saveExpense,saveNca,saveRcpa,startClm,submitDcr,submitExpense,submitNca,submitTimesheet,unlinkCustomer} from "./qa-store";
 import type {ApprovalQueueItem,ExpenseRecord,LeaveRecord,NcaRecord,QaScenario,QaState} from "./types";
 
 export type TerrevoDataMode="FUNCTIONAL_QA"|"LIVE_API";
@@ -16,7 +16,7 @@ export type TerrevoDataContextValue={
  nca:{save:(input:Omit<NcaRecord,"id"|"status">)=>void;submit:(id:string)=>void;decide:(id:string,d:"APPROVED"|"REJECTED",comment?:string)=>void};
  workforce:{requestLeave:(input:Omit<LeaveRecord,"id"|"status">)=>void;saveExpense:(input:Omit<ExpenseRecord,"id"|"status">)=>void;submitExpense:(id:string)=>void;submitTimesheet:(id:string)=>void;decide:(kind:"LEAVE"|"EXPENSE"|"TIMESHEET",id:string,d:"APPROVED"|"REJECTED"|"RETURNED",comment?:string)=>void};
  dcr:{preview:ReturnType<typeof buildDcr>;submit:(repId?:string,date?:string)=>void};
- manager:{decide:(item:ApprovalQueueItem,approve:boolean,comment?:string)=>void};
+ manager:{decide:(item:ApprovalQueueItem,approve:boolean,comment?:string)=>void};relationships:{link:(sourceKind:"doctor"|"chemist",sourceId:string,targetKind:"chemist"|"stockist",targetId:string)=>void;unlink:(id:string)=>void};
 };
 const Ctx=createContext<TerrevoDataContextValue|null>(null);
 export function FunctionalQaProvider({children}:{children:ReactNode}){
@@ -35,7 +35,7 @@ export function FunctionalQaProvider({children}:{children:ReactNode}){
    nca:{save:input=>replace(saveNca(state,input)),submit:id=>replace(submitNca(state,id)),decide:(id,d,c)=>replace(decideNca(state,id,d,c))},
    workforce:{requestLeave:input=>replace(requestLeave(state,input)),saveExpense:input=>replace(saveExpense(state,input)),submitExpense:id=>replace(submitExpense(state,id)),submitTimesheet:id=>replace(submitTimesheet(state,id)),decide:(k,id,d,c)=>replace(decideWorkforce(state,k,id,d,c))},
    dcr:{preview:buildDcr(state),submit:(repId,date)=>replace(submitDcr(state,repId,date))},
-   manager:{decide:(item,approve,comment)=>replace(decideQueue(state,item,approve,comment))},
+   manager:{decide:(item,approve,comment)=>replace(decideQueue(state,item,approve,comment))},relationships:{link:(sk,sid,tk,tid)=>replace(linkCustomers(state,sk,sid,tk,tid)),unlink:id=>replace(unlinkCustomer(state,id))},
   };
  },[state]);
  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -45,7 +45,7 @@ export function LiveApiProvider({children}:{children:ReactNode}){
  const empty=initialQaState();
  const value=useMemo<TerrevoDataContextValue>(()=>({
   mode:"LIVE_API",state:empty,scenario:"NORMAL_DAY",setScenario:fail,resetScenario:fail,activeVisit:null,rcpaEligibility:{enabled:false,reason:"Live adapter inactive"},pobEligibility:{enabled:false,reason:"Live adapter inactive"},managerMetrics:managerMetrics(empty),approvalQueue:[],
-  visits:{checkIn:fail,close:fail},clm:{start:fail,finish:fail},inventory:{distribute:fail},rcpa:{save:fail},pob:{book:fail},nca:{save:fail,submit:fail,decide:fail},workforce:{requestLeave:fail,saveExpense:fail,submitExpense:fail,submitTimesheet:fail,decide:fail},dcr:{preview:buildDcr(empty),submit:fail},manager:{decide:fail},
+  visits:{checkIn:fail,close:fail},clm:{start:fail,finish:fail},inventory:{distribute:fail},rcpa:{save:fail},pob:{book:fail},nca:{save:fail,submit:fail,decide:fail},workforce:{requestLeave:fail,saveExpense:fail,submitExpense:fail,submitTimesheet:fail,decide:fail},dcr:{preview:buildDcr(empty),submit:fail},manager:{decide:fail},relationships:{link:fail,unlink:fail},
  }),[]);
  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
