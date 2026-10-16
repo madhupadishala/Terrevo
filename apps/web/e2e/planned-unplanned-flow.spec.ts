@@ -56,7 +56,7 @@ function mockApi(page:any,asManager=false){
 }
 test("planned call opens existing authorized tour stop without creating an unplanned write",async({page})=>{
  const fixture=mockApi(page);await fixture.bind();
- await page.goto("/");await page.locator("#account-email").fill("mr@example.invalid");
+ await page.goto("/?auth-test=1");await page.locator("#account-email").fill("mr@example.invalid");
  await page.locator("#account-password").fill("password");
  await page.getByRole("button",{name:"Connect to live workflows"}).click();
  await page.getByRole("button",{name:"NCA & activities"}).click();
@@ -70,7 +70,7 @@ test("planned call opens existing authorized tour stop without creating an unpla
 test("unplanned doctor call submits actual GPS and appears in own history",async({page,context})=>{
  await context.grantPermissions(["geolocation"]);await context.setGeolocation({latitude:17.38,longitude:78.48,accuracy:15});
  const fixture=mockApi(page);await fixture.bind();
- await page.goto("/");await page.locator("#account-email").fill("mr@example.invalid");
+ await page.goto("/?auth-test=1");await page.locator("#account-email").fill("mr@example.invalid");
  await page.locator("#account-password").fill("password");
  await page.getByRole("button",{name:"Connect to live workflows"}).click();
  await page.getByRole("button",{name:"NCA & activities"}).click();
@@ -91,7 +91,7 @@ test("unplanned doctor call submits actual GPS and appears in own history",async
 });
 test("manager reviews submitted unplanned call using distinct approval API",async({page})=>{
  const fixture=mockApi(page,true);await fixture.bind();
- await page.goto("/");await page.locator("#account-email").fill("manager@example.invalid");
+ await page.goto("/?auth-test=1");await page.locator("#account-email").fill("manager@example.invalid");
  await page.locator("#account-password").fill("password");
  await page.getByRole("button",{name:"Connect to live workflows"}).click();
  await page.getByRole("button",{name:"Manager command"}).click();
