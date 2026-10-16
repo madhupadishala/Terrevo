@@ -36,11 +36,12 @@ export function buildScenario(id:QaScenario):QaState{
  }
  if(id==="COMPLETED_DAY"){
   s.visits=s.visits.map(v=>({...v,status:"COMPLETED",checkinAt:v.plannedAt,checkoutAt:QA_DATE+"T15:00:00+05:30",callOutcome:"Completed"}));
-  s.dcrs=[{id:"dcr-complete",repId:"rep-hyd-01",date:QA_DATE,visitIds:s.visits.map(v=>v.id),ncaIds:["nca-01"],clmSessionIds:s.visits.flatMap(v=>v.clmSessionIds),sampleDistributionIds:s.visits.flatMap(v=>v.sampleDistributionIds),rcpaIds:s.visits.flatMap(v=>v.rcpaIds),pobIds:s.visits.flatMap(v=>v.pobIds),status:"SUBMITTED",submittedAt:QA_DATE+"T18:00:00+05:30",locked:true}];
+  const approvedSameDayNca=s.nca.filter(n=>n.repId==="rep-hyd-01"&&n.date===QA_DATE&&n.status==="APPROVED").map(n=>n.id);
+  s.dcrs=[{id:"dcr-complete",repId:"rep-hyd-01",date:QA_DATE,visitIds:s.visits.map(v=>v.id),ncaIds:approvedSameDayNca,clmSessionIds:s.visits.flatMap(v=>v.clmSessionIds),sampleDistributionIds:s.visits.flatMap(v=>v.sampleDistributionIds),rcpaIds:s.visits.flatMap(v=>v.rcpaIds),pobIds:s.visits.flatMap(v=>v.pobIds),status:"SUBMITTED",submittedAt:QA_DATE+"T18:00:00+05:30",locked:true}];
   s.lockedDate=QA_DATE;return s;
  }
  if(id==="EMPTY_TENANT"){
-  return {...s,doctors:[],chemists:[],stockists:[],products:[],links:[],clmAssets:[],clmSessions:[],inventory:[],distributions:[],visits:[],rcpa:[],pob:[],nca:[],attendance:[],leaves:[],expenses:[],timesheets:[],tourPlans:[],gpsExceptions:[],dcrs:[]};
+  return {...s,doctors:[],chemists:[],stockists:[],products:[],links:[],clmAssets:[],clmSessions:[],inventory:[],distributions:[],ncaCategories:[],ncaTowns:[],visits:[],rcpa:[],pob:[],nca:[],attendance:[],leaves:[],expenses:[],timesheets:[],tourPlans:[],gpsExceptions:[],dcrs:[]};
  }
  return s;
 }
