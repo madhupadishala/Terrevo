@@ -10,6 +10,8 @@ export function LiveOrganizationAdmin(){
  const [unitType,setUnitType]=useState("territory"),[unitCode,setUnitCode]=useState(""),[unitName,setUnitName]=useState(""),[parentId,setParentId]=useState("");
  const canRbac=Boolean(data.access?.permissions.includes("RBAC_MANAGE")),canOrg=Boolean(data.access?.permissions.includes("ORG_MANAGE"));
  const territories=data.units.filter(x=>x.type==="territory"&&x.status==="active");
+ const parentType:Record<string,string|undefined>={division:"company",zone:"division",region:"zone",area:"region",territory:"area"};
+ const parentOptions=unitType==="company"?[]:data.units.filter(x=>x.type===parentType[unitType]&&x.status==="active");
  const managers=(data.masters.employees??[]).filter(x=>String((x as any).designation??"").toLowerCase().includes("manager")&&x.status==="active");
  useEffect(()=>{if(!org&&territories[0])setOrg(territories[0].id)},[org,territories]);
  if(!auth)return null;
@@ -29,7 +31,7 @@ export function LiveOrganizationAdmin(){
     {["company","division","zone","region","area","territory"].map(x=><option key={x} value={x}>{x}</option>)}
    </select>
    <label htmlFor="live-unit-parent">Parent unit</label><select id="live-unit-parent" data-testid="live-unit-parent" className="tr-select" value={parentId} disabled={unitType==="company"} onChange={e=>setParentId(e.target.value)}>
-    <option value="">Select parent</option>{data.units.map(x=><option key={x.id} value={x.id}>{x.type} · {x.name}</option>)}
+    <option value="">Select parent</option>{parentOptions.map(x=><option key={x.id} value={x.id}>{x.type} · {x.name}</option>)}
    </select>
    <TextInput id="live-unit-code" data-testid="live-unit-code" labelText="Unit code" value={unitCode} onChange={e=>setUnitCode(e.target.value)}/>
    <TextInput id="live-unit-name" data-testid="live-unit-name" labelText="Unit name" value={unitName} onChange={e=>setUnitName(e.target.value)}/>
