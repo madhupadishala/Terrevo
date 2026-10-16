@@ -12,7 +12,8 @@ export type ClmAsset={id:Id;code:string;title:string;version:string;productIds:I
 export type ClmSlideDwell={slideId:Id;durationMs:number};
 export type ClmSession={id:Id;mode:"REHEARSAL"|"DETAILING";assetId:Id;visitId?:Id;startedAt:string;endedAt?:string;reaction?:"POSITIVE"|"NEUTRAL"|"NEGATIVE";slideDwells:ClmSlideDwell[]};
 export type InventoryItemKind="SAMPLE"|"GIFT"|"INPUT";
-export type InventoryBalance={id:Id;code:string;name:string;kind:InventoryItemKind;productId?:Id;allocatedQty:number;distributedQty:number;availableQty:number;lot?:string;expiresAt?:string};
+export type InventoryLot={lot:string;expiresAt?:string;quantity:number};
+export type InventoryBalance={id:Id;code:string;name:string;kind:InventoryItemKind;productId?:Id;allocatedQty:number;distributedQty:number;availableQty:number;lot?:string;expiresAt?:string;lots?:InventoryLot[]};
 export type SampleDistribution={id:Id;visitId:Id;inventoryId:Id;quantity:number;createdAt:string};
 export type VisitStatus="PLANNED"|"CHECKED_IN"|"COMPLETED";
 export type Visit={id:Id;repId:Id;customerType:CustomerKind;customerId:Id;territoryId:Id;plannedAt:string;status:VisitStatus;checkinAt?:string;checkoutAt?:string;gpsVariance?:boolean;callOutcome?:string;remarks?:string;clmSessionIds:Id[];sampleDistributionIds:Id[];rcpaIds:Id[];pobIds:Id[]};
@@ -21,6 +22,8 @@ export type RcpaRecord={id:Id;visitId:Id;chemistId:Id;lines:RcpaLine[];createdAt
 export type PobLine={productId:Id;quantity:number};
 export type PobOrder={id:Id;visitId:Id;chemistId?:Id;stockistId?:Id;lines:PobLine[];status:"BOOKED";idempotencyToken:string;createdAt:string};
 export type NcaCategory="MEETING"|"TRAINING"|"ADMIN_WORK"|"CAMP"|"TRAVEL"|"LEAVE";
+export type NcaCategoryMaster={code:NcaCategory;label:string;active:boolean};
+export type NcaTown={id:Id;name:string;territoryId:Id;active:boolean};
 export type NcaRecord={id:Id;repId:Id;category:NcaCategory;town:string;date:string;durationMinutes:number;reason:string;remarks:string;status:WorkflowStatus};
 export type AttendanceRecord={id:Id;repId:Id;date:string;status:"PRESENT"|"SHORT_DAY"|"FIELD_DAY";workedMinutes:number;requiredMinutes:number};
 export type LeaveRecord={id:Id;repId:Id;from:string;to:string;type:"FULL_DAY"|"HALF_DAY";reason:string;status:WorkflowStatus;managerComment?:string};
@@ -36,7 +39,7 @@ export type QaScenario="NORMAL_DAY"|"FULL_FIELD_DAY"|"MANAGER_QUEUE"|"VALIDATION
 export type QaState={
  scenario:QaScenario;organization:{id:Id;name:string};division:{id:Id;name:string};territory:{id:Id;name:string};manager:{id:Id;name:string};reps:Rep[];
  doctors:Doctor[];chemists:Chemist[];stockists:Stockist[];products:Product[];links:CustomerLink[];
- clmAssets:ClmAsset[];clmSessions:ClmSession[];inventory:InventoryBalance[];distributions:SampleDistribution[];
+ clmAssets:ClmAsset[];clmSessions:ClmSession[];inventory:InventoryBalance[];distributions:SampleDistribution[];ncaCategories:NcaCategoryMaster[];ncaTowns:NcaTown[];
  visits:Visit[];rcpa:RcpaRecord[];pob:PobOrder[];nca:NcaRecord[];attendance:AttendanceRecord[];leaves:LeaveRecord[];expenses:ExpenseRecord[];timesheets:TimesheetRecord[];
  tourPlans:TourPlan[];gpsExceptions:GpsException[];dcrs:Dcr[];lockedDate?:string;
 };
