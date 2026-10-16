@@ -7,7 +7,8 @@ export type NcaOptions = { categories: NcaCategory[]; towns: NcaTown[] };
 export type NcaRecord = {
   id: string; workDate: string; territoryId: string; phase: NcaPhase;
   categoryCode: string; townId: string | null; reason: string; remarks: string;
-  durationMinutes: number; status: "DRAFT" | "SUBMITTED"; createdAt: string;
+  durationMinutes: number; status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED"; createdAt: string;
+  managerComment?:string|null;reviewedAt?:string|null;createdBy?:string;
 };
 export type NcaCommand = {
   operationId: string; workDate: string; territoryId: string; phase: NcaPhase;
@@ -18,6 +19,9 @@ export type NcaRepository = {
   options(tenantId:string,accessToken:string):Promise<NcaOptions>;
   listOwn(tenantId:string,userId:string,accessToken:string):Promise<NcaRecord[]>;
   getOwn(tenantId:string,userId:string,id:string,accessToken:string):Promise<NcaRecord|null>;
+  listPending(tenantId:string,accessToken:string):Promise<NcaRecord[]>;
+  getVisible(tenantId:string,id:string,accessToken:string):Promise<NcaRecord|null>;
+  decide(tenantId:string,actorId:string,id:string,decision:"APPROVE"|"REJECT",comment:string|null):Promise<void>;
   create(tenantId:string,userId:string,command:NcaCommand):Promise<string>;
   submit(tenantId:string,userId:string,id:string):Promise<void>;
   createCategory(tenantId:string,actorId:string,code:string,label:string):Promise<void>;
@@ -72,7 +76,7 @@ export function createNcaService(repo:NcaRepository,rbac:RbacService) {
         remarks:short(raw.remarks,"remarks",2000,phase==="REPORT"),
         durationMinutes:Number(raw.durationMinutes),
       };
-      if(!Number.isInteger(command.durationMinutes)||command.durationMinutes<1||command.durationMinutes>1440)throw new NcaInputError("durationMinutes must be 1 to 1440");
+      if(!Number.isInteger(command.durationMinutes)||command.durationMinutes<30||command.durationMinutes>600)throw new NcaInputError("durationMinutes must be 30 to 600");
       if(command.phase==="PLAN"&&!command.townId)throw new NcaInputError("An authorized town is required for planned NCA");
       await rbac.authorize(t,"TOUR_PLAN_OWN",command.territoryId,token);
       const options=await repo.options(t,token);
@@ -92,6 +96,19 @@ export function createNcaService(repo:NcaRepository,rbac:RbacService) {
       await repo.submit(t,u,id);
       const saved=await repo.getOwn(t,u,id,token);
       if(!saved||saved.status!=="SUBMITTED")throw new NcaConflictError("NCA submission could not be confirmed");
+      return saved;
+    },
+    async listPending(t:string,token:string){return repo.listPending(t,token);},
+    async decide(t:string,actor:string,token:string,idValue:unknown,raw:Record<string,unknown>){
+      const id=uuid(idValue,"ncaId"),row=await repo.getVisible(t,id,token);
+      if(!row||row.status!=="SUBMITTED")throw new NcaNotFoundError("Submitted NCA not found");
+      const decision=raw.decision;if(decision!=="APPROVE"&&decision!=="REJECT")throw new NcaInputError("Invalid NCA decision");
+      const comment=raw.comment==null||raw.comment===""?null:short(raw.comment,"comment",1000);
+      if(decision==="REJECT"&&!comment)throw new NcaInputError("Reject comment required");
+      await rbac.authorize(t,"TOUR_APPROVE",row.territoryId,token);
+      await repo.decide(t,actor,id,decision,comment);
+      const saved=await repo.getVisible(t,id,token);
+      if(!saved||saved.status!==(decision==="APPROVE"?"APPROVED":"REJECTED"))throw new NcaConflictError("NCA decision could not be confirmed");
       return saved;
     },
     async configureCategory(t:string,actor:string,token:string,raw:Record<string,unknown>){
