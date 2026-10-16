@@ -14,3 +14,4 @@ coverage/
 configs/pilot-provision.json
 pilot-credentials.json
 pilot-run/
+pilot-auth-credentials.json
