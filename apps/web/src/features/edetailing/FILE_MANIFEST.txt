@@ -1,0 +1,6 @@
+apps/web/src/features/edetailing/model.ts | approval eligibility and draft types
+apps/web/src/features/edetailing/EDetailingView.tsx | Carbon library/viewer and review
+apps/web/test/edetailing.model.test.ts | policy and navigation tests
+apps/web/src/features/edetailing/README.md | usage/state
+apps/web/src/features/edetailing/INTEGRATION_REQUEST.md | secured CLM contracts
+apps/web/src/features/edetailing/FILE_MANIFEST.txt | manifest

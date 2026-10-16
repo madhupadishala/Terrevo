@@ -1,0 +1,11 @@
+begin;
+drop function if exists public.admin_decide_nca(uuid,uuid,uuid,text,text);
+drop table if exists public.nca_decisions;
+alter table public.nca_records drop column if exists manager_comment;
+alter table public.nca_records drop column if exists reviewed_at;
+alter table public.nca_records drop column if exists reviewed_by;
+alter table public.nca_records drop constraint if exists nca_records_duration_minutes_check;
+alter table public.nca_records add constraint nca_records_duration_minutes_check check(duration_minutes between 1 and 1440);
+alter table public.nca_records drop constraint if exists nca_records_status_check;
+alter table public.nca_records add constraint nca_records_status_check check(status in('DRAFT','SUBMITTED'));
+commit;

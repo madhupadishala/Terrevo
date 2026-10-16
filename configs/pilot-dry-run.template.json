@@ -1,0 +1,26 @@
+{
+  "baseUrl": "https://terrevo.vercel.app",
+  "tenantId": "REPLACE_AFTER_PROVISION",
+  "geo": {"latitude":17.385,"longitude":78.4867,"accuracyMeters":10},
+  "flow": {
+    "planDayId": "REPLACE_APPROVED_PLAN_DAY_UUID",
+    "doctorStopId": "REPLACE_DOCTOR_STOP_UUID",
+    "clmAssetId": "REPLACE_APPROVED_CLM_ASSET_UUID",
+    "sampleId": "REPLACE_ALLOCATED_SAMPLE_UUID",
+    "chemistStopId": "REPLACE_CHEMIST_STOP_UUID",
+    "productId": "REPLACE_PRODUCT_UUID",
+    "competitorBrand": "Pilot Comparator",
+    "nca": {
+      "territoryId": "REPLACE_TERRITORY_UUID",
+      "categoryCode": "MEETING",
+      "townId": "REPLACE_AUTHORIZED_TOWN_UUID",
+      "reason": "Pilot UAT operational review",
+      "remarks": "Automated real-network pilot dry-run",
+      "durationMinutes": 30
+    }
+  },
+  "boundaryChecks": {
+    "inaccessibleTenantId": "00000000-0000-4000-8000-000000000099",
+    "crossTerritoryPlanId": "REPLACE_WITH_REAL_PLAN_OUTSIDE_MANAGER_SCOPE"
+  }
+}

@@ -1,0 +1,56 @@
+begin;
+
+create or replace function public.admin_link_customer(
+  p_tenant_id uuid,p_user_id uuid,p_source_kind text,p_source_id uuid,p_target_kind text,p_target_id uuid
+)
+returns uuid
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare v_relationship text;v_id uuid;v_source_ok boolean:=false;v_target_ok boolean:=false;
+begin
+  if p_source_kind='doctor' and p_target_kind='chemist' then v_relationship:='DOCTOR_CHEMIST';
+  elsif p_source_kind='chemist' and p_target_kind='stockist' then v_relationship:='CHEMIST_STOCKIST';
+  else raise exception 'unsupported customer relationship';end if;
+
+  if not exists(select 1 from public.tenant_memberships m where m.tenant_id=p_tenant_id and m.user_id=p_user_id and m.status='active')
+  then raise exception 'active tenant membership required';end if;
+
+  if p_source_kind='doctor' then
+    select exists(select 1 from public.doctors d where d.tenant_id=p_tenant_id and d.id=p_source_id and d.status='active') into v_source_ok;
+  elsif p_source_kind='chemist' then
+    select exists(select 1 from public.chemists c where c.tenant_id=p_tenant_id and c.id=p_source_id and c.status='active') into v_source_ok;
+  end if;
+
+  if p_target_kind='chemist' then
+    select exists(select 1 from public.chemists c where c.tenant_id=p_tenant_id and c.id=p_target_id and c.status='active') into v_target_ok;
+  elsif p_target_kind='stockist' then
+    select exists(select 1 from public.stockists s where s.tenant_id=p_tenant_id and s.id=p_target_id and s.status='active') into v_target_ok;
+  end if;
+
+  if not v_source_ok or not v_target_ok then raise exception 'active customer not found';end if;
+
+  select id into v_id from public.customer_relationships
+   where tenant_id=p_tenant_id and source_kind=p_source_kind and source_id=p_source_id
+     and target_kind=p_target_kind and target_id=p_target_id;
+  if v_id is not null then return v_id;end if;
+
+  insert into public.customer_relationships(
+    tenant_id,source_kind,source_id,target_kind,target_id,relationship,created_by
+  ) values(
+    p_tenant_id,p_source_kind,p_source_id,p_target_kind,p_target_id,v_relationship,p_user_id
+  ) returning id into v_id;
+
+  insert into public.customer_relationship_audit(
+    tenant_id,relationship_id,actor_user_id,action,source_kind,source_id,target_kind,target_id
+  ) values(p_tenant_id,v_id,p_user_id,'LINK',p_source_kind,p_source_id,p_target_kind,p_target_id);
+
+  return v_id;
+end;
+$$;
+
+revoke all on function public.admin_link_customer(uuid,uuid,text,uuid,text,uuid) from public,anon,authenticated;
+grant execute on function public.admin_link_customer(uuid,uuid,text,uuid,text,uuid) to service_role;
+
+commit;

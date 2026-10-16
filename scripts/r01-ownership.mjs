@@ -1,0 +1,88 @@
+#!/usr/bin/env node
+// R01: fail-closed path ownership check. No external packages or network access.
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+
+// The PR's policy is only a proposal. Runtime authorization comes exclusively
+// from the immutable PR base SHA supplied by the trusted workflow.
+export function loadIntegrationScope(base) {
+  if (!/^[0-9a-f]{40}$/.test(base ?? '')) throw new Error('Trusted base must be a full commit SHA');
+  return JSON.parse(execFileSync('git', ['show', base + ':scripts/terrevo-v32-integration-scope.json'], {encoding:'utf8'}));
+}
+
+export const engine2Paths = [
+  /^apps\/web\/src\/features\/(customer-relations|clm-library|workforce-evidence|manager-reporting)\//,
+  /^apps\/web\/test\/(customer-relations|clm-library|workforce-evidence|manager-reporting)[^/]*\.test\.ts$/
+];
+export function validateChangedPaths(paths, owner, integrationScope) {
+  if (!['engineer1', 'engineer2', 'integrator'].includes(owner)) throw new Error('Owner must be engineer1, engineer2 or integrator');
+  if (owner === 'integrator' && !Array.isArray(integrationScope?.allowedPaths)) throw new Error('Trusted integration policy required');
+  const violations = [];
+  for (const path of paths) {
+    if (!path || path.startsWith('/') || path.includes('..') || path.includes('\\')) {
+      violations.push(path); continue;
+    }
+    if(owner === 'integrator'){if(!integrationScope.allowedPaths.includes(path))violations.push(path);continue;}
+    const delegated = engine2Paths.some(re => re.test(path));
+    if ((owner === 'engineer1' && delegated) || (owner === 'engineer2' && !delegated)) violations.push(path);
+  }
+  return violations;
+}
+// NUL-delimited git output preserves tabs, newlines and quoted names verbatim.
+export function parseNameStatusZ(text) {
+  if (!text) return [];
+  const fields = text.split('\0');
+  if (fields.pop() !== '') throw new Error('Unterminated git diff output');
+  const paths = [];
+  for (let i = 0; i < fields.length;) {
+    const status = fields[i++];
+    if (!/^[ACDMRTUXB][0-9]*$/.test(status)) throw new Error('Unrecognized git diff status: ' + status);
+    const count = /^[RC]/.test(status) ? 2 : 1;
+    for (let n = 0; n < count; n++) {
+      if (!fields[i]) throw new Error('Missing git diff path');
+      paths.push(fields[i++]);
+    }
+  }
+  return paths;
+}
+export function ownerForBranch(branch, assignment, integrationScope) {
+  const registeredOwner = branch && branch === integrationScope?.branch ? 'integrator' : /^feature\/terrevo-s(09-customer-relations|11-clm-library|13-workforce-evidence|14-manager-reporting)-ui$/.test(branch)
+    ? 'engineer2'
+    : ['chore/r01-repository-consolidation', 'feature/ui-live-role-workspaces', 'chore/terrevo-trusted-scope-policy'].includes(branch) ? 'engineer1' : null;
+  if (!registeredOwner) throw new Error('Unregistered engineer branch');
+  if (assignment !== registeredOwner) throw new Error('Branch/engineer assignment mismatch');
+  return registeredOwner;
+}
+export function validateAssignment({author, assignedAuthor, headRepository, repository}) {
+  if (!author || !assignedAuthor || !repository || !headRepository
+      || author !== assignedAuthor || headRepository !== repository) {
+    throw new Error('Missing or untrusted engineer assignment');
+  }
+}
+function main() {
+  validateAssignment({author: process.env.TERREVO_PR_AUTHOR, assignedAuthor: process.env.TERREVO_ASSIGNED_AUTHOR,
+    headRepository: process.env.TERREVO_HEAD_REPOSITORY, repository: process.env.TERREVO_REPOSITORY});
+  const base = process.env.TERREVO_DIFF_BASE;
+  if (!/^[0-9a-f]{40}$/.test(base ?? '')) {
+    throw new Error('TERREVO_DIFF_BASE must be a full trusted commit SHA');
+  }
+  execFileSync('git', ['rev-parse', '--verify', base + '^{commit}'], {stdio:'pipe'});
+  const head = process.env.TERREVO_DIFF_HEAD;
+  if (!/^[0-9a-f]{40}$/.test(head ?? '')) throw new Error('TERREVO_DIFF_HEAD must be a full commit SHA');
+  execFileSync('git', ['rev-parse', '--verify', head + '^{commit}'], {stdio:'pipe'});
+  const integrationScope = process.env.TERREVO_OWNER === 'integrator' ? loadIntegrationScope(base) : undefined;
+  const owner = ownerForBranch(process.env.TERREVO_HEAD_BRANCH, process.env.TERREVO_OWNER, integrationScope);
+  const output = execFileSync('git', ['diff', '--name-status', '-z', '--find-renames', base + '...' + head], {encoding:'utf8'});
+  const paths = parseNameStatusZ(output);
+  const violations = validateChangedPaths(paths, owner, integrationScope);
+  if (violations.length) {
+    process.stderr.write('R01 OWNERSHIP VIOLATION for ' + owner + ':\n' + violations.join('\n') + '\n');
+    process.exitCode = 1;
+  } else {
+    console.log('R01 path ownership PASS (' + owner + '): ' + paths.length + ' paths checked');
+  }
+}
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  try { main(); } catch (err) { console.error('R01 check failed:', err.message); process.exitCode = 1; }
+}

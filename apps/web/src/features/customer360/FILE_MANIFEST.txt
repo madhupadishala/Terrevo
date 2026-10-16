@@ -1,0 +1,6 @@
+apps/web/src/features/customer360/model.ts | pure typed data guards
+apps/web/src/features/customer360/Customer360View.tsx | Carbon UI
+apps/web/src/features/customer360/README.md | status and usage
+apps/web/src/features/customer360/INTEGRATION_REQUEST.md | integration dependencies
+apps/web/src/features/customer360/FILE_MANIFEST.txt | ownership listing
+apps/web/test/customer360.model.test.ts | read-only model tests

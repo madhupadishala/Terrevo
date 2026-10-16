@@ -1,229 +1,110 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  Button, InlineNotification, Tag, TextArea, TextInput, Tile,
-} from "@carbon/react";
-import {
-  activeTour, checkIn, checkOut, emptyWorkspace, openVisit, readWorkspace, saveNotes,
-  startTour, STORAGE_KEY, submitTour, type VisitType, type Workspace,
-} from "./workspace";
+import {useMemo,useState} from "react";
+import {Button,Tag,TextArea,TextInput,Tile} from "@carbon/react";
+import {type BusinessArea} from "./BusinessWorkspace";
+import {Customer360View} from "./features/customer360/Customer360View";
+import {ActivitiesView} from "./features/activities/ActivitiesView";
+import {EDetailingView} from "./features/edetailing/EDetailingView";
+import {MonthlyPlanner} from "./MonthlyPlanner";
+import {TodayIntelligenceView} from "./features/intelligence/TodayIntelligenceView";
+import {TerrevoWebApi,type Master,type Plan,type PlanDay,type Progress,type StartOption,type ManagerCommand,type CustomerRelationship as LegacyRelationship} from "./terrevo-api";
+import {useDcr,useManagerCommand,useNca,useTerrevoData,useVisit} from "./qa/TerrevoDataProvider";
+import {FunctionalQaFieldExecution} from "./qa/FunctionalQaFieldExecution";
+import {FunctionalQaManagerCommand} from "./qa/FunctionalQaManagerCommand";
+import {FunctionalQaBusinessWorkspace} from "./qa/FunctionalQaBusinessWorkspace";
+import {LiveOrganizationAdmin,LivePlatformAdmin} from "./qa/LiveAdminPanels";
 
-type View = "overview" | "tours" | "visits" | "insights" | "integration";
-type Health = {
-  status: "ok" | "degraded";
-  apiAdapter: string;
-  provider: { identity: string; serverMutations: string };
-};
-
-const NAV: Array<{ id: View; label: string; short: string }> = [
-  { id: "overview", label: "Command overview", short: "Overview" },
-  { id: "tours", label: "My tours", short: "Tours" },
-  { id: "visits", label: "Field visits", short: "Visits" },
-  { id: "insights", label: "Activity intelligence", short: "Insights" },
-  { id: "integration", label: "Connections & safety", short: "Connections" },
+type Area="overview"|"today"|"customers"|"activities"|"edetailing"|"field"|"plans"|"manager"|"admin"|"platform"|BusinessArea;
+const NAV:Array<{id:Area;title:string;subtitle:string;icon:string}>=[
+ {id:"overview",title:"Command overview",subtitle:"Operational QA summary",icon:"▦"},
+ {id:"today",title:"Today briefing",subtitle:"Daily field agenda",icon:"◴"},
+ {id:"customers",title:"Customer 360",subtitle:"Doctors, chemists, stockists and outlet graph",icon:"◎"},
+ {id:"activities",title:"NCA & activities",subtitle:"Controlled non-call activities",icon:"▣"},
+ {id:"edetailing",title:"E-detailing / CLM",subtitle:"Approved content and detailing sessions",icon:"▧"},
+ {id:"field",title:"Field execution",subtitle:"Visit lifecycle and call completion",icon:"⌖"},
+ {id:"plans",title:"Tour planning",subtitle:"Monthly, weekly and daily planning",icon:"▤"},
+ {id:"trade",title:"RCPA & orders",subtitle:"Retail audit and POB",icon:"▥"},
+ {id:"inventory",title:"Samples & inventory",subtitle:"Representative stock and distributions",icon:"▧"},
+ {id:"workforce",title:"Workforce operations",subtitle:"Attendance, leave, expenses and timesheets",icon:"◷"},
+ {id:"reports",title:"Daily call reports",subtitle:"Deterministic DCR rollup",icon:"▦"},
+ {id:"manager",title:"Manager command",subtitle:"Five-rep operational command center",icon:"◫"},
+ {id:"approvals",title:"Manager approvals",subtitle:"Tour, GPS, NCA and workforce decisions",icon:"✓"},
+ {id:"admin",title:"Organization admin",subtitle:"Hierarchy and master field inspection",icon:"⚙"},
+ {id:"platform",title:"Platform Super Admin",subtitle:"Local-only platform field inspection",icon:"◇"},
 ];
 
-const LABEL: Record<VisitType, string> = {
-  DOCTOR: "Doctor", CHEMIST: "Chemist", STOCKIST: "Stockist",
-};
-
-function formatTime(iso: string | null): string {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString(undefined, {
-    dateStyle: "medium", timeStyle: "short",
-  });
+const monday=(date:string)=>{const d=new Date(date+"T12:00:00");d.setDate(d.getDate()-((d.getDay()+6)%7));return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")};
+const tagType=(status:string):"green"|"blue"|"red"|"gray"|"purple"=>status==="APPROVED"||status==="COMPLETED"||status==="SUBMITTED"?"green":status==="CHECKED_IN"?"blue":status==="REJECTED"?"red":"gray";
+function Metric({label,value,context}:{label:string;value:string|number;context:string}){return <Tile className="tr-metric"><p className="tr-metric-label">{label}</p><strong className="tr-metric-number">{value}</strong><p className="tr-muted">{context}</p></Tile>}
+function Panel({eyebrow,title,children}:{eyebrow:string;title:string;children:React.ReactNode}){return <section className="tr-panel"><span className="tr-section-kicker">{eyebrow}</span><h2>{title}</h2>{children}</section>}
+function PlatformQaPreview(){
+ const [name,setName]=useState("QA Pharma"),[slug,setSlug]=useState("qa-pharma"),[status,setStatus]=useState("active");
+ return <div className="tr-grid-wide" data-testid="qa-platform-admin"><Panel eyebrow="FUNCTIONAL QA / PLATFORM" title="Organization lifecycle fields">
+  <p className="tr-detail">Authentication and real platform mutations are intentionally deferred. These controls are local-only.</p>
+  <div className="tr-form"><TextInput id="qa-platform-name" data-testid="platform-name" labelText="Organization name" value={name} onChange={e=>setName(e.target.value)}/><TextInput id="qa-platform-slug" data-testid="platform-code" labelText="Organization code" value={slug} onChange={e=>setSlug(e.target.value.toLowerCase())}/>
+  <label htmlFor="qa-platform-status">Organization status</label><select id="qa-platform-status" data-testid="platform-status" className="tr-select" value={status} onChange={e=>setStatus(e.target.value)}><option value="active">active</option><option value="inactive">inactive</option></select>
+  <Button data-testid="platform-validate" disabled={!name.trim()||slug.trim().length<3}>Validate organization fields</Button></div>
+ </Panel><Panel eyebrow="FUNCTIONAL QA / AUDIT" title="Administration controls"><div className="tr-check-row"><span>Authentication</span><Tag type="purple">FINAL ENGINEERING SPRINT</Tag></div><div className="tr-check-row"><span>QA mutations</span><Tag type="green">LOCAL ONLY</Tag></div></Panel></div>
+}
+function OrganizationQaAdmin(){
+ const [kind,setKind]=useState("doctors"),[code,setCode]=useState(""),[name,setName]=useState(""),[roleUser,setRoleUser]=useState("");
+ return <div className="tr-grid-wide" data-testid="qa-org-admin">
+  <Panel eyebrow="ORGANIZATION" title="Hierarchy fields"><div className="tr-form"><TextInput id="org-code" data-testid="org-code" labelText="Unit code" value={code} onChange={e=>setCode(e.target.value)}/><TextInput id="org-name" data-testid="org-name" labelText="Unit name" value={name} onChange={e=>setName(e.target.value)}/><label htmlFor="org-kind">Unit type</label><select id="org-kind" data-testid="org-kind" className="tr-select"><option>company</option><option>division</option><option>zone</option><option>region</option><option>area</option><option>territory</option></select><Button data-testid="org-create" disabled={!code||!name}>Create organization unit</Button></div></Panel>
+  <Panel eyebrow="MASTERS" title="Master data fields"><label htmlFor="masters-kind">Master type</label><select id="masters-kind" data-testid="masters-kind" className="tr-select" value={kind} onChange={e=>setKind(e.target.value)}>{["employees","doctors","chemists","stockists","products","samples","gifts"].map(x=><option key={x}>{x}</option>)}</select><p className="tr-detail">Selected: {kind}</p></Panel>
+  <Panel eyebrow="ROLE ASSIGNMENT" title="User-role fields"><div className="tr-form"><TextInput id="assign-user" data-testid="assign-user" labelText="Existing user UUID" value={roleUser} onChange={e=>setRoleUser(e.target.value)}/><label htmlFor="assign-role">Role</label><select id="assign-role" data-testid="assign-role" className="tr-select"><option value="MR">Field user</option><option value="MANAGER">Manager</option><option value="TENANT_ADMIN">Organization administrator</option></select><Button data-testid="role-assign" disabled={!roleUser}>Assign role</Button></div></Panel>
+  <Panel eyebrow="NCA MASTER" title="Category and town fields"><div className="tr-form"><TextInput id="nca-master-code" labelText="Category code" defaultValue="MEETING"/><TextInput id="nca-master-label" labelText="NCA category label" defaultValue="Meeting"/><label htmlFor="nca-town-territory">Town territory</label><select id="nca-town-territory" className="tr-select"><option>Hyderabad Central Territory</option></select><TextInput id="nca-town-name" labelText="Actual town name" defaultValue="Hyderabad"/></div></Panel>
+ </div>;
 }
 
-function useWorkspace() {
-  const [workspace, setWorkspace] = useState<Workspace>(() => {
-    try { return readWorkspace(window.localStorage); }
-    catch { return emptyWorkspace(); }
-  });
-  const [storageWarning, setStorageWarning] = useState(false);
-  useEffect(() => {
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace)); }
-    catch { setStorageWarning(true); }
-  }, [workspace]);
-  return { workspace, setWorkspace, storageWarning };
-}
-
-function Metric({ label, value, context }: { label: string; value: string | number; context: string }) {
-  return <Tile className="tr-metric">
-    <p className="tr-metric-label">{label}</p>
-    <strong className="tr-metric-number">{value}</strong>
-    <p className="tr-muted">{context}</p>
-  </Tile>;
-}
-
-export default function App() {
-  const [view, setView] = useState<View>("overview");
-  const { workspace, setWorkspace, storageWarning } = useWorkspace();
-  const [health, setHealth] = useState<Health | null>(null);
-  const [apiUnavailable, setApiUnavailable] = useState(false);
-  const [territory, setTerritory] = useState("");
-  const [account, setAccount] = useState("");
-  const [visitType, setVisitType] = useState<VisitType>("DOCTOR");
-  const [notes, setNotes] = useState("");
-  const [notice, setNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/health", { signal: controller.signal, headers: { accept: "application/json" } })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("API health check failed");
-        return response.json() as Promise<Health>;
-      })
-      .then(setHealth)
-      .catch(() => { if (!controller.signal.aborted) setApiUnavailable(true); });
-    return () => controller.abort();
-  }, []);
-
-  const active = activeTour(workspace);
-  const currentVisit = openVisit(workspace);
-  useEffect(() => { setNotes(currentVisit?.notes ?? ""); }, [currentVisit?.id]);
-  const activeVisits = active ? workspace.visits.filter((visit) => visit.tourId === active.id) : [];
-  const completedVisits = workspace.visits.filter((visit) => visit.status === "CHECKED_OUT");
-  const submittedTours = workspace.tours.filter((tour) => tour.status === "SUBMITTED");
-  const recentVisits = workspace.visits.slice(0, 6);
-  const names = useMemo(
-    () => new Set(workspace.visits.map((visit) => visit.account.toLocaleLowerCase())).size,
-    [workspace.visits],
-  );
-
-  function apply(change: () => Workspace, message: string) {
-    try {
-      setWorkspace(change());
-      setNotice({ kind: "success", message });
-    } catch (error) {
-      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Action could not be completed." });
-    }
-  }
-  function handleStart() {
-    apply(() => startTour(workspace, territory, crypto.randomUUID(), new Date().toISOString()), "Tour started in this local workspace.");
-    if (!active && territory.trim().length >= 2) setTerritory("");
-  }
-  function handleCheckIn() {
-    apply(() => checkIn(workspace, account, visitType, crypto.randomUUID(), new Date().toISOString()), "Visit check-in recorded locally.");
-    if (active && !currentVisit && account.trim().length >= 2) { setAccount(""); setNotes(""); }
-  }
-  function handleCheckOut() {
-    if (!currentVisit) return;
-    apply(() => checkOut(workspace, currentVisit.id, new Date().toISOString()), "Visit check-out recorded locally.");
-    setNotes("");
-  }
-  const countByType = (type: VisitType) => workspace.visits.filter(v => v.type === type).length;
-
-  return (
-    <div className="tr-app">
-      <aside className="tr-sidebar" aria-label="Application navigation">
-        <div className="tr-brand"><div className="tr-mark">T<span>.</span></div><div><strong>terrevo</strong><small>FIELD INTELLIGENCE</small></div></div>
-        <div className="tr-workspace"><span className="tr-workspace-dot" /> LOCAL WORKSPACE <span className="tr-chevron">⌄</span></div>
-        <p className="tr-nav-label">OPERATIONS</p>
-        <nav className="tr-nav" aria-label="Primary">
-          {NAV.map((item, i) => <button key={item.id} type="button" className={view === item.id ? "tr-nav-item selected" : "tr-nav-item"} aria-current={view === item.id ? "page" : undefined} onClick={() => { setView(item.id); setNotice(null); }}>
-            <span className="tr-nav-glyph" aria-hidden="true">{["▦", "▤", "⌖", "◫", "⚙"][i]}</span>{item.label}
-          </button>)}
-        </nav>
-        <div className="tr-sidebar-foot">
-          <div className="tr-foot-pill"><span className="tr-foot-dot" /> Browser-only mode</div>
-          <p>Operational web workspace<br/>Wave 1 · No sign-in</p>
-        </div>
-      </aside>
-
-      <div className="tr-main">
-        <header className="tr-topbar">
-          <div className="tr-breadcrumb">TERREVO <span>/</span> FIELD OPERATIONS <span>/</span> <b>{NAV.find(n => n.id === view)?.short}</b></div>
-          <div className="tr-header-right"><span className="tr-live"><span /> LOCAL MODE</span><span className="tr-avatar" aria-hidden="true">TR</span></div>
-        </header>
-
-        <main className="tr-content" id="main-content">
-          <div className="tr-page-heading">
-            <div><p className="tr-eyebrow">FIELD EXECUTION PLATFORM / WAVE 01</p>
-              <h1>{view === "overview" ? "Your field, in focus." : NAV.find(n => n.id === view)?.label}</h1>
-              <p className="tr-intro">{view === "overview" ? "A single command space for tour activity, visits and operational momentum." :
-                view === "tours" ? "Plan your day, start a tour and record its completion." :
-                view === "visits" ? "Capture field interactions and keep each visit accounted for." :
-                view === "insights" ? "Live totals computed from your browser-local workspace." :
-                "Understand which services are configured and what this environment can safely do."}</p>
-            </div>
-            <Tag type="blue">WAVE 1 · WORKSPACE</Tag>
-          </div>
-
-          <InlineNotification kind="info" lowContrast hideCloseButton
-            title="Protected development boundary"
-            subtitle="No login screen. Tour and visit actions are saved on this browser only, not to Supabase. Do not enter personal or customer data. API write operations remain protected." />
-          {storageWarning && <InlineNotification kind="error" lowContrast hideCloseButton title="Local storage unavailable" subtitle="Changes may disappear when this page reloads." />}
-          {notice && <div className="tr-notice" role="status"><InlineNotification kind={notice.kind} lowContrast hideCloseButton title={notice.kind === "success" ? "Recorded" : "Action blocked"} subtitle={notice.message} /></div>}
-
-          {view === "overview" && <>
-            <section className="tr-metrics" aria-label="Local activity overview">
-              <Metric label="Active tour" value={active ? "01" : "00"} context={active ? active.territory : "Ready when you are"} />
-              <Metric label="Visits recorded" value={workspace.visits.length.toString().padStart(2, "0")} context={completedVisits.length + " checked out"} />
-              <Metric label="Accounts covered" value={names.toString().padStart(2, "0")} context="Unique visit accounts" />
-              <Metric label="Tours submitted" value={submittedTours.length.toString().padStart(2, "0")} context="Recorded locally" />
-            </section>
-            <div className="tr-grid-wide">
-              <section className="tr-panel tr-mission">
-                <div className="tr-section-line"><span className="tr-section-kicker">TODAY'S MISSION</span><Tag type={active ? "green" : "gray"}>{active ? "In progress" : "Not started"}</Tag></div>
-                <h2>{active ? active.territory : "Ready to take the field?"}</h2>
-                <p>{active ? "Your tour is active. Every recorded visit builds your field activity timeline." : "Start a tour to activate visit recording and create your first operational timeline."}</p>
-                {active ? <div className="tr-tour-stats"><div><span>STARTED</span><strong>{formatTime(active.startAt)}</strong></div><div><span>VISITS</span><strong>{activeVisits.length}</strong></div></div> : <div className="tr-empty-lines"><span /><span /><span /></div>}
-                <Button onClick={() => setView(active ? "visits" : "tours")} className="tr-action">{active ? "Record a field visit" : "Start your first tour"} <span aria-hidden="true">↗</span></Button>
-              </section>
-              <section className="tr-panel tr-secondary-panel">
-                <span className="tr-section-kicker">WORKSPACE STATUS</span>
-                <h3>Operational foundations</h3>
-                <div className="tr-check-row"><span className="tr-tick">✓</span> Local lifecycle engine <Tag type="green">Available</Tag></div>
-                <div className="tr-check-row"><span className="tr-tick">✓</span> Persistent browser records <Tag type="green">Available</Tag></div>
-                <div className="tr-check-row"><span className="tr-tick">○</span> Supabase business writes <Tag type="gray">Protected</Tag></div>
-                <div className="tr-check-row"><span className="tr-tick">○</span> Identity / RBAC UI <Tag type="gray">Deferred</Tag></div>
-                <Button kind="ghost" size="sm" onClick={() => setView("integration")}>View connection details ↗</Button>
-              </section>
-            </div>
-            <section className="tr-panel tr-activity"><div className="tr-section-line"><div><span className="tr-section-kicker">ACTIVITY STREAM</span><h3>Recent field interactions</h3></div><Button kind="ghost" size="sm" onClick={() => setView("visits")}>View all ↗</Button></div>
-              {recentVisits.length === 0 ? <div className="tr-empty"><div className="tr-empty-icon">⌖</div><strong>No activity recorded yet</strong><p>Field visits will appear here as you check in to accounts.</p></div> :
-                <div className="tr-visit-list">{recentVisits.map(visit => <div className="tr-visit-row" key={visit.id}><span className="tr-row-icon">{LABEL[visit.type].charAt(0)}</span><div><strong>{visit.account}</strong><p>{LABEL[visit.type]} · {formatTime(visit.checkinAt)}</p></div><Tag type={visit.status === "CHECKED_OUT" ? "green" : "blue"}>{visit.status === "CHECKED_OUT" ? "Completed" : "On site"}</Tag></div>)}</div>}
-            </section>
-          </>}
-
-          {view === "tours" && <div className="tr-grid-wide">
-            <section className="tr-panel">
-              <span className="tr-section-kicker">TOUR CONTROL</span>
-              {active ? <><h2>{active.territory}</h2><Tag type="green">Active field tour</Tag><p className="tr-detail">Started {formatTime(active.startAt)}</p><p className="tr-detail">{activeVisits.length} field visits · {activeVisits.filter(v => v.status === "CHECKED_OUT").length} completed</p>
-                <Button kind="primary" disabled={Boolean(currentVisit)} onClick={() => apply(() => submitTour(workspace, new Date().toISOString()), "Tour submitted to local activity history.")}>Submit tour</Button>
-                {currentVisit && <p className="tr-hint">Check out from the open visit before submitting.</p>}
-              </> : <><h2>Start My Tour</h2><p className="tr-detail">Begin a new field day. Only one tour can be active at once.</p><div className="tr-form"><TextInput id="tour-territory" labelText="Territory or working area" placeholder="e.g. Central Zone" value={territory} onChange={e => setTerritory(e.target.value)} maxLength={100}/><Button onClick={handleStart}>Start tour ↗</Button></div></>}
-            </section>
-            <section className="tr-panel"><span className="tr-section-kicker">TOUR HISTORY</span><h3>Previous tours</h3>
-              {workspace.tours.length === 0 ? <p className="tr-detail">Your first completed tour will appear here.</p> : workspace.tours.map(tour => <div className="tr-history-row" key={tour.id}><div><strong>{tour.territory}</strong><p>{formatTime(tour.startAt)}</p></div><Tag type={tour.status === "ACTIVE" ? "blue" : "green"}>{tour.status === "ACTIVE" ? "Active" : "Submitted"}</Tag></div>)}
-            </section>
-          </div>}
-
-          {view === "visits" && <div className="tr-grid-wide">
-            <section className="tr-panel"><span className="tr-section-kicker">VISIT EXECUTION</span><h2>{currentVisit ? "Visit in progress" : "Check in to an account"}</h2>
-              {currentVisit ? <><div className="tr-highlight-visit"><Tag type="blue">On site</Tag><h3>{currentVisit.account}</h3><p>{LABEL[currentVisit.type]} · Checked in {formatTime(currentVisit.checkinAt)}</p></div><div className="tr-form"><TextArea id="visit-notes" labelText="Field notes (local only)" placeholder="Record a non-sensitive call outcome" value={notes} onChange={e => setNotes(e.target.value)} maxLength={2000}/><div className="tr-button-row"><Button kind="secondary" onClick={() => apply(() => saveNotes(workspace, currentVisit.id, notes), "Visit notes saved.")}>Save notes</Button><Button onClick={handleCheckOut}>Check out</Button></div></div></> :
-                <div className="tr-form"><p className="tr-detail">{active ? "Record your next account visit." : "Start a tour before checking in to a visit."}</p><TextInput id="visit-account" labelText="Account / HCP display name" placeholder="Enter a non-sensitive test account" value={account} onChange={e => setAccount(e.target.value)} disabled={!active} maxLength={160}/>
-                  <label className="tr-select-label" htmlFor="visit-type">Visit category</label><select className="tr-select" id="visit-type" value={visitType} disabled={!active} onChange={e => setVisitType(e.target.value as VisitType)}><option value="DOCTOR">Doctor</option><option value="CHEMIST">Chemist</option><option value="STOCKIST">Stockist</option></select>
-                  <Button onClick={handleCheckIn} disabled={!active}>Record check-in ↗</Button></div>}
-            </section>
-            <section className="tr-panel"><span className="tr-section-kicker">VISIT LEDGER</span><h3>All recorded visits</h3>
-              {workspace.visits.length === 0 ? <p className="tr-detail">No visits yet. Start a tour and check in to an account.</p> : workspace.visits.map(visit => <div className="tr-history-row" key={visit.id}><div><strong>{visit.account}</strong><p>{LABEL[visit.type]} · {formatTime(visit.checkinAt)}</p>{visit.notes && <p className="tr-note">{visit.notes}</p>}</div><Tag type={visit.status === "CHECKED_IN" ? "blue" : "green"}>{visit.status === "CHECKED_IN" ? "On site" : "Done"}</Tag></div>)}
-            </section>
-          </div>}
-
-          {view === "insights" && <>
-            <div className="tr-metrics"><Metric label="Recorded tours" value={workspace.tours.length} context="All local sessions"/><Metric label="Completed visits" value={completedVisits.length} context="Checked out"/><Metric label="Doctor interactions" value={countByType("DOCTOR")} context="Local records"/><Metric label="Trade interactions" value={countByType("CHEMIST") + countByType("STOCKIST")} context="Chemist + stockist"/></div>
-            <section className="tr-panel"><span className="tr-section-kicker">COVERAGE MIX</span><h3>Field interaction composition</h3><div className="tr-bars">{(["DOCTOR", "CHEMIST", "STOCKIST"] as VisitType[]).map(type => <div className="tr-bar-row" key={type}><span>{LABEL[type]}</span><div className="tr-bar"><span style={{width: workspace.visits.length ? (100 * countByType(type) / workspace.visits.length) + "%" : "0%"}}/></div><strong>{countByType(type)}</strong></div>)}</div><p className="tr-detail">Computed only from browser-local records. Not a server business report.</p></section>
-          </>}
-
-          {view === "integration" && <div className="tr-grid-wide">
-            <section className="tr-panel"><span className="tr-section-kicker">SERVICE CONNECTIVITY</span><h2>API environment</h2><div className="tr-check-row"><span>Health endpoint</span><Tag type={health ? "green" : apiUnavailable ? "red" : "gray"}>{health ? "Responding" : apiUnavailable ? "Unavailable" : "Checking"}</Tag></div><div className="tr-check-row"><span>Identity variables</span><Tag type={health?.provider.identity === "configured" ? "green" : "gray"}>{health?.provider.identity ?? "Unknown"}</Tag></div><div className="tr-check-row"><span>Server mutation variables</span><Tag type={health?.provider.serverMutations === "configured" ? "green" : "gray"}>{health?.provider.serverMutations ?? "Unknown"}</Tag></div><p className="tr-detail">Configured variables do not establish authenticated connectivity or database health.</p></section>
-            <section className="tr-panel"><span className="tr-section-kicker">SECURITY BOUNDARY</span><h3>Local workspace isolation</h3><p className="tr-detail">This interface never sends local tour or visit records to a remote service. Existing authenticated business endpoints are unchanged. Identity, RBAC and tenant selection remain pluggable for later activation.</p><Tag type="purple">Local device only</Tag></section>
-          </div>}
-
-          <footer className="tr-footer"><span>TERREVO / FIELD INTELLIGENCE</span><span>Operational workspace · data saved locally · not a qualified production release</span></footer>
-        </main>
-      </div>
-    </div>
-  );
+export default function App(){
+ const data=useTerrevoData(),manager=useManagerCommand(),visit=useVisit(),nca=useNca(),dcr=useDcr();
+ const [view,setView]=useState<Area>("overview"),[notice,setNotice]=useState("");
+ const fallbackApi=useMemo(()=>new TerrevoWebApi(()=>{}),[]),api=data.api??fallbackApi;
+ const tenantId=data.state.organization.id,contextKey=(data.mode==="LIVE_API"?"live|":"qa|")+tenantId,territoryId=data.state.territory.id;
+ const qaMasters=useMemo<Record<string,Master[]>>(()=>({
+  employees:data.state.reps.map(r=>({id:r.id,code:r.id,name:r.name,status:"active",territoryId:r.territoryId})),
+  doctors:data.state.doctors.map(x=>({id:x.id,code:x.code,name:x.name,status:x.status.toLowerCase(),territoryId:x.territoryId,specialty:x.specialty,qualification:x.qualification})),
+  chemists:data.state.chemists.map(x=>({id:x.id,code:x.code,name:x.name,status:x.status.toLowerCase(),territoryId:x.territoryId})),
+  stockists:data.state.stockists.map(x=>({id:x.id,code:x.code,name:x.name,status:x.status.toLowerCase(),territoryId:x.territoryId})),
+  products:data.state.products.map(x=>({id:x.id,code:x.code,name:x.name,status:x.status.toLowerCase(),divisionId:x.divisionId})),
+  samples:data.state.inventory.filter(x=>x.kind==="SAMPLE").map(x=>({id:x.id,code:x.code,name:x.name,status:"active",productId:x.productId})),
+  gifts:data.state.inventory.filter(x=>x.kind!=="SAMPLE").map(x=>({id:x.id,code:x.code,name:x.name,status:"active"})),
+ }),[data.state]);
+ const masters=data.mode==="LIVE_API"?data.masters:qaMasters;
+ const legacyLinks=useMemo<LegacyRelationship[]>(()=>data.state.links.map(l=>l.type==="DOCTOR_CHEMIST"?{id:l.id,tenantId,sourceKind:"doctor",sourceId:l.doctorId!,targetKind:"chemist",targetId:l.chemistId,relationship:"DOCTOR_CHEMIST",createdAt:"2026-10-16T00:00:00Z"}:{id:l.id,tenantId,sourceKind:"chemist",sourceId:l.chemistId,targetKind:"stockist",targetId:l.stockistId!,relationship:"CHEMIST_STOCKIST",createdAt:"2026-10-16T00:00:00Z"}),[data.state.links,tenantId]);
+ const plan=useMemo<Plan>(()=>{const stops=data.state.visits.map((v,i)=>({sequence:i+1,type:v.customerType.toLowerCase() as "doctor"|"chemist"|"stockist",targetId:v.customerId,remarks:"Functional QA"}));const day:PlanDay={date:"2026-10-16",territoryId,remarks:"Functional QA daily plan",stops};return{id:"qa-plan-provider",weekStart:monday("2026-10-16"),status:"APPROVED",submittedAt:"2026-10-15T18:00:00+05:30",days:[day]}},[data.state.visits,territoryId]);
+ const activeVisit=visit.activeVisit;
+ const qaProgress:Progress|null=activeVisit?{
+  executionId:activeVisit.executionId??"qa-execution-01",workDate:"2026-10-16",territoryId,startedAt:activeVisit.checkinAt??"2026-10-16T09:00:00+05:30",serverNow:"2026-10-16T12:00:00+05:30",
+  requiredMinutes:480,elapsedMinutes:180,remainingMinutes:300,plannedCount:data.state.visits.length,completedCount:data.state.visits.filter(v=>v.status==="COMPLETED").length,
+  inProgressCount:data.state.visits.filter(v=>v.status==="CHECKED_IN").length,pendingCount:data.state.visits.filter(v=>v.status==="PLANNED").length,
+  stops:data.state.visits.map((v,i)=>({planStopId:v.id,sequence:i+1,type:v.customerType.toLowerCase() as "doctor"|"chemist"|"stockist",targetId:v.customerId,targetName:v.customerId,status:v.status==="PLANNED"?"PENDING":v.status==="CHECKED_IN"?"IN_PROGRESS":"COMPLETED"}))
+ }:null;
+ const qaStartOptions:StartOption[]=data.mode==="LIVE_API"?data.startOptions:(activeVisit||!data.state.visits.length?[]:[{planId:"qa-plan-provider",planDayId:"qa-day-2026-10-16",workDate:"2026-10-16",territoryId}]);
+ const qaManager:ManagerCommand={localDate:"2026-10-16",teamMembers:manager.metrics.teamMembers,activeTours:manager.metrics.activeTours,submittedToursToday:manager.metrics.submittedDays,shortDaysToday:data.state.attendance.filter(a=>a.date==="2026-10-16"&&a.status==="SHORT_DAY").length,activeJointWork:0,pending:{tourApprovals:manager.metrics.pendingTourPlans,gpsExceptions:manager.metrics.pendingGpsExceptions,weeklyTimesheets:data.state.timesheets.filter(t=>t.status==="SUBMITTED").length,leaves:manager.metrics.pendingLeaves,expenses:manager.metrics.pendingExpenses}};
+ const currentTitle=NAV.find(n=>n.id===view)?.title??"Terrevo";
+ const customerHistory=async(kind:"doctor"|"chemist"|"stockist",id:string)=>{
+  if(data.mode==="LIVE_API"&&data.api)return data.api.customerHistory(kind,id);
+  if(kind==="doctor")return data.state.dcrs.filter(d=>d.visitIds.some(v=>data.state.visits.find(x=>x.id===v)?.customerId===id)).map(d=>({tenantId,customerKind:"doctor" as const,customerId:id,id:d.id,occurredAt:d.submittedAt??d.date+"T18:00:00+05:30",activityType:"DCR" as const,summary:"Submitted DCR"}));
+  if(kind==="chemist")return [...data.state.rcpa.filter(r=>r.chemistId===id).map(r=>({tenantId,customerKind:"chemist" as const,customerId:id,id:r.id,occurredAt:r.createdAt,activityType:"RCPA" as const,summary:"RCPA captured"})),...data.state.pob.filter(o=>o.chemistId===id).map(o=>({tenantId,customerKind:"chemist" as const,customerId:id,id:o.id,occurredAt:o.createdAt,activityType:"POB" as const,summary:"POB booked"}))];
+  return data.state.pob.filter(o=>o.stockistId===id).map(o=>({tenantId,customerKind:"stockist" as const,customerId:id,id:o.id,occurredAt:o.createdAt,activityType:"POB" as const,summary:"POB booked"}));
+ };
+ return <div className="tr-app">
+  <aside className="tr-sidebar"><div className="tr-brand"><div className="tr-brand-mark">T</div><div><strong>Terrevo</strong><span>{data.mode==="LIVE_API"?"Live Operations":"Functional QA"}</span></div></div><nav className="tr-nav" aria-label="Terrevo workspace">{NAV.map(n=><button key={n.id} className={view===n.id?"is-active":""} data-testid={"nav-"+n.id} onClick={()=>{setView(n.id);setNotice("")}}><span>{n.icon}</span><span><strong>{n.title}</strong><small>{n.subtitle}</small></span></button>)}</nav><div className="tr-sidebar-foot"><div className="tr-foot-pill"><span className="tr-foot-dot"/> {data.mode==="LIVE_API"?"Live API provider":"Functional QA provider"}</div><p>{data.state.organization.name}<br/>{data.state.territory.name}</p></div></aside>
+  <main className="tr-main"><header className="tr-topbar"><div><span className="tr-live"><span/>{data.mode==="LIVE_API"?"LIVE DATA PROVIDER":"QA DATA PROVIDER"}</span><h1>{currentTitle}</h1><p>{data.mode==="LIVE_API"?"Authenticated tenant-scoped operations":"Scenario: "+data.scenario}</p></div><Tag type={data.mode==="LIVE_API"?"green":"purple"}>{data.mode==="LIVE_API"?"SERVER PERSISTED":"NO LOGIN · LOCAL MUTATIONS"}</Tag></header>
+  <div className="tr-page">
+   {notice&&<p role="status">{notice}</p>}
+   {view==="overview"&&<><div className="tr-metrics"><Metric label="Team members" value={manager.metrics.teamMembers} context={data.mode==="LIVE_API"?"Authorized team":"Deterministic QA team"}/><Metric label="Active tours" value={manager.metrics.activeTours} context="Derived from visits"/><Metric label="Completed calls" value={manager.metrics.completedCalls} context="Derived from visits"/><Metric label="Pending approvals" value={manager.queue.length} context="Derived manager queue"/></div><div className="tr-grid-wide"><Panel eyebrow={data.mode==="LIVE_API"?"LIVE STATE":"QA STATE"} title="Provider-backed domain"><p>{data.mode==="LIVE_API"?"Operational data is authenticated, tenant-scoped and server persisted.":"All operational data comes from the centralized QA adapter. Change scenarios with the QA drawer."}</p><div className="tr-check-row"><span>Authentication</span><Tag type={data.mode==="LIVE_API"?"green":"purple"}>{data.mode==="LIVE_API"?"ACTIVE":"DEFERRED"}</Tag></div><div className="tr-check-row"><span>Field mutations</span><Tag type="green">{data.mode==="LIVE_API"?"PERSISTED":"DETERMINISTIC"}</Tag></div></Panel></div></>}
+   {view==="today"&&<TodayIntelligenceView tenantId={tenantId} authorizedForTenantId={tenantId} contextKey={contextKey} progress={qaProgress} startOptions={qaStartOptions} manager={qaManager} todayLocalDate={new Date().toISOString().slice(0,10)} onOpenPlan={()=>setView("plans")} onOpenStop={()=>setView("field")}/>} 
+   {view==="customers"&&<Customer360View tenantId={tenantId} authorizedForTenantId={tenantId} contextKey={contextKey} masters={{doctors:masters.doctors,chemists:masters.chemists,stockists:masters.stockists}} relationships={legacyLinks} loadHistory={customerHistory} onLinkRelationship={async(sk,sid,tk,tid)=>{if((sk==="doctor"||sk==="chemist")&&(tk==="chemist"||tk==="stockist"))data.relationships.link(sk,sid,tk,tid);else throw new Error("Unsupported outlet relationship.")}} onUnlinkRelationship={async id=>data.relationships.unlink(id)} onOpenWorkflow={r=>{setNotice("Customer workflow selected: "+r.workflow);setView(r.workflow==="plan"?"plans":"field")}}/>}
+   {view==="activities"&&<div className="tr-grid-wide"><ActivitiesView tenantId={tenantId} authorizedForTenantId={tenantId} contextKey={contextKey} territories={[{id:territoryId,name:data.state.territory.name}]} customers={{doctors:masters.doctors,chemists:masters.chemists,stockists:masters.stockists}} plannedCalls={data.state.visits.filter(v=>v.status==="PLANNED").map(v=>({planStopId:v.id,label:(v.customerType+" · "+v.customerId),territoryId:v.territoryId,workDate:"2026-10-16"}))} ncaSubtypes={data.state.ncaCategories.filter(x=>x.active).map(x=>({code:x.code,label:x.label}))} towns={data.state.ncaTowns.filter(x=>x.active).map(x=>({id:x.id,name:x.name}))} defaultWorkDate={new Date().toISOString().slice(0,10)} defaultTerritoryId={territoryId} saveMode="HANDOFF" onSaveDraft={async draft=>{if(draft.kind==="NON_CALL_ACTIVITY"){await nca.save({repId:data.auth?.session?.user.id??"rep-hyd-01",category:draft.ncaSubtype as any,town:data.state.ncaTowns.find(x=>x.id===draft.townId)?.name||"Hyderabad",date:draft.workDate,durationMinutes:draft.durationMinutes,reason:draft.reason,remarks:draft.remarks});setNotice("NCA draft created in provider.")}else setNotice("Activity form validated in QA mode.")}}/><Panel eyebrow="NCA RECORDS" title="State transitions">{nca.records.map(r=><div className="tr-history-row" key={r.id}><div><strong>{r.category} · {r.town}</strong><p>{r.durationMinutes} min · {r.reason}</p></div><Tag type={tagType(r.status)}>{r.status}</Tag>{r.status==="DRAFT"&&<Button size="sm" data-testid={"nca-submit-"+r.id} onClick={()=>void Promise.resolve(nca.submit(r.id))}>Submit</Button>}</div>)}</Panel></div>}
+   {view==="edetailing"&&<EDetailingView tenantId={tenantId} authorizedForTenantId={tenantId} contextKey={contextKey} products={masters.products} today={new Date().toISOString().slice(0,10)} linkedVisitId={activeVisit?.customerType==="DOCTOR"?activeVisit.id:undefined}/>}
+   {view==="field"&&<FunctionalQaFieldExecution/>}
+   {view==="plans"&&<MonthlyPlanner api={api} connected={data.mode==="FUNCTIONAL_QA"||Boolean(data.auth?.tenantId)} functionalQa={data.mode==="FUNCTIONAL_QA"} busy={data.loading} plans={data.mode==="LIVE_API"?data.plans:[plan]} units={data.mode==="LIVE_API"?data.units:[{id:territoryId,parentId:null,type:"territory",code:"QA-HYD",name:data.state.territory.name,status:"active"}]} masters={masters} focusCustomer={null} perform={async(fn,label)=>{await fn();if(data.mode==="LIVE_API")await data.refresh();setNotice(label)}} onPlanNca={()=>setView("activities")}/>}
+   {(["trade","inventory","workforce","reports","approvals"] as Area[]).includes(view)&&<FunctionalQaBusinessWorkspace mode={view as BusinessArea}/>}
+   {view==="manager"&&<FunctionalQaManagerCommand/>}
+   {view==="admin"&&(data.mode==="LIVE_API"?<LiveOrganizationAdmin/>:<OrganizationQaAdmin/>)}
+   {view==="platform"&&(data.mode==="LIVE_API"?<LivePlatformAdmin/>:<PlatformQaPreview/>)}
+  </div>
+  <footer className="tr-footer-actions"><div><strong>{data.state.organization.name}</strong><p>{data.mode==="LIVE_API"?"Live API provider · tenant/RBAC enforced":"Functional QA provider · authentication intentionally deferred"}</p></div><Tag type="green">{data.mode==="LIVE_API"?"LIVE READY":"SCENARIO READY"}</Tag></footer></main>
+ </div>;
 }

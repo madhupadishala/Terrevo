@@ -31,7 +31,8 @@ button, input, textarea, select { font: inherit; }
 .tr-workspace-dot, .tr-foot-dot, .tr-live span { display: inline-block; height: 7px; width: 7px; border-radius: 100%; background: #51d6a7; flex: 0 0 7px; }
 .tr-chevron { margin-left: auto; font-size: 15px; color: #8da9c2; }
 .tr-nav-label { margin: 0 0 10px 15px; color: #7391ad; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
-.tr-nav { display: flex; flex-direction: column; gap: 4px; }
+.tr-nav { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: #577594 transparent; scrollbar-width: thin; padding-right: 3px; }
+.tr-brand, .tr-workspace, .tr-nav-label, .tr-sidebar-foot { flex-shrink: 0; }
 .tr-nav-item { display: flex; align-items: center; gap: 13px; background: none; border: 0; color: #b1c2d3; text-align: left; cursor: pointer; padding: 13px 13px; border-radius: 5px; font-size: 13px; font-weight: 500; width: 100%; transition: background .2s; }
 .tr-nav-item:hover { background: #1b3855; color: #fff; }
 .tr-nav-item.selected { background: #244b74; color: #fff; font-weight: 700; border-left: 3px solid #6bdac7; padding-left: 10px; }
@@ -133,7 +134,7 @@ button, input, textarea, select { font: inherit; }
   .tr-brand strong { font-size: 20px; }
   .tr-mark { width: 32px; height: 32px; font-size: 23px; }
   .tr-workspace, .tr-nav-label, .tr-sidebar-foot { display: none; }
-  .tr-nav { flex-direction: row; overflow-x: auto; gap: 4px; padding-bottom: 3px; }
+  .tr-nav { flex-direction: row; flex: none; min-height: auto; overflow-x: auto; overflow-y: hidden; gap: 4px; padding: 0 0 3px; }
   .tr-nav-item { white-space: nowrap; width: auto; padding: 9px 12px; font-size: 11px; }
   .tr-nav-item.selected { padding-left: 9px; }
   .tr-nav-glyph { display: none; }
@@ -155,3 +156,75 @@ button, input, textarea, select { font: inherit; }
   .tr-metrics { grid-template-columns: 1fr; }
   .tr-live { display: none; }
 }
+
+
+/* Connected operations workspace — Carbon primitives with Terrevo's own visual grammar */
+.tr-connect-grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr); gap:20px; margin-top:22px; align-items:start; }
+.tr-connect-grid .tr-panel { min-height:330px; }
+.tr-connect-grid .tr-panel p { margin-top:12px; }
+.tr-loading { color:#2866b4; font-weight:600; font-size:13px; margin:18px 0; }
+.tr-grid-wide > .tr-panel { min-height:270px; }
+.tr-panel .cds--btn { max-width:100%; }
+.tr-panel .cds--text-area__wrapper { margin-top:12px; }
+.tr-panel .cds--text-input-wrapper { width:100%; }
+.tr-panel .cds--label { color:#2f465e; }
+.tr-panel .cds--text-input, .tr-panel .cds--text-area { background:#f3f7fa; color:#162b40; }
+.tr-panel .tr-form + .tr-list-sm { margin-top:22px; }
+.tr-panel .tr-form { max-width:640px; }
+.tr-list-sm { margin:18px 0 0; max-height:370px; overflow-y:auto; scrollbar-color:#b5c7dc transparent; }
+.tr-panel .tr-history-row { align-items:center; }
+.tr-history-row .cds--btn { margin-top:7px; }
+.tr-history-row .tr-button-row { margin-top:10px; }
+.tr-tour-stats { padding:15px 0; border-bottom:1px solid #e7ebf0; }
+.tr-tour-stats strong { display:block; font-weight:600; font-size:18px; }
+.tr-panel .tr-button-row { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.tr-form .tr-select { width:100%; min-width:0; }
+.tr-select:disabled { opacity:.6; cursor:not-allowed; }
+.tr-check-row strong { font-weight:600; color:#123456; }
+.tr-footer-actions { background:#fff; border:1px solid #dde6ef; margin-top:28px; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+.tr-footer-actions strong { font-size:13px; }
+.tr-footer-actions p { font-size:11px; color:#8291a0; margin:4px 0 0; }
+.tr-footer-actions .tr-select { max-width:260px; }
+.tr-panel .tr-detail { line-height:1.65; }
+.tr-panel .tr-check-row .cds--tag { max-width:220px; text-align:right; white-space:nowrap; }
+.tr-app .tr-connect-grid .cds--inline-notification { margin-top:0; }
+@media (max-width:1000px) { .tr-connect-grid { grid-template-columns:1fr; } }
+@media (max-width:720px) { .tr-footer-actions { align-items:flex-start; } .tr-connect-grid { margin-top:16px; } }
+
+.tr-business { margin-top:22px; }
+.tr-business .tr-panel { min-width:0; }
+.tr-business .tr-panel h3 { margin:22px 0 12px; }
+.tr-form-three { display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:12px; }
+.tr-business-error { background:#fff4e6; border-left:3px solid #bb7100; padding:13px 18px; color:#6b3d00; font-size:13px; margin-bottom:18px; }
+.tr-record-detail { min-width:0; flex:1; }
+.tr-record-detail strong { word-break:break-word; }
+.tr-record-detail p { overflow-wrap:anywhere; }
+.tr-master-editor { border-top:1px solid #e4eaf0; margin-top:28px; padding-top:18px; }
+.tr-business .cds--btn--ghost { max-width:100%; }
+@media(max-width:600px) {
+  .tr-business .tr-grid-wide { gap:12px; }
+  .tr-form-three { grid-template-columns:1fr; }
+  .tr-business .tr-panel { padding:18px; }
+}
+
+
+/* Calendar-led field tour planning – Terrevo visual system with Carbon controls */
+.tr-monthly-layout { grid-template-columns: minmax(0,1.15fr) minmax(300px,.85fr); }
+.tr-month-heading { display:flex;align-items:center;justify-content:space-between;gap:12px;margin:15px 0 20px; }
+.tr-month-heading h2 { font-size:23px;margin:0; }
+.tr-month-controls { display:flex;align-items:center;gap:3px; }
+.tr-month-grid { display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px; }
+.tr-month-weekday { color:#657c95;font-size:11px;text-align:center;padding:10px 0;font-weight:700; }
+.tr-month-day { min-width:0;min-height:65px;background:#f8fafc;border:1px solid #e5edf4;display:flex;align-items:flex-start;justify-content:space-between;flex-direction:column;padding:8px;text-align:left;color:#25415a;cursor:pointer;border-radius:4px;position:relative; }
+.tr-month-day:hover { border-color:#6e9fd9;background:#f2f8ff; }
+.tr-month-day:focus-visible { outline:3px solid #2871c8;outline-offset:2px; }
+.tr-month-day.tr-month-selected { border-color:#2865bb;background:#e5effd;box-shadow:inset 0 0 0 1px #2865bb; }
+.tr-month-day.tr-month-outside { opacity:.42; }
+.tr-month-day small { color:#2871c8;font-size:9px; }
+.tr-month-day i { display:block;width:7px;height:7px;background:#138875;border-radius:100%;margin-left:auto; }
+.tr-month-summary { margin-top:26px;padding-top:20px;border-top:1px solid #e7eef5; }
+.tr-month-summary > strong { font-size:14px;color:#244661; }
+.tr-monthly-layout .tr-form { margin-top:18px; }
+.tr-monthly-layout .tr-history-row { min-height:55px; }
+@media(max-width:1100px){.tr-monthly-layout {grid-template-columns:1fr;}}
+@media(max-width:480px){.tr-month-grid{gap:2px;}.tr-month-day{min-height:50px;padding:4px;font-size:11px;}.tr-month-weekday{font-size:9px;}.tr-month-heading h2{font-size:19px;}}

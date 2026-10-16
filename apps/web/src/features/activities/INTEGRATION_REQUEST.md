@@ -1,0 +1,2 @@
+# Chat 1 integration
+Pass tenantId, authorizedForTenantId, contextKey rotated on session/role/tenant transitions, authorized territories and customers, planned stops validated by current plan data, and official ncaSubtypes. No verified NCA/unplanned submission, approval, file-upload, evidence or audit endpoint. Confirm taxonomy and field validation against the 84-page guide; do not convert to doctor-call API. onSaveDraft may be wired only after backend validation/RBAC/audit contract is implemented. App shell and styling owned by Chat 1.

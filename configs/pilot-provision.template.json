@@ -1,0 +1,40 @@
+{
+  "tenant": {
+    "name": "REPLACE_WITH_PILOT_ORGANIZATION_NAME",
+    "slug": "replace-with-pilot-slug"
+  },
+  "hierarchy": {
+    "company":   {"code":"PILOT_CO","name":"REPLACE Company"},
+    "division":  {"code":"PILOT_DIV","name":"REPLACE Division"},
+    "zone":      {"code":"PILOT_ZONE","name":"REPLACE Zone"},
+    "region":    {"code":"PILOT_REG","name":"REPLACE Region"},
+    "area":      {"code":"PILOT_AREA","name":"REPLACE Area"},
+    "territory": {"code":"PILOT_TER","name":"REPLACE Territory"}
+  },
+  "users": {
+    "tenantAdmin": {
+      "email": "tenant.admin@example.com",
+      "name": "REPLACE Tenant Administrator",
+      "reuseExistingAuthUser": false
+    },
+    "manager": {
+      "email": "manager@example.com",
+      "name": "REPLACE Pilot Manager",
+      "employeeCode": "PILOT_MGR_01",
+      "reuseExistingAuthUser": false
+    },
+    "mr": {
+      "email": "pilot.mr@example.com",
+      "name": "REPLACE Pilot MR",
+      "employeeCode": "PILOT_MR_01",
+      "reuseExistingAuthUser": false
+    }
+  },
+  "passwordPolicy": {
+    "minLength": 20,
+    "requireUppercase": true,
+    "requireLowercase": true,
+    "requireDigit": true,
+    "requireSymbol": true
+  }
+}

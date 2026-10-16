@@ -1,0 +1,2 @@
+# Chat 1 integration request
+Mount Customer360View from feature folder in App.tsx. Pass tenantId, contextKey rotated on tenant/session/role changes, authorizedForTenantId equal to data tenant only after successful read, masters with doctor/chemist/stockist arrays from api.masters. Optional relationships/history MUST be explicitly authorized, scoped and audited; no verified endpoints yet. Handle onOpenWorkflow with server-verified RBAC. Confirm master field names against Niti guide. No new CSS required; verify mobile UI and keyboard navigation.
