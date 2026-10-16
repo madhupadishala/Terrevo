@@ -97,10 +97,10 @@ test("NORMAL_DAY supports NCA master selections and duration validation",async({
   await page.getByTestId("nav-activities").click();
   await page.getByTestId("nca-kind").selectOption("NON_CALL_ACTIVITY");
   await page.getByTestId("nca-phase").selectOption("PLAN");
-  await expect(page.getByTestId("nca-category")).toContainText("MEETING");
+  await expect(page.getByTestId("nca-category")).toContainText("Meeting");
   await expect(page.getByTestId("nca-town")).toContainText("Hyderabad");
   await page.getByTestId("nca-category").selectOption("MEETING");
-  await page.getByTestId("nca-town").selectOption("Hyderabad");
+  await page.getByTestId("nca-town").selectOption("town-hyd");
   await page.getByTestId("nca-reason").fill("Regional meeting");
   await page.getByTestId("nca-duration").fill("15");
   await expect(page.getByText("NCA duration must be between 30 minutes and 10 hours.")).toBeVisible();
