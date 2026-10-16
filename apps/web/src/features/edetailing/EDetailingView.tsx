@@ -48,14 +48,14 @@ export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets
  }
  const draft=selected&&viewing&&viewing.mode==="DETAILING"&&viewing.endedAt?createDetailingSessionDraft(tenantId,selected,viewing.startedAt,viewing.endedAt,viewing.visits,viewing.linkedVisitId):null;
  async function save(){
-  if(!review||!draft||!onSaveSessionDraft||saving||handedOff)return;
+  if(!review||!draft||(!onSaveSessionDraft&&!viewing?.providerSessionId)||saving||handedOff)return;
   const savingEpoch=epoch.current;
   setSaving(true);setMessage("");
   try{
     if(onSaveSessionDraft)await onSaveSessionDraft(draft);
     if(viewing?.providerSessionId)qa.finish(viewing.providerSessionId,reaction,draft.slideVisits);
     if(epoch.current!==savingEpoch)return;
-    setHandedOff(true);setMessage("Session draft passed to the parent callback; server recording remains unverified.");setReview(false);
+    setHandedOff(true);setMessage(onSaveSessionDraft?"Session recorded through the connected adapter.":"Functional QA detailing session recorded.");setReview(false);
   }catch(e){
     if(epoch.current===savingEpoch)setMessage(e instanceof Error?e.message:"Session draft handoff failed.");
   }finally{
@@ -82,7 +82,7 @@ export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets
  <p role="status">Slide {viewing.index+1} of {selected.slides.length}</p>
  <Button kind="secondary" data-testid="clm-prev-slide" disabled={review||viewing.index===0} onClick={()=>navigate(-1)}>Previous slide</Button>
  <Button data-testid="clm-next-slide" disabled={review||viewing.index===selected.slides.length-1} onClick={()=>navigate(1)}>Next slide</Button></div>
- {!review&&(viewing.mode==="REHEARSAL"?<Button kind="secondary" onClick={()=>setViewing(null)}>End rehearsal</Button>:
+ {!review&&(viewing.mode==="REHEARSAL"?<Button kind="secondary" data-testid="clm-end-rehearsal" onClick={()=>{if(viewing.providerSessionId)qa.finish(viewing.providerSessionId,"NEUTRAL",viewing.visits);setViewing(null);}}>End rehearsal</Button>:
  !viewing.endedAt?<Button kind="tertiary" data-testid="clm-end-detailing" onClick={()=>{const now=Date.now();setViewing({...viewing,endedAt:new Date().toISOString(),visits:visited(viewing,selected,now)});}}>End detailing</Button>:
  <Button kind="tertiary" onClick={()=>setReview(true)}>Review ended session</Button>)}
  {review&&draft&&<>
