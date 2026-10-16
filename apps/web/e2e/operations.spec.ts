@@ -12,7 +12,7 @@ const USER = "88888888-8888-4888-8888-888888888888";
 test("functional QA provider is interactive without login or server writes", async ({ page }) => {
   const writes:string[]=[];
   page.on("request",request=>{if(["POST","PUT","PATCH","DELETE"].includes(request.method()))writes.push(request.url());});
-  await page.goto("/");
+  await page.goto("/?qa=1");
   await expect(page.locator("#account-email")).toHaveCount(0);
   await expect(page.getByText("QA DATA PROVIDER",{exact:true})).toBeVisible();
 
