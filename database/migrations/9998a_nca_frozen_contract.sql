@@ -1,7 +1,7 @@
 begin;
 
 alter table public.nca_records drop constraint if exists nca_records_duration_minutes_check;
-alter table public.nca_records add constraint nca_records_duration_minutes_check check(duration_minutes between 30 and 600);
+alter table public.nca_records add constraint nca_records_duration_minutes_check check(duration_minutes between 30 and 600) not valid;
 alter table public.nca_records drop constraint if exists nca_records_status_check;
 alter table public.nca_records add constraint nca_records_status_check check(status in('DRAFT','SUBMITTED','APPROVED','REJECTED'));
 alter table public.nca_records add column if not exists reviewed_by uuid;
