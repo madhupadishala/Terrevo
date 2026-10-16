@@ -10,7 +10,7 @@ export function FunctionalQaManagerCommand(){
     <div><span>TEAM</span><strong>{m.teamMembers}</strong></div><div><span>ACTIVE TOURS</span><strong>{m.activeTours}</strong></div><div><span>SUBMITTED DAYS</span><strong>{m.submittedDays}</strong></div>
     <div><span>PLANNED CALLS</span><strong>{m.plannedCalls}</strong></div><div><span>COMPLETED</span><strong>{m.completedCalls}</strong></div>
    </div>
-   <div className="tr-check-row"><span>Tour plans</span><strong>{m.pendingTourPlans}</strong></div>
+   <div className="tr-check-row"><span>Pending DCRs</span><strong>{m.pendingDcrs}</strong></div><div className="tr-check-row"><span>Tour plans</span><strong>{m.pendingTourPlans}</strong></div>
    <div className="tr-check-row"><span>GPS exceptions</span><strong>{m.pendingGpsExceptions}</strong></div>
    <div className="tr-check-row"><span>NCAs</span><strong>{m.pendingNca}</strong></div>
    <div className="tr-check-row"><span>Expenses</span><strong>{m.pendingExpenses}</strong></div>
