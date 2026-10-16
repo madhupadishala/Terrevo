@@ -548,11 +548,28 @@ export default function App() {
           key={contextKey || "disconnected"} tenantId={tenantId} authorizedForTenantId={authorizedForTenantId}
           contextKey={contextKey} masters={{doctors:masters.doctors??[],chemists:masters.chemists??[],stockists:masters.stockists??[]}}
           relationships={customerRelationships} loading={loading}
-          loadHistory={(kind,id)=>api.customerHistory(kind,id)}
+          loadHistory={async(kind,id)=>{
+            if(FUNCTIONAL_QA_MODE){
+              if(kind==="doctor")return [{tenantId:QA_TENANT_ID,customerKind:"doctor",customerId:id,id:"qa-dcr",occurredAt:new Date().toISOString(),activityType:"DCR",summary:"QA doctor call · Detailed"}];
+              if(kind==="chemist")return [{tenantId:QA_TENANT_ID,customerKind:"chemist",customerId:id,id:"qa-rcpa",occurredAt:new Date().toISOString(),activityType:"RCPA",summary:"QA RCPA captured"}];
+              return [{tenantId:QA_TENANT_ID,customerKind:"stockist",customerId:id,id:"qa-pob",occurredAt:new Date().toISOString(),activityType:"POB",summary:"QA POB booked"}];
+            }
+            return api.customerHistory(kind,id);
+          }}
           onLinkRelationship={async(sourceKind,sourceId,targetKind,targetId)=>{
+            if(FUNCTIONAL_QA_MODE){
+              setCustomerRelationships(rows=>{
+                const exists=rows.some(r=>r.sourceKind===sourceKind&&r.sourceId===sourceId&&r.targetKind===targetKind&&r.targetId===targetId);
+                if(exists)return rows;
+                return [...rows,{id:crypto.randomUUID(),tenantId:QA_TENANT_ID,sourceKind,sourceId,targetKind,targetId,relationship:sourceKind==="doctor"?"DOCTOR_CHEMIST":"CHEMIST_STOCKIST",createdAt:new Date().toISOString()}];
+              });return;
+            }
             await api.linkCustomer(sourceKind,sourceId,targetKind,targetId);await refresh(access);
           }}
-          onUnlinkRelationship={async id=>{await api.unlinkCustomer(id);await refresh(access);}}
+          onUnlinkRelationship={async id=>{
+            if(FUNCTIONAL_QA_MODE){setCustomerRelationships(rows=>rows.filter(r=>r.id!==id));return;}
+            await api.unlinkCustomer(id);await refresh(access);
+          }}
           onOpenWorkflow={request=>{
             if(!connected&&!FUNCTIONAL_QA_MODE)return;
             const group=masters[request.customerType==="doctor"?"doctors":request.customerType==="chemist"?"chemists":"stockists"]??[];
