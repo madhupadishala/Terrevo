@@ -650,11 +650,11 @@ export default function App() {
           linkedVisitId={visit?.id} loading={loading} />}
 
         {view==="plans" && <MonthlyPlanner key={[contextKey,focusedCustomer?.kind??"",focusedCustomer?.id??""].join(":")}
-          api={api} connected={connected} busy={busy} plans={plans} units={units} masters={masters}
+          api={api} connected={connected} functionalQa={FUNCTIONAL_QA_MODE} busy={busy} plans={plans} units={units} masters={masters}
           focusCustomer={focusedCustomer} perform={(fn,title)=>action(fn,title)} onPlanNca={(date,territory)=>{setNcaPlanningDate(date);setActivityPlanningKind("NON_CALL_ACTIVITY");setActivityPlanningTerritory(territory||"");setFocusedCustomer(null);setView("activities");}} />}
 
         {(["trade","inventory","workforce","approvals","reports"] as Area[]).includes(view) &&
-          <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} manager={manager} busy={busy}
+          <BusinessWorkspace key={tenantId} mode={view as BusinessArea} api={api} connected={connected} functionalQa={FUNCTIONAL_QA_MODE} manager={manager} busy={busy}
             visit={visit} progress={progress} masters={masters} relationships={customerRelationships} perform={(fn,title)=>action(fn,title)} />}
 
         {view==="manager"&&manager&&<Panel eyebrow="MANAGER DECISIONS" title="Unplanned customer-call review">
