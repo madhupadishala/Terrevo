@@ -69,6 +69,7 @@ export function LiveApiProvider({children}:{children:ReactNode}){
  const [state,setState]=useState<QaState>(EMPTY),[loading,setLoading]=useState(false),[error,setError]=useState<string|null>(null),[platformAdmin,setPlatformAdmin]=useState(false);
  const [access,setAccess]=useState<AccessContext|null>(null),[units,setUnits]=useState<OrgUnit[]>([]),[masters,setMasters]=useState<Record<string,Master[]>>({}),[plans,setPlans]=useState<Plan[]>([]),[startOptions,setStartOptions]=useState<Array<{planId:string;planDayId:string;workDate:string;territoryId:string}>>([]);
  const [liveManagerMetrics,setLiveManagerMetrics]=useState(managerMetrics(EMPTY)),[liveQueue,setLiveQueue]=useState<ApprovalQueueItem[]>([]);
+ const clearTenantState=useCallback(()=>{setState(EMPTY);setAccess(null);setUnits([]);setMasters({});setPlans([]);setStartOptions([]);setLiveManagerMetrics(managerMetrics(EMPTY));setLiveQueue([]);},[]);
  const tokenMap=useRef(new Map<string,string>()),api=useMemo(()=>new TerrevoWebApi(s=>{setSession(s);if(s)sessionStorage.setItem("terrevo-session",JSON.stringify(s));else sessionStorage.removeItem("terrevo-session")}),[]);
 
  const hydrate=useCallback(async()=>{
@@ -118,13 +119,13 @@ export function LiveApiProvider({children}:{children:ReactNode}){
   }catch(e){setError(e instanceof Error?e.message:"Unable to load live Terrevo data");throw e}finally{setLoading(false)}
  },[api,session?.user.id,tenantId,tenants]);
 
- const chooseTenant=useCallback(async(id:string)=>{api.setTenant(id);setTenantId(id);await Promise.resolve();},[api]);
+ const chooseTenant=useCallback(async(id:string)=>{clearTenantState();api.setTenant(id);setTenantId(id);await Promise.resolve();},[api,clearTenantState]);
  useEffect(()=>{if(tenantId&&api.connected)void hydrate()},[tenantId,session?.accessToken]);
  useEffect(()=>{const raw=sessionStorage.getItem("terrevo-session");if(!raw)return;try{const saved=JSON.parse(raw) as Session;api.setSession(saved);setSession(saved);void (async()=>{try{const [ts,isPlatform]=await Promise.all([api.tenants(),api.platformContext().catch(()=>false)]);setTenants(ts);setPlatformAdmin(isPlatform);if(ts[0]){api.setTenant(ts[0].id);setTenantId(ts[0].id)}}catch{api.reset()}})()}catch{sessionStorage.removeItem("terrevo-session")}},[api]);
  const refresh=useCallback(async()=>{await hydrate()},[hydrate]);
  const login=useCallback(async(email:string,password:string)=>{setLoading(true);setError(null);try{const ss=await api.login(email,password);setSession(ss);const [ts,isPlatform]=await Promise.all([api.tenants(),api.platformContext().catch(()=>false)]);setTenants(ts);setPlatformAdmin(isPlatform);if(ts[0]){api.setTenant(ts[0].id);setTenantId(ts[0].id)}else setState({...EMPTY,organization:{id:"platform",name:"Platform administration"}})}catch(e){setError(e instanceof Error?e.message:"Login failed");throw e}finally{setLoading(false)}},[api]);
- const logout=useCallback(async()=>{await api.logout();setSession(null);setTenants([]);setTenantId(null);setAccess(null);setState(EMPTY)},[api]);
- const selectTenant=useCallback(async(id:string)=>{if(!tenants.some(x=>x.id===id))throw new Error("Tenant is not accessible");api.setTenant(id);setTenantId(id)},[api,tenants]);
+ const logout=useCallback(async()=>{await api.logout();setSession(null);setTenants([]);setTenantId(null);clearTenantState()},[api,clearTenantState]);
+ const selectTenant=useCallback(async(id:string)=>{if(!tenants.some(x=>x.id===id))throw new Error("Tenant is not accessible");clearTenantState();api.setTenant(id);setTenantId(id)},[api,tenants,clearTenantState]);
  const mutate=useCallback(async(fn:()=>Promise<unknown>)=>{await fn();await hydrate()},[hydrate]);
  const idForToken=(token:string)=>{let id=tokenMap.current.get(token);if(!id){id=crypto.randomUUID();tokenMap.current.set(token,id)}return id};
  const active=activeVisit(state);
