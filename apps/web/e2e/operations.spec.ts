@@ -9,21 +9,31 @@ const VISIT = "66666666-6666-4666-8666-666666666666";
 const TOUR_PLAN = "77777777-7777-4777-8777-777777777777";
 const USER = "88888888-8888-4888-8888-888888888888";
 
-test("public UI exposes role workspaces without inventing data or performing writes", async ({ page }) => {
+test("functional QA mode exposes workspaces and fields without login or server writes", async ({ page }) => {
   const writes: string[] = [];
   page.on("request", request => {
     if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method())) writes.push(request.url());
   });
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Operations, connected." })).toBeVisible();
-  await expect(page.getByText("Terrevo is online.")).toHaveCount(0);
+  await expect(page.locator("#account-email")).toHaveCount(0);
+  await expect(page.getByText("FUNCTIONAL QA",{exact:true})).toBeVisible();
+
   await page.getByRole("button", { name: "Field execution", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Start My Day" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start My Day (GPS)" })).toBeDisabled();
+  await expect(page.locator("#approved-day")).toHaveValue("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  await expect(page.getByRole("button", { name: "Start My Day (GPS)" })).toBeEnabled();
+
   await page.getByRole("button", { name: "Manager command" }).click();
-  await expect(page.getByText("Manager workspace is permission-gated")).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Tour approvals"})).toBeVisible();
+
+  await page.getByRole("button", { name: "Organization admin" }).click();
+  await expect(page.locator("#org-code")).toBeVisible();
+  await expect(page.locator("#masters-kind")).toBeVisible();
+  await expect(page.locator("#assign-user")).toBeVisible();
+
   await page.getByRole("button", { name: "Platform Super Admin" }).click();
-  await expect(page.getByRole("heading", { name: "Connect an existing authorized account" })).toBeVisible();
+  await expect(page.locator("#qa-platform-name")).toBeVisible();
+  await expect(page.locator("#qa-platform-slug")).toBeVisible();
   expect(writes).toEqual([]);
 });
 
