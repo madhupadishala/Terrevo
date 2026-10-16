@@ -16,6 +16,7 @@ test("FULL_FIELD_DAY exercises detailing, sampling, chemist RCPA and POB through
   await expect(page.getByRole("heading",{name:"Core Brand Aid"})).toBeVisible();
   await page.getByTestId("clm-next-slide").click();
   await page.getByTestId("clm-end-detailing").click();
+  await page.getByTestId("clm-review-session").click();
   await page.getByTestId("clm-reaction").selectOption("POSITIVE");
   await page.getByTestId("clm-save-session").click();
   await expect(page.getByText("Functional QA detailing session recorded.")).toBeVisible();
@@ -95,6 +96,7 @@ test("NORMAL_DAY supports NCA master selections and duration validation",async({
   await page.goto("/");
   await page.getByRole("button",{name:"NCA & activities",exact:true}).click();
   await page.getByTestId("nca-kind").selectOption("NON_CALL_ACTIVITY");
+  await page.getByTestId("nca-phase").selectOption("PLAN");
   await expect(page.getByTestId("nca-category")).toContainText("MEETING");
   await expect(page.getByTestId("nca-town")).toContainText("Hyderabad");
   await page.getByTestId("nca-category").selectOption("MEETING");
