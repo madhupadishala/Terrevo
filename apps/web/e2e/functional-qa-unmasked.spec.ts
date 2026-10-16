@@ -1,7 +1,8 @@
 import {test,expect} from "@playwright/test";
 
 test("functional QA provider exposes operational fields without login",async({page})=>{
-  const writes:string[]=[];
+  const writes:string[]=[];const consoleErrors:string[]=[];
+  page.on("console",msg=>{if(msg.type()==="error")consoleErrors.push(msg.text())});page.on("pageerror",err=>consoleErrors.push(err.message));
   page.on("request",request=>{if(["POST","PUT","PATCH","DELETE"].includes(request.method()))writes.push(request.url());});
   await page.goto("/");
   await expect(page.locator("#account-email")).toHaveCount(0);
@@ -52,4 +53,5 @@ test("functional QA provider exposes operational fields without login",async({pa
   await expect(page.getByTestId("platform-code")).toBeVisible();
 
   expect(writes).toEqual([]);
+  expect(consoleErrors).toEqual([]);
 });
