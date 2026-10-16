@@ -9,3 +9,8 @@ coverage/
 .expo/
 .DS_Store
 *.log
+
+# Local pilot provisioning / UAT artifacts
+configs/pilot-provision.json
+pilot-credentials.json
+pilot-run/
