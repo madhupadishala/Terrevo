@@ -6,6 +6,7 @@ import type { Master, OrgUnit, Plan, PlanDay, PlanStop, TerrevoWebApi } from "./
 type Props = {
   api: TerrevoWebApi;
   connected: boolean;
+  functionalQa?: boolean;
   busy: boolean;
   plans: Plan[];
   units: OrgUnit[];
@@ -15,7 +16,7 @@ type Props = {
   onPlanNca?: (date: string, territoryId: string | null) => void;
 };
 
-export function MonthlyPlanner({ api, connected, busy, plans, units, masters, focusCustomer, perform, onPlanNca }: Props) {
+export function MonthlyPlanner({ api, connected, functionalQa=false, busy, plans, units, masters, focusCustomer, perform, onPlanNca }: Props) {
   const [level, setLevel] = useState<"monthly"|"weekly"|"daily">("monthly");
   const [month, setMonth] = useState(localDate());
   const [selected, setSelected] = useState(localDate());
@@ -30,6 +31,7 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
   const grid = useMemo(() => getMonthGrid(month), [month]);
 
   useEffect(() => {
+    if(functionalQa){const local:Record<string,Plan>={};for(const p of plans)if(p.days)local[p.id]=p;setDetails(local);setReadFailures([]);return;}
     if (!connected) { setDetails({});setReadFailures([]);return; }
     let alive = true;
     // The list endpoint returns only week summaries. Fetch the server's full days.
@@ -46,7 +48,7 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
         setReadFailures(failures);
       });
     return () => { alive = false; };
-  }, [connected, api, plans]);
+  }, [connected, functionalQa, api, plans]);
 
   const selectedWeek = weekStart(selected);
   const weekDays = useMemo(() => Array.from({length:7},(_,i)=>{const d=new Date(Number(selectedWeek.slice(0,4)),Number(selectedWeek.slice(5,7))-1,Number(selectedWeek.slice(8)),12);d.setDate(d.getDate()+i);return localDate(d);}),[selectedWeek]);
@@ -88,7 +90,7 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
 
 
   useEffect(() => {
-    if (!connected || !focusCustomer) return;
+    if ((!connected&&!functionalQa) || !focusCustomer) return;
     const list = masters[focusCustomer.kind==="doctor"?"doctors":focusCustomer.kind==="chemist"?"chemists":"stockists"]??[];
     const record = list.find(m=>m.id===focusCustomer.id&&m.status==="active"&&m.territoryId===focusCustomer.territoryId);
     if (!record || !territories.some(t=>t.id===focusCustomer.territoryId)) return;
@@ -96,7 +98,7 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
     setTerritoryId(focusCustomer.territoryId);
     setTargetId(focusCustomer.id);
     setLevel("daily");
-  }, [connected, focusCustomer, masters, units]);
+  }, [connected, functionalQa, focusCustomer, masters, units]);
 
   function addStop() {
     if (!targetId || !territoryId) return;
@@ -115,7 +117,7 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
     });
   }
   async function saveDay() {
-    if (!connected || busy || !modifiable || detailFailed || !territoryId || !stops.length) return;
+    if ((!connected&&!functionalQa) || busy || !modifiable || detailFailed || !territoryId || !stops.length) return;
     const entry: PlanDay = { date: selected, territoryId, remarks: dayRemark.trim()||null,
       stops: stops.map((s,i) => ({ ...s, sequence:i+1 })) };
     const combined = [...(detail?.days??[]).filter(d => d.date!==selected),entry]
@@ -179,7 +181,7 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
       <div className="tr-month-controls"><Button kind="ghost" size="sm" onClick={()=>{const d=new Date(Number(selected.slice(0,4)),Number(selected.slice(5,7))-1,Number(selected.slice(8)),12);d.setDate(d.getDate()-7);setSelected(localDate(d));}}>← Previous week</Button><Button kind="ghost" size="sm" onClick={()=>{const d=new Date(Number(selected.slice(0,4)),Number(selected.slice(5,7))-1,Number(selected.slice(8)),12);d.setDate(d.getDate()+7);setSelected(localDate(d));}}>Next week →</Button></div>
       {weekDays.map(date=>{const day=weeklyDays.find(d=>d.date===date);return <div key={date} className="tr-history-row"><div><strong>{date}</strong><p>{day?`${day.stops.length} planned calls · ${units.find(u=>u.id===day.territoryId)?.name??day.territoryId}`:"No scheduled calls"}</p></div><Button kind="ghost" size="sm" onClick={()=>{setSelected(date);setLevel("daily");}}>View / plan day</Button></div>})}
       {plan&&!detail&&<p role="status">Weekly details loading or unavailable. Submission is disabled.</p>}
-      <Button disabled={!connected||busy||!plan||!detail||!modifiable||weeklyDays.length===0} onClick={()=>plan&&void perform(()=>api.submitPlan(plan.id),"Weekly tour plan submitted for manager approval")}>Submit weekly plan for approval</Button>
+      <Button disabled={!functionalQa&&!connected||busy||!plan||!detail||!modifiable||weeklyDays.length===0} onClick={()=>plan&&void perform(()=>api.submitPlan(plan.id),"Weekly tour plan submitted for manager approval")}>Submit weekly plan for approval</Button>
       <p className="tr-detail">All dates and call sequences are saved in the existing weekly plan. Manager approval applies to the submitted week.</p>
     </section>}
     {level==="monthly"&&<section className="tr-panel"><span className="tr-section-kicker">MONTH WEEKS</span><h2>Weekly breakdown</h2>{monthWeeks.map(week=>{const p=plans.find(x=>x.weekStart===week);const d=p?details[p.id]?.days??[]:[];return <div key={week} className="tr-history-row"><div><strong>Week of {week}</strong><p>{d.length} planned days · {d.reduce((n,x)=>n+x.stops.length,0)} calls · {p?.status??"UNPLANNED"}</p></div><Button kind="ghost" size="sm" onClick={()=>{setSelected(week);setLevel("weekly");}}>Open week</Button></div>})}</section>}
@@ -192,24 +194,24 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
       {plan&&!detail&&<p className="tr-detail">Loading authorized weekly plan details…</p>}
       <div className="tr-form">
         <label className="tr-select-label" htmlFor="calendar-territory">Territory</label>
-        <select id="calendar-territory" className="tr-select" value={territoryId} disabled={!connected||!modifiable||Boolean(plan&&!detail)}
+        <select id="calendar-territory" className="tr-select" value={territoryId} disabled={!functionalQa&&!connected||!modifiable||Boolean(plan&&!detail)}
           onChange={e=>{setTerritoryId(e.target.value);setTargetId("");}}>
           <option value="">Select assigned territory</option>
           {territories.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
         <label className="tr-select-label" htmlFor="calendar-visit-type">Call type</label>
-        <select id="calendar-visit-type" className="tr-select" value={stopType} disabled={!connected||!modifiable}
+        <select id="calendar-visit-type" className="tr-select" value={stopType} disabled={!functionalQa&&!connected||!modifiable}
           onChange={e=>{setStopType(e.target.value as typeof stopType);setTargetId("");}}>
           <option value="doctor">Doctor</option><option value="chemist">Chemist</option><option value="stockist">Stockist</option>
         </select>
         <label className="tr-select-label" htmlFor="calendar-account">Planned account</label>
-        <select id="calendar-account" className="tr-select" value={targetId} disabled={!connected||!modifiable||!territoryId} onChange={e=>setTargetId(e.target.value)}>
+        <select id="calendar-account" className="tr-select" value={targetId} disabled={!functionalQa&&!connected||!modifiable||!territoryId} onChange={e=>setTargetId(e.target.value)}>
           <option value="">Select existing account</option>
           {targets.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
         <TextInput id="calendar-remark" labelText="Stop remarks" value={stopRemark} maxLength={1000}
           disabled={!modifiable} onChange={e=>setStopRemark(e.target.value)}/>
-        <Button kind="secondary" disabled={!connected||busy||!modifiable||!territoryId||!targetId||Boolean(plan&&!detail)}
+        <Button kind="secondary" disabled={!functionalQa&&!connected||busy||!modifiable||!territoryId||!targetId||Boolean(plan&&!detail)}
           onClick={addStop}>Add planned call</Button>
       </div>
       {focusCustomer&&<p className="tr-detail" role="status">Selected from Customer 360: <strong>{focusCustomer.name}</strong> ({focusCustomer.kind}). Confirm the date and add the call before saving.</p>}
@@ -222,10 +224,10 @@ export function MonthlyPlanner({ api, connected, busy, plans, units, masters, fo
       <div className="tr-form">
         <TextInput id="calendar-day-remark" labelText="Day remarks (optional)" maxLength={1000}
           disabled={!modifiable} value={dayRemark} onChange={e=>setDayRemark(e.target.value)}/>
-        <Button disabled={!connected||busy||!modifiable||!territoryId||!stops.length||Boolean(plan&&!detail)}
+        <Button disabled={!functionalQa&&!connected||busy||!modifiable||!territoryId||!stops.length||Boolean(plan&&!detail)}
           onClick={()=>void saveDay()}>Save {plan?"updated":"new"} weekly plan</Button>
       </div>
-      <div className="tr-month-controls"><Button kind="secondary" size="sm" disabled={!connected||!onPlanNca} onClick={()=>onPlanNca?.(selected,territoryId||existingDay?.territoryId||null)}>Plan NCA for this day</Button><Button kind="ghost" size="sm" onClick={()=>setLevel("weekly")}>Return to weekly plan</Button></div>
+      <div className="tr-month-controls"><Button kind="secondary" size="sm" disabled={!functionalQa&&!connected||!onPlanNca} onClick={()=>onPlanNca?.(selected,territoryId||existingDay?.territoryId||null)}>Plan NCA for this day</Button><Button kind="ghost" size="sm" onClick={()=>setLevel("weekly")}>Return to weekly plan</Button></div>
       <p className="tr-detail">NCA uses the controlled NCA workflow and remains a distinct activity record; it is never saved as a customer visit.</p>
     </section>}
   </div></div>;
