@@ -41,6 +41,34 @@ const MASTER_KINDS = ["employees", "doctors", "chemists", "stockists", "products
 const FUNCTIONAL_QA_MODE = true;
 const QA_TENANT_ID = "qa-functional-tenant";
 const QA_CONTEXT_KEY = "qa-functional-context";
+
+const QA_TERRITORY_ID = "11111111-1111-4111-8111-111111111111";
+const QA_DOCTOR_ID = "22222222-2222-4222-8222-222222222222";
+const QA_CHEMIST_ID = "33333333-3333-4333-8333-333333333333";
+const QA_STOCKIST_ID = "44444444-4444-4444-8444-444444444444";
+const QA_PRODUCT_ID = "55555555-5555-4555-8555-555555555555";
+const QA_SAMPLE_ID = "66666666-6666-4666-8666-666666666666";
+const QA_GIFT_ID = "77777777-7777-4777-8777-777777777777";
+const QA_UNITS:OrgUnit[]=[{id:QA_TERRITORY_ID,parentId:null,type:"territory",code:"QA-HYD",name:"Hyderabad Central",status:"active"}];
+const QA_MASTERS:Record<string,Master[]>={
+  employees:[{id:"88888888-8888-4888-8888-888888888888",code:"MR-QA-01",name:"QA Medical Representative",status:"active",territoryId:QA_TERRITORY_ID}],
+  doctors:[{id:QA_DOCTOR_ID,code:"DR-QA-01",name:"Dr. Ananya Rao",status:"active",specialty:"Cardiology",qualification:"MD",territoryId:QA_TERRITORY_ID,address:"Banjara Hills, Hyderabad"}],
+  chemists:[{id:QA_CHEMIST_ID,code:"CH-QA-01",name:"Central Care Pharmacy",status:"active",territoryId:QA_TERRITORY_ID,address:"Jubilee Hills, Hyderabad"}],
+  stockists:[{id:QA_STOCKIST_ID,code:"ST-QA-01",name:"Metro Pharma Distributors",status:"active",territoryId:QA_TERRITORY_ID,address:"Ameerpet, Hyderabad"}],
+  products:[{id:QA_PRODUCT_ID,code:"PR-QA-01",name:"Terrevo Test Brand",status:"active",divisionId:"qa-division"}],
+  samples:[{id:QA_SAMPLE_ID,code:"SM-QA-01",name:"Terrevo Test Sample",status:"active",productId:QA_PRODUCT_ID}],
+  gifts:[{id:QA_GIFT_ID,code:"GF-QA-01",name:"Patient Education Kit",status:"active"}],
+};
+const QA_ACCESS:AccessContext={
+  roles:[
+    {roleKey:"MR",scopeOrgUnitId:QA_TERRITORY_ID},
+    {roleKey:"MANAGER",scopeOrgUnitId:QA_TERRITORY_ID},
+    {roleKey:"TENANT_ADMIN",scopeOrgUnitId:QA_TERRITORY_ID},
+  ],
+  permissions:["TOUR_PLAN_OWN","TOUR_VIEW_TEAM","TOUR_APPROVE","MASTER_VIEW","MASTER_ADMIN"],
+  orgAssignments:[{orgUnitId:QA_TERRITORY_ID,isPrimary:true}],
+};
+
 const dateTime = (value: string | null | undefined) => value ? new Date(value).toLocaleString() : "—";
 const errText = (error: unknown) => error instanceof Error ? error.message : "The operation could not be completed.";
 const fmt = (v: number | string | null | undefined) => v == null ? "—" : String(v);
@@ -68,8 +96,8 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const api = useMemo(() => new TerrevoWebApi(setSession), []);
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [tenantId, setTenantId] = useState("");
-  const [access, setAccess] = useState<AccessContext | null>(null);
+  const [tenantId, setTenantId] = useState(FUNCTIONAL_QA_MODE?QA_TENANT_ID:"");
+  const [access, setAccess] = useState<AccessContext | null>(FUNCTIONAL_QA_MODE?QA_ACCESS:null);
   const tenantGeneration = useRef(0);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [email, setEmail] = useState("");
@@ -84,8 +112,8 @@ export default function App() {
   const [pending, setPending] = useState<Plan[]>([]);
   const [command, setCommand] = useState<ManagerCommand | null>(null);
   const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
-  const [units, setUnits] = useState<OrgUnit[]>([]);
-  const [masters, setMasters] = useState<Record<string, Master[]>>({});
+  const [units, setUnits] = useState<OrgUnit[]>(FUNCTIONAL_QA_MODE?QA_UNITS:[]);
+  const [masters, setMasters] = useState<Record<string, Master[]>>(FUNCTIONAL_QA_MODE?QA_MASTERS:{});
   const [selectedOption, setSelectedOption] = useState("");
   const [stopId, setStopId] = useState("");
   const [gpsReason, setGpsReason] = useState("");
@@ -121,7 +149,7 @@ export default function App() {
 
   function resetTenantState() {
     setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
-    setCommand(null); setAnalytics(null); setUnits([]); setMasters({});
+    setCommand(null); setAnalytics(null); setUnits(FUNCTIONAL_QA_MODE?QA_UNITS:[]); setMasters(FUNCTIONAL_QA_MODE?QA_MASTERS:{});
     setSelectedOption(""); setStopId(""); setGpsReason(""); setCallOutcome("");
     setCallRemarks(""); setShortDayReason("");
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
@@ -208,8 +236,14 @@ export default function App() {
   async function action(fn: () => Promise<unknown>, title: string, shouldRefresh = true) {
     setBusy(true); setNotice(null);
     try {
-      await fn();
-      if (shouldRefresh) await refresh(access);
+      if (!FUNCTIONAL_QA_MODE) {
+        await fn();
+        if (shouldRefresh) await refresh(access);
+      }
+      if (FUNCTIONAL_QA_MODE) {
+        setNotice({kind:"success",title,message:"Functional QA interaction accepted locally. No authenticated server mutation was attempted."});
+        return;
+      }
       // Keep the confirmed result visible: a partial-refresh warning must not
       // incorrectly replace an accepted business transaction.
       setNotice({ kind: "success", title, message: "The operation was accepted by the Terrevo API." });
@@ -477,7 +511,7 @@ export default function App() {
           }}
           onUnlinkRelationship={async id=>{await api.unlinkCustomer(id);await refresh(access);}}
           onOpenWorkflow={request=>{
-            if(!connected)return;
+            if(!connected&&!FUNCTIONAL_QA_MODE)return;
             const group=masters[request.customerType==="doctor"?"doctors":request.customerType==="chemist"?"chemists":"stockists"]??[];
             const record=group.find(m=>m.id===request.customerId&&m.status==="active"&&typeof m.territoryId==="string");
             if(!record)return;
@@ -503,13 +537,13 @@ export default function App() {
           defaultWorkDate={ncaPlanningDate||progress?.workDate||localDate()} defaultKind={activityPlanningKind} defaultTerritoryId={activityPlanningTerritory||progress?.territoryId||""}
           onOpenPlannedCall={planStopId=>{
             const selected=progress?.stops.find(x=>x.planStopId===planStopId&&x.status!=="COMPLETED");
-            if(!connected||!selected||visit?.status==="CHECKED_IN")return;
+            if((!connected&&!FUNCTIONAL_QA_MODE)||!selected||visit?.status==="CHECKED_IN")return;
             setStopId(planStopId);setView("field");
           }}
           ncaSubtypes={ncaOptions.categories.map(x=>({code:x.code,label:x.label}))}
           towns={ncaOptions.towns.map(x=>({id:x.id,name:x.name}))}
           onSaveDraft={async draft=>{
-            if(!connected||draft.tenantId!==tenantId)throw new Error("The organization changed; start a new authorized draft.");
+            if((!connected&&!FUNCTIONAL_QA_MODE)||draft.tenantId!==tenantId)throw new Error("The organization changed; start a new authorized draft.");
             if(draft.kind==="PLANNED_CALL")throw new Error("Use the approved planned stop and GPS field execution workflow.");
             if(draft.evidence)throw new Error("Evidence uploads are not yet supported; remove the unverified attachment reference.");
             if(draft.kind==="UNPLANNED_CALL"){
@@ -653,7 +687,7 @@ export default function App() {
         {view==="platform"&&<PlatformConsole api={api} authenticated={Boolean(session)}
           isSuperAdmin={isPlatformAdmin} busy={busy} perform={(fn,title)=>action(fn,title,false)}/>}
 
-        {connected&&<div className="tr-footer-actions"><div><strong>{selectedTenantName}</strong>
+        {(connected||FUNCTIONAL_QA_MODE)&&<div className="tr-footer-actions"><div><strong>{selectedTenantName}</strong>
           <p>{access?.roles.map(r=>roles[r.roleKey]??r.roleKey).join(" · ")||"No assigned roles"}</p></div>
           {tenants.length>1&&<select className="tr-select" aria-label="Switch organization" value={tenantId} disabled={busy||loading} onChange={e=>void chooseTenant(e.target.value)}>{tenants.map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select>}
           <Button kind="ghost" onClick={()=>void disconnect()} disabled={busy}>Disconnect</Button></div>}
