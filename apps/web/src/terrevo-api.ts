@@ -60,6 +60,9 @@ export type Coordinates = { latitude: number; longitude: number; accuracyMeters:
 export type CustomerKind = "doctor"|"chemist"|"stockist";
 export type CustomerRelationship = {id:string;tenantId:string;sourceKind:CustomerKind;sourceId:string;targetKind:CustomerKind;targetId:string;relationship:"DOCTOR_CHEMIST"|"CHEMIST_STOCKIST";createdAt:string};
 export type CustomerActivity = {tenantId:string;customerKind:CustomerKind;customerId:string;id:string;occurredAt:string;activityType:"DCR"|"RCPA"|"POB";summary:string};
+export type LiveClmAsset={id:string;code:string;title:string;version:string;category:string;status:"APPROVED";effectiveFrom:string;expiresAt:string|null;productIds:string[];slides:Array<{id:string;title:string;body:string;sequence:number}>};
+export type LiveClmSession={id:string;visitId:string;assetId:string;startedAt:string;endedAt:string;reaction:"POSITIVE"|"NEUTRAL"|"NEGATIVE";slideDwells:Array<{slideId:string;durationMs:number}>};
+export type ProvisionedUser={userId:string;email:string;role:"TENANT_ADMIN"|"MANAGER"|"MR";orgUnitId:string|null};
 
 export class ApiFailure extends Error {
   readonly status: number;
@@ -270,6 +273,21 @@ export class TerrevoWebApi {
   }
   async dcrs(): Promise<Array<{ id: string; doctorName: string; doctorCode: string; callOutcome: string; submittedAt: string; doctorId: string }>> {
     return (await this.raw("/v1/dcrs") as {dcrs: Array<{id:string;doctorName:string;doctorCode:string;callOutcome:string;submittedAt:string;doctorId:string}>}).dcrs;
+  }
+  async clmAssets():Promise<LiveClmAsset[]>{
+    return (await this.raw("/v1/clm/assets") as {assets:LiveClmAsset[]}).assets;
+  }
+  async clmSessions(visitId:string):Promise<LiveClmSession[]>{
+    return (await this.raw("/v1/visits/"+encodeURIComponent(visitId)+"/clm-sessions") as {sessions:LiveClmSession[]}).sessions;
+  }
+  async saveClmSession(visitId:string,input:{assetId:string;startedAt:string;endedAt:string;reaction:"POSITIVE"|"NEUTRAL"|"NEGATIVE";slideDwells:Array<{slideId:string;durationMs:number}>}):Promise<LiveClmSession>{
+    return (await this.raw("/v1/visits/"+encodeURIComponent(visitId)+"/clm-sessions","POST",{operationId:crypto.randomUUID(),...input}) as {session:LiveClmSession}).session;
+  }
+  async provisionTenantUser(input:{email:string;temporaryPassword:string;name:string;employeeCode:string;role:"MANAGER"|"MR";orgUnitId:string;reportingManagerEmployeeId?:string|null}):Promise<ProvisionedUser>{
+    return (await this.raw("/v1/users/provision","POST",input) as {user:ProvisionedUser}).user;
+  }
+  async provisionPlatformTenantAdmin(tenantId:string,input:{email:string;temporaryPassword:string;name:string}):Promise<ProvisionedUser>{
+    return (await this.raw("/v1/platform/tenants/"+encodeURIComponent(tenantId)+"/users","POST",{...input,role:"TENANT_ADMIN"},false) as {user:ProvisionedUser}).user;
   }
   async customerRelationships():Promise<CustomerRelationship[]> {
     return (await this.raw("/v1/customer-relationships") as {relationships:CustomerRelationship[]}).relationships;
