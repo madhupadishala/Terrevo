@@ -47,7 +47,7 @@ test("tenant-admin configures NCA master, field user saves draft, and submission
     if(path.startsWith("/api/v1/manager/analytics"))return respond({analytics:{tours:{submitted:0},coverage:{plannedStops:0,completedVisits:0,doctorCalls:0}}});
     return respond({error:"Unexpected route "+path},404);
   });
-  await page.goto("/");
+  await page.goto("/?auth-test=1");
   await page.locator("#account-email").fill("user@example.invalid");
   await page.locator("#account-password").fill("pass");
   await page.getByRole("button",{name:"Connect to live workflows"}).click();
