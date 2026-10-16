@@ -42,12 +42,12 @@ export function ActivitiesView({tenantId,authorizedForTenantId,contextKey,territ
  <TextInput id="activity-date" data-testid="nca-date" type="date" labelText="Activity date" value={draft.workDate} disabled={!authorized||busy} onChange={e=>patch({workDate:e.target.value,plannedStopId:undefined})}/>
  <label htmlFor="activity-territory">Authorized territory</label><select id="activity-territory" data-testid="nca-territory" className="tr-select" value={draft.territoryId} disabled={!authorized||busy} onChange={e=>patch({territoryId:e.target.value,plannedStopId:undefined})}>
  <option value="">Choose territory</option>{territories.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
- {draft.kind==="PLANNED_CALL"&&<><label htmlFor="activity-stop">Verified planned call</label><select id="activity-stop" className="tr-select" value={draft.plannedStopId||""} disabled={busy} onChange={e=>patch({plannedStopId:e.target.value})}>
+ {draft.kind==="PLANNED_CALL"&&<><label htmlFor="activity-stop">Verified planned call</label><select id="activity-stop" data-testid="activity-planned-stop" className="tr-select" value={draft.plannedStopId||""} disabled={busy} onChange={e=>patch({plannedStopId:e.target.value})}>
  <option value="">Choose planned stop</option>{planned.map(x=><option value={x.planStopId} key={x.planStopId}>{x.label}</option>)}</select></>}
  {draft.kind==="UNPLANNED_CALL"&&<>
- <label htmlFor="activity-customer-type">Customer type</label><select id="activity-customer-type" className="tr-select" value={draft.customerType||""} disabled={busy} onChange={e=>setCustomerKind(e.target.value as ActivityCustomerKind)}>
+ <label htmlFor="activity-customer-type">Customer type</label><select id="activity-customer-type" data-testid="activity-customer-type" className="tr-select" value={draft.customerType||""} disabled={busy} onChange={e=>setCustomerKind(e.target.value as ActivityCustomerKind)}>
  <option value="">Choose type</option><option value="doctor">Doctor</option><option value="chemist">Chemist</option><option value="stockist">Stockist</option></select>
- <label htmlFor="activity-customer">Authorized customer</label><select id="activity-customer" className="tr-select" value={draft.customerId||""} disabled={!draft.customerType||busy} onChange={e=>patch({customerId:e.target.value})}>
+ <label htmlFor="activity-customer">Authorized customer</label><select id="activity-customer" data-testid="activity-customer" className="tr-select" value={draft.customerId||""} disabled={!draft.customerType||busy} onChange={e=>patch({customerId:e.target.value})}>
  <option value="">Choose customer</option>{(draft.customerType?customers[group]??[]:[]).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></>}
  {draft.kind==="NON_CALL_ACTIVITY"&&<>
  <label htmlFor="activity-phase">NCA workflow</label><select className="tr-select" id="activity-phase" data-testid="nca-phase" value={draft.ncaPhase||"REPORT"} disabled={busy} onChange={e=>patch({ncaPhase:e.target.value as "PLAN"|"REPORT",townId:undefined,ncaSubtype:undefined})}>
@@ -62,17 +62,17 @@ export function ActivitiesView({tenantId,authorizedForTenantId,contextKey,territ
  onChange={e=>patch({durationMinutes:Number(e.target.value)})}/>
  <TextArea id="activity-remarks" data-testid="nca-remarks" labelText="Remarks" value={draft.remarks} maxLength={2000} disabled={!authorized||busy} onChange={e=>patch({remarks:e.target.value})}/>
  <h3>Optional evidence metadata (no upload)</h3>
- <TextInput id="activity-evidence" labelText="Evidence reference (no upload, size or media type verified)" value={draft.evidence?.name||""} disabled={busy} onChange={e=>patch({evidence:e.target.value?{name:e.target.value}:undefined})}/>
+ <TextInput id="activity-evidence" data-testid="activity-evidence" labelText="Evidence reference (no upload, size or media type verified)" value={draft.evidence?.name||""} disabled={busy} onChange={e=>patch({evidence:e.target.value?{name:e.target.value}:undefined})}/>
  </div>
  {errors.length>0&&<div role="status"><strong>Complete before review:</strong><ul>{errors.map(e=><li key={e}>{e}</li>)}</ul></div>}
- {draft.kind==="PLANNED_CALL"&&onOpenPlannedCall&&<Button kind="secondary" disabled={!authorized||loading||busy||!planned.some(x=>x.planStopId===draft.plannedStopId)}
+ {draft.kind==="PLANNED_CALL"&&onOpenPlannedCall&&<Button kind="secondary" data-testid="activity-open-planned-stop" disabled={!authorized||loading||busy||!planned.some(x=>x.planStopId===draft.plannedStopId)}
     onClick={()=>{if(draft.plannedStopId)onOpenPlannedCall(draft.plannedStopId);}}>Open approved planned stop</Button>}
  {!review?<Button data-testid="nca-review" disabled={!authorized||loading||errors.length>0||busy} onClick={()=>setReview(true)}>Review activity draft</Button>:<div className="tr-panel" aria-label="Review activity">
  <h3>Review before draft handoff</h3><p>{draft.kind} · {draft.workDate} · {draft.territoryId} · {draft.durationMinutes} minutes</p>
  <p>Reason: {draft.reason}</p><p>Evidence: {draft.evidence?.name||"None"}</p><p>No record has been saved on a server.</p>
- <Button kind="secondary" disabled={busy} onClick={()=>setReview(false)}>Edit</Button>
- <Button disabled={!canSave||busy||errors.length>0} onClick={()=>void save()}>{saveMode==="SERVER_FIELD"&&draft.kind==="UNPLANNED_CALL"?"Submit unplanned call for review":saveMode==="SERVER_NCA"||saveMode==="SERVER_FIELD"?"Save NCA draft":"Hand off draft"}</Button>
+ <Button kind="secondary" data-testid="activity-edit" disabled={busy} onClick={()=>setReview(false)}>Edit</Button>
+ <Button data-testid="activity-save" disabled={!canSave||busy||errors.length>0} onClick={()=>void save()}>{saveMode==="SERVER_FIELD"&&draft.kind==="UNPLANNED_CALL"?"Submit unplanned call for review":saveMode==="SERVER_NCA"||saveMode==="SERVER_FIELD"?"Save NCA draft":"Hand off draft"}</Button>
  {!canSave&&<p role="status">No server save contract is available for this activity type. Nothing will be submitted.</p>}</div>}
  {message&&<p role="status">{message}</p>}
- {saved&&<Button kind="ghost" size="sm" disabled={busy} onClick={()=>{setState({tenantId,contextKey,draft:emptyActivityDraft(tenantId,defaultWorkDate,defaultKind,defaultTerritoryId)});setReview(false);setSaved(false);setMessage("");}}>Start another activity</Button>}</section>;
+ {saved&&<Button kind="ghost" size="sm" data-testid="activity-start-another" disabled={busy} onClick={()=>{setState({tenantId,contextKey,draft:emptyActivityDraft(tenantId,defaultWorkDate,defaultKind,defaultTerritoryId)});setReview(false);setSaved(false);setMessage("");}}>Start another activity</Button>}</section>;
 }
