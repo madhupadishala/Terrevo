@@ -1,7 +1,7 @@
 export type Id=string;
 export type RecordStatus="ACTIVE"|"INACTIVE";
 export type CustomerKind="DOCTOR"|"CHEMIST"|"STOCKIST";
-export type WorkflowStatus="DRAFT"|"SUBMITTED"|"APPROVED"|"REJECTED"|"RETURNED";
+export type WorkflowStatus="DRAFT"|"SUBMITTED"|"PENDING"|"APPROVED"|"REJECTED"|"RETURNED";
 export type Doctor={id:Id;code:string;name:string;specialty:string;qualification:string;territoryId:Id;category:"A"|"B"|"C";status:RecordStatus};
 export type Chemist={id:Id;code:string;name:string;territoryId:Id;status:RecordStatus};
 export type Stockist={id:Id;code:string;name:string;territoryId:Id;status:RecordStatus};
