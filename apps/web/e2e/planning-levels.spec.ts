@@ -87,6 +87,7 @@ test("MTP WTP DTP share one persisted plan, support sequencing and submitted pla
   await page.getByRole("button",{name:"Connect to live workflows"}).click();
   await page.getByRole("button",{name:"Tour planning"}).click();
   await page.getByRole("button",{name:"Daily Tour Plan"}).click();
+  await page.getByLabel("Selected daily tour date").fill("2026-10-15");
   await expect(page.getByText("1. Doctor Beta")).toBeVisible();
   await expect(page.getByText("2. Doctor Alpha")).toBeVisible();
 
