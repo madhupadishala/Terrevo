@@ -23,6 +23,7 @@ import type { AnalyticsRepository, ManagerAnalytics } from "../../../modules/ana
 import type { NcaRepository, NcaRecord } from "../../../modules/nca/src/index.ts";
 import type {UnplannedRepository,UnplannedCall} from "../../../modules/unplanned-calls/src/index.ts";
 import type {CustomerNetworkRepository,CustomerRelationship,CustomerActivity,CustomerKind} from "../../../modules/customer-network/src/index.ts";
+import type {ClmRepository,ClmAsset,ClmSession} from "../../../modules/clm/src/index.ts";
 import type {
   OrgAssignmentSummary,
   PermissionKey,
@@ -157,6 +158,7 @@ export function createSupabaseAdapter(
   nca: NcaRepository;
   unplanned: UnplannedRepository;
   customerNetwork: CustomerNetworkRepository;
+  clm: ClmRepository;
 } {
   const base = config.url.replace(/\/+$/, "");
 
@@ -1190,5 +1192,49 @@ export function createSupabaseAdapter(
     },
   };
 
-  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders, attendanceLeave, expenses, jointWork, managerCommand, analytics, nca, unplanned, customerNetwork };
+
+  const clm:ClmRepository={
+    async listApproved(t,token){
+      const aq=new URLSearchParams({select:"id,code,title,version,category,status,effective_from,expires_at",tenant_id:"eq."+t,status:"eq.APPROVED",effective_from:"lte."+new Date().toISOString().slice(0,10),order:"code.asc"});
+      const ar=await expectOk(await fetcher(`${base}/rest/v1/clm_assets?${aq}`,{headers:authHeaders(config,token)}));
+      const assets=await ar.json() as Array<Record<string,unknown>>;
+      const out:ClmAsset[]=[];
+      for(const a of assets){
+        if(a.expires_at&&String(a.expires_at)<new Date().toISOString().slice(0,10))continue;
+        const pq=new URLSearchParams({select:"product_id",tenant_id:"eq."+t,asset_id:"eq."+String(a.id)});
+        const sq=new URLSearchParams({select:"id,title,body,sequence_no",tenant_id:"eq."+t,asset_id:"eq."+String(a.id),order:"sequence_no.asc"});
+        const [pr,sr]=await Promise.all([
+          expectOk(await fetcher(`${base}/rest/v1/clm_asset_products?${pq}`,{headers:authHeaders(config,token)})),
+          expectOk(await fetcher(`${base}/rest/v1/clm_slides?${sq}`,{headers:authHeaders(config,token)})),
+        ]);
+        out.push({id:String(a.id),code:String(a.code),title:String(a.title),version:String(a.version),category:String(a.category),status:"APPROVED",effectiveFrom:String(a.effective_from),expiresAt:a.expires_at?String(a.expires_at):null,
+          productIds:(await pr.json() as Array<{product_id:string}>).map(x=>x.product_id),
+          slides:(await sr.json() as Array<{id:string;title:string;body:string;sequence_no:number}>).map(x=>({id:x.id,title:x.title,body:x.body,sequence:x.sequence_no}))});
+      }
+      return out;
+    },
+    async saveDetailing(t,u,v,input){
+      const r=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_save_clm_detailing`,{method:"POST",headers:adminHeaders(config),body:JSON.stringify({
+        p_tenant_id:t,p_user_id:u,p_operation_id:input.operationId,p_visit_id:v,p_asset_id:input.assetId,
+        p_started_at:input.startedAt,p_ended_at:input.endedAt,p_reaction:input.reaction,p_slide_dwells:input.slideDwells,
+      })}));return await r.json() as string;
+    },
+    async getSession(t,id,token){
+      const q=new URLSearchParams({select:"id,visit_id,asset_id,started_at,ended_at,reaction",tenant_id:"eq."+t,id:"eq."+id,limit:"1"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/clm_detailing_sessions?${q}`,{headers:authHeaders(config,token)}));
+      const row=(await r.json() as Array<Record<string,unknown>>)[0];if(!row)return null;
+      const sq=new URLSearchParams({select:"slide_id,duration_ms,sequence_no",tenant_id:"eq."+t,session_id:"eq."+id,order:"sequence_no.asc"});
+      const sr=await expectOk(await fetcher(`${base}/rest/v1/clm_session_slides?${sq}`,{headers:authHeaders(config,token)}));
+      return{id:String(row.id),visitId:String(row.visit_id),assetId:String(row.asset_id),startedAt:String(row.started_at),endedAt:String(row.ended_at),reaction:row.reaction as ClmSession["reaction"],slideDwells:(await sr.json() as Array<{slide_id:string;duration_ms:number}>).map(x=>({slideId:x.slide_id,durationMs:x.duration_ms}))};
+    },
+    async listVisitSessions(t,v,token){
+      const q=new URLSearchParams({select:"id",tenant_id:"eq."+t,visit_id:"eq."+v,order:"started_at.asc"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/clm_detailing_sessions?${q}`,{headers:authHeaders(config,token)}));
+      const rows=await r.json() as Array<{id:string}>;const out:ClmSession[]=[];
+      for(const row of rows){const x=await this.getSession(t,row.id,token);if(x)out.push(x)}
+      return out;
+    },
+  };
+
+  return { auth, tenants, organization, rbac, masters, tourPlanning, tourApproval, tourExecution, tourProgress, visits, doctorCalls, inventory, tourSubmit, dailyTimesheets, weeklyTimesheets, tradeCalls, rcpa, orders, attendanceLeave, expenses, jointWork, managerCommand, analytics, nca, unplanned, customerNetwork, clm };
 }
