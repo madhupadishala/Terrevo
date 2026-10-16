@@ -108,7 +108,10 @@ export function decideWorkforce(s:QaState,kind:"LEAVE"|"EXPENSE"|"TIMESHEET",id:
 export function buildDcr(s:QaState,repId="rep-hyd-01",date=QA_DATE):Dcr{
  const visits=s.visits.filter(v=>v.repId===repId&&v.plannedAt.slice(0,10)===date&&v.status==="COMPLETED");
  const nca=s.nca.filter(n=>n.repId===repId&&n.date===date&&n.status==="APPROVED");
- return{id:`dcr-${repId}-${date}`,repId,date,visitIds:visits.map(v=>v.id),ncaIds:nca.map(n=>n.id),status:"DRAFT",locked:false};
+ const visitIds=visits.map(v=>v.id);
+ return{id:`dcr-${repId}-${date}`,repId,date,visitIds,ncaIds:nca.map(n=>n.id),
+  clmSessionIds:visits.flatMap(v=>v.clmSessionIds),sampleDistributionIds:visits.flatMap(v=>v.sampleDistributionIds),
+  rcpaIds:visits.flatMap(v=>v.rcpaIds),pobIds:visits.flatMap(v=>v.pobIds),status:"DRAFT",locked:false};
 }
 export function submitDcr(s:QaState,repId="rep-hyd-01",date=QA_DATE):QaState{
  if(s.visits.some(v=>v.repId===repId&&v.plannedAt.slice(0,10)===date&&v.status==="CHECKED_IN"))throw new Error("Close all visits before submitting DCR.");
@@ -118,7 +121,7 @@ export function submitDcr(s:QaState,repId="rep-hyd-01",date=QA_DATE):QaState{
 }
 export function managerMetrics(s:QaState){
  const planned=s.tourPlans.reduce((n,p)=>n+p.plannedVisitIds.length,0);
- return{teamMembers:s.reps.length,activeTours:new Set(s.visits.filter(v=>v.status==="CHECKED_IN").map(v=>v.repId)).size,submittedDays:s.dcrs.filter(d=>d.status==="SUBMITTED").length,plannedCalls:planned,completedCalls:s.visits.filter(v=>v.status==="COMPLETED").length,pendingTourPlans:s.tourPlans.filter(x=>x.status==="SUBMITTED").length,pendingGpsExceptions:s.gpsExceptions.filter(x=>x.status==="SUBMITTED").length,pendingNca:s.nca.filter(x=>x.status==="SUBMITTED").length,pendingExpenses:s.expenses.filter(x=>x.status==="SUBMITTED").length,pendingLeaves:s.leaves.filter(x=>x.status==="SUBMITTED").length};
+ return{teamMembers:s.reps.length,activeTours:new Set(s.visits.filter(v=>v.status==="CHECKED_IN").map(v=>v.repId)).size,submittedDays:s.dcrs.filter(d=>d.status==="SUBMITTED").length,plannedCalls:planned,completedCalls:s.visits.filter(v=>v.status==="COMPLETED").length,pendingDcrs:s.dcrs.filter(d=>d.status==="DRAFT").length,pendingTourPlans:s.tourPlans.filter(x=>x.status==="SUBMITTED").length,pendingGpsExceptions:s.gpsExceptions.filter(x=>x.status==="SUBMITTED").length,pendingNca:s.nca.filter(x=>x.status==="SUBMITTED").length,pendingExpenses:s.expenses.filter(x=>x.status==="SUBMITTED").length,pendingLeaves:s.leaves.filter(x=>x.status==="SUBMITTED").length};
 }
 export function approvalQueue(s:QaState):ApprovalQueueItem[]{
  return[
