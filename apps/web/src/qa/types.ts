@@ -29,9 +29,9 @@ export type TimesheetDay={date:string;hours:number};
 export type TimesheetRecord={id:Id;repId:Id;weekStart:string;days:TimesheetDay[];status:WorkflowStatus;managerComment?:string};
 export type TourPlan={id:Id;repId:Id;date:string;status:WorkflowStatus;plannedVisitIds:Id[];managerComment?:string};
 export type GpsException={id:Id;repId:Id;visitId:Id;distanceMeters:number;reason:string;status:WorkflowStatus;managerComment?:string};
-export type Dcr={id:Id;repId:Id;date:string;visitIds:Id[];ncaIds:Id[];status:"DRAFT"|"SUBMITTED";submittedAt?:string;locked:boolean};
+export type Dcr={id:Id;repId:Id;date:string;visitIds:Id[];ncaIds:Id[];clmSessionIds:Id[];sampleDistributionIds:Id[];rcpaIds:Id[];pobIds:Id[];status:"DRAFT"|"SUBMITTED";submittedAt?:string;locked:boolean};
 export type Rep={id:Id;name:string;territoryId:Id;managerId:Id};
-export type ManagerMetric={teamMembers:number;activeTours:number;submittedDays:number;plannedCalls:number;completedCalls:number;pendingTourPlans:number;pendingGpsExceptions:number;pendingNca:number;pendingExpenses:number;pendingLeaves:number};
+export type ManagerMetric={teamMembers:number;activeTours:number;submittedDays:number;plannedCalls:number;completedCalls:number;pendingDcrs:number;pendingTourPlans:number;pendingGpsExceptions:number;pendingNca:number;pendingExpenses:number;pendingLeaves:number};
 export type QaScenario="NORMAL_DAY"|"FULL_FIELD_DAY"|"MANAGER_QUEUE"|"VALIDATION_ERRORS"|"COMPLETED_DAY"|"EMPTY_TENANT";
 export type QaState={
  scenario:QaScenario;organization:{id:Id;name:string};division:{id:Id;name:string};territory:{id:Id;name:string};manager:{id:Id;name:string};reps:Rep[];
