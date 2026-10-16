@@ -37,7 +37,12 @@ const thisMonday = () => { const d = new Date();d.setDate(d.getDate() - ((d.getD
 const thisDate = () => localDate(new Date());
 const empty = <p className="tr-detail">No authorized records were returned for this workspace.</p>;
 
-export function BusinessWorkspace({ mode, api, connected, functionalQa=false, manager, busy, visit, progress, masters, relationships, perform }: Props) {
+export function BusinessWorkspace(props:Props) {
+ const adapter=useTerrevoData();
+ if(adapter.mode==="FUNCTIONAL_QA")return <FunctionalQaBusinessWorkspace mode={props.mode}/>;
+ return <LiveBusinessWorkspace {...props}/>;
+}
+function LiveBusinessWorkspace({ mode, api, connected, functionalQa=false, manager, busy, visit, progress, masters, relationships, perform }: Props) {
   const [revision, setRevision] = useState(0);
   const [message, setMessage] = useState("");
   const [dcrs, setDcrs] = useState<Dcr[]>([]);
