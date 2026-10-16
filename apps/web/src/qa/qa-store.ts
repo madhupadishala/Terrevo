@@ -137,3 +137,14 @@ export function decideQueue(s:QaState,item:ApprovalQueueItem,approve:boolean,com
  if(item.kind==="EXPENSE")return{...s,expenses:moveStatus(s.expenses,item.id,status,comment)};
  return{...s,leaves:moveStatus(s.leaves,item.id,approve?"APPROVED":"REJECTED",comment)};
 }
+
+export function linkCustomers(s:QaState,sourceKind:"doctor"|"chemist",sourceId:string,targetKind:"chemist"|"stockist",targetId:string):QaState{
+ ensureUnlocked(s);
+ const valid=(sourceKind==="doctor"&&targetKind==="chemist")||(sourceKind==="chemist"&&targetKind==="stockist");
+ if(!valid)throw new Error("Only Doctor → Chemist and Chemist → Stockist links are supported.");
+ const exists=s.links.some(l=>sourceKind==="doctor"?l.type==="DOCTOR_CHEMIST"&&l.doctorId===sourceId&&l.chemistId===targetId:l.type==="CHEMIST_STOCKIST"&&l.chemistId===sourceId&&l.stockistId===targetId);
+ if(exists)return s;
+ const link=sourceKind==="doctor"?{id:`link-dc-${s.links.length+1}`,doctorId:sourceId,chemistId:targetId,type:"DOCTOR_CHEMIST" as const}:{id:`link-cs-${s.links.length+1}`,chemistId:sourceId,stockistId:targetId,type:"CHEMIST_STOCKIST" as const};
+ return {...s,links:[...s.links,link]};
+}
+export function unlinkCustomer(s:QaState,id:string):QaState{ensureUnlocked(s);return{...s,links:s.links.filter(x=>x.id!==id)}}
