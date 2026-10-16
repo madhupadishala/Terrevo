@@ -9,46 +9,46 @@ test("functional QA provider exposes operational fields without login",async({pa
   await expect(page.getByText("QA DATA PROVIDER",{exact:true})).toBeVisible();
   await expect(page.getByTestId("qa-scenario-toggle")).toBeVisible();
 
-  await page.getByRole("button",{name:"Customer 360",exact:true}).click();
+  await page.getByTestId("nav-customers").click();
   await expect(page.getByLabel("Search name, code or territory")).toBeVisible();
   await expect(page.getByText("Dr. Ananya Rao",{exact:true})).toBeVisible();
 
-  await page.getByRole("button",{name:"NCA & activities",exact:true}).click();
+  await page.getByTestId("nav-activities").click();
   for(const id of ["#activity-kind","#activity-date","#activity-territory","#activity-reason","#activity-duration","#activity-remarks"])await expect(page.locator(id)).toBeVisible();
 
-  await page.getByRole("button",{name:"E-detailing / CLM",exact:true}).click();
+  await page.getByTestId("nav-edetailing").click();
   await expect(page.getByTestId("clm-search")).toBeVisible();
   await expect(page.getByText("Core Brand Aid",{exact:true})).toBeVisible();
 
-  await page.getByRole("button",{name:"Field execution",exact:true}).click();
+  await page.getByTestId("nav-field").click();
   await expect(page.getByTestId("qa-field-execution")).toBeVisible();
   await expect(page.getByTestId("visit-checkin-visit-doc-01")).toBeVisible();
 
-  await page.getByRole("button",{name:"RCPA & orders",exact:true}).click();
+  await page.getByTestId("nav-trade").click();
   await expect(page.getByTestId("rcpa-product")).toBeVisible();
   await expect(page.getByTestId("pob-product")).toBeVisible();
 
-  await page.getByRole("button",{name:"Samples & inventory",exact:true}).click();
+  await page.getByTestId("nav-inventory").click();
   await expect(page.getByTestId("inventory-item")).toBeVisible();
   await expect(page.getByTestId("inventory-qty")).toBeVisible();
 
-  await page.getByRole("button",{name:"Workforce operations",exact:true}).click();
+  await page.getByTestId("nav-workforce").click();
   await expect(page.getByTestId("leave-from")).toBeVisible();
   await expect(page.getByTestId("expense-category")).toBeVisible();
 
-  await page.getByRole("button",{name:"Manager approvals",exact:true}).click();
+  await page.getByTestId("nav-approvals").click();
   await expect(page.getByTestId("manager-review-comment")).toBeVisible();
 
-  await page.getByRole("button",{name:"Manager command",exact:true}).click();
+  await page.getByTestId("nav-manager").click();
   await expect(page.getByTestId("qa-manager-command")).toBeVisible();
   await expect(page.getByTestId("manager-command-comment")).toBeVisible();
 
-  await page.getByRole("button",{name:"Organization admin",exact:true}).click();
+  await page.getByTestId("nav-admin").click();
   await expect(page.getByTestId("org-code")).toBeVisible();
   await expect(page.getByTestId("masters-kind")).toBeVisible();
   await expect(page.getByTestId("assign-user")).toBeVisible();
 
-  await page.getByRole("button",{name:"Platform Super Admin",exact:true}).click();
+  await page.getByTestId("nav-platform").click();
   await expect(page.getByTestId("platform-name")).toBeVisible();
   await expect(page.getByTestId("platform-code")).toBeVisible();
 
