@@ -606,6 +606,25 @@ export default function App() {
             if((!connected&&!FUNCTIONAL_QA_MODE)||draft.tenantId!==tenantId)throw new Error("The organization changed; start a new authorized draft.");
             if(draft.kind==="PLANNED_CALL")throw new Error("Use the approved planned stop and GPS field execution workflow.");
             if(draft.evidence)throw new Error("Evidence uploads are not yet supported; remove the unverified attachment reference.");
+            if(FUNCTIONAL_QA_MODE){
+              if(draft.kind==="UNPLANNED_CALL"){
+                setOwnUnplanned(rows=>[...rows,{
+                  id:crypto.randomUUID(),actorUserId:"qa-user",executionId:progress?.executionId??"qa-execution",
+                  workDate:draft.workDate,territoryId:draft.territoryId,customerType:draft.customerType!,
+                  customerId:draft.customerId!,reason:draft.reason,remarks:draft.remarks,durationMinutes:draft.durationMinutes,
+                  latitude:17.385,longitude:78.4867,accuracyMeters:8,status:"SUBMITTED",managerComment:null,
+                  submittedAt:new Date().toISOString(),reviewedAt:null,
+                }]);
+              }else{
+                setNcaRecords(rows=>[...rows,{
+                  id:crypto.randomUUID(),workDate:draft.workDate,territoryId:draft.territoryId,
+                  phase:draft.ncaPhase==="PLAN"?"PLAN":"REPORT",categoryCode:draft.ncaSubtype??"QA_NCA",
+                  townId:draft.townId??null,reason:draft.reason,remarks:draft.remarks,durationMinutes:draft.durationMinutes,
+                  status:"DRAFT",createdAt:new Date().toISOString(),
+                }]);
+              }
+              return;
+            }
             if(draft.kind==="UNPLANNED_CALL"){
               if(!progress||draft.workDate!==progress.workDate||draft.territoryId!==progress.territoryId)
                 throw new Error("Start an approved tour in this territory and date before submitting an unplanned call.");
