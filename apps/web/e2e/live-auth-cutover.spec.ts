@@ -38,7 +38,7 @@ test("production default authenticates, hydrates live provider, preserves tenant
  await expect(page.getByTestId("live-session-bar")).toBeVisible();
  await expect(page.getByTestId("live-tenant-select")).toHaveValue(tenant);
  await expect(page.getByText("LIVE DATA PROVIDER",{exact:true})).toBeVisible();
- await expect(page.getByText("Live Pharma",{exact:true}).first()).toBeVisible();
+ await expect(page.getByTestId("live-tenant-select")).toContainText("Live Pharma");
  expect(loginCalls).toBe(1);
  await page.reload();
  await expect(page.getByTestId("live-session-bar")).toBeVisible();
