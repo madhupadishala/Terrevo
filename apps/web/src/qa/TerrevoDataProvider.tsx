@@ -1,5 +1,5 @@
 import {createContext,useContext,useMemo,useReducer,type ReactNode} from "react";
-import {QA_SCENARIOS} from "./qa-scenarios";
+import {QA_SCENARIOS,buildScenario} from "./qa-scenarios";
 import {approvalQueue,activeVisit,bookPob,buildDcr,checkInVisit,closeVisit,decideNca,decideQueue,decideWorkforce,distributeInventory,finishClm,initialQaState,linkCustomers,managerMetrics,pobEligibility,qaReducer,rcpaEligibility,requestLeave,saveExpense,saveNca,saveRcpa,startClm,submitDcr,submitExpense,submitNca,submitTimesheet,unlinkCustomer} from "./qa-store";
 import type {ApprovalQueueItem,ExpenseRecord,LeaveRecord,NcaRecord,QaScenario,QaState} from "./types";
 
@@ -42,7 +42,7 @@ export function FunctionalQaProvider({children}:{children:ReactNode}){
 }
 export function LiveApiProvider({children}:{children:ReactNode}){
  const fail=()=>{throw new Error("Live API provider is intentionally inactive until functional acceptance and authentication integration.")};
- const empty=initialQaState();
+ const empty=buildScenario("EMPTY_TENANT");
  const value=useMemo<TerrevoDataContextValue>(()=>({
   mode:"LIVE_API",state:empty,scenario:"NORMAL_DAY",setScenario:fail,resetScenario:fail,activeVisit:null,rcpaEligibility:{enabled:false,reason:"Live adapter inactive"},pobEligibility:{enabled:false,reason:"Live adapter inactive"},managerMetrics:managerMetrics(empty),approvalQueue:[],
   visits:{checkIn:fail,close:fail},clm:{start:fail,finish:fail},inventory:{distribute:fail},rcpa:{save:fail},pob:{book:fail},nca:{save:fail,submit:fail,decide:fail},workforce:{requestLeave:fail,saveExpense:fail,submitExpense:fail,submitTimesheet:fail,decide:fail},dcr:{preview:buildDcr(empty),submit:fail},manager:{decide:fail},relationships:{link:fail,unlink:fail},
