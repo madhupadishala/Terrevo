@@ -9,31 +9,26 @@ const VISIT = "66666666-6666-4666-8666-666666666666";
 const TOUR_PLAN = "77777777-7777-4777-8777-777777777777";
 const USER = "88888888-8888-4888-8888-888888888888";
 
-test("functional QA mode exposes workspaces and fields without login or server writes", async ({ page }) => {
-  const writes: string[] = [];
-  page.on("request", request => {
-    if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method())) writes.push(request.url());
-  });
+test("functional QA provider is interactive without login or server writes", async ({ page }) => {
+  const writes:string[]=[];
+  page.on("request",request=>{if(["POST","PUT","PATCH","DELETE"].includes(request.method()))writes.push(request.url());});
   await page.goto("/");
   await expect(page.locator("#account-email")).toHaveCount(0);
-  await expect(page.getByText("FUNCTIONAL QA",{exact:true})).toBeVisible();
+  await expect(page.getByText("QA DATA PROVIDER",{exact:true})).toBeVisible();
 
-  await page.getByRole("button", { name: "Field execution", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Start My Day" })).toBeVisible();
-  await expect(page.locator("#approved-day")).toHaveValue("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-  await expect(page.getByRole("button", { name: "Start My Day (GPS)" })).toBeEnabled();
+  await page.getByRole("button",{name:"Field execution",exact:true}).click();
+  await page.getByTestId("visit-checkin-visit-doc-01").click();
+  await expect(page.getByText("Checked in",{exact:true})).toBeVisible();
+  await expect(page.getByTestId("visit-complete")).toBeVisible();
 
-  await page.getByRole("button", { name: "Manager command" }).click();
-  await expect(page.getByRole("heading",{name:"Tour approvals"})).toBeVisible();
+  await page.getByRole("button",{name:"Manager command",exact:true}).click();
+  await expect(page.getByTestId("qa-manager-command")).toBeVisible();
 
-  await page.getByRole("button", { name: "Organization admin" }).click();
-  await expect(page.locator("#org-code")).toBeVisible();
-  await expect(page.locator("#masters-kind")).toBeVisible();
-  await expect(page.locator("#assign-user")).toBeVisible();
+  await page.getByRole("button",{name:"Organization admin",exact:true}).click();
+  await expect(page.getByTestId("org-code")).toBeVisible();
+  await page.getByRole("button",{name:"Platform Super Admin",exact:true}).click();
+  await expect(page.getByTestId("qa-platform-admin")).toBeVisible();
 
-  await page.getByRole("button", { name: "Platform Super Admin" }).click();
-  await expect(page.locator("#qa-platform-name")).toBeVisible();
-  await expect(page.locator("#qa-platform-slug")).toBeVisible();
   expect(writes).toEqual([]);
 });
 
