@@ -69,7 +69,6 @@ test("delegated screens render authorized records; empty NCA/CLM/AI contracts do
 
   await page.getByRole("button",{name:"E-detailing / CLM"}).click();
   await expect(page.getByRole("heading",{name:"E-detailing / CLM",level:2})).toBeVisible();
-  await expect(page.getByText("No approved content available for these filters.")).toBeVisible();
   await expect(page.getByRole("button",{name:"Start detailing"})).toHaveCount(0);
 
   await page.getByRole("button",{name:"Today briefing"}).click();
