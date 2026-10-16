@@ -59,6 +59,20 @@ const QA_MASTERS:Record<string,Master[]>={
   samples:[{id:QA_SAMPLE_ID,code:"SM-QA-01",name:"Terrevo Test Sample",status:"active",productId:QA_PRODUCT_ID}],
   gifts:[{id:QA_GIFT_ID,code:"GF-QA-01",name:"Patient Education Kit",status:"active"}],
 };
+
+const QA_PLAN_ID = "99999999-9999-4999-8999-999999999999";
+const QA_DAY_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const QA_PLAN_DAY:PlanDay={
+  date:localDate(),territoryId:QA_TERRITORY_ID,remarks:"Functional QA daily plan",
+  stops:[
+    {sequence:1,type:"doctor",targetId:QA_DOCTOR_ID,remarks:"Doctor detailing"},
+    {sequence:2,type:"chemist",targetId:QA_CHEMIST_ID,remarks:"RCPA / POB"},
+    {sequence:3,type:"stockist",targetId:QA_STOCKIST_ID,remarks:"POB"},
+  ],
+};
+const QA_PLAN:Plan={id:QA_PLAN_ID,weekStart:(()=>{const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));return localDate(d)})(),status:"APPROVED",submittedAt:new Date().toISOString(),days:[QA_PLAN_DAY]};
+const QA_START_OPTION:StartOption={planId:QA_PLAN_ID,planDayId:QA_DAY_ID,workDate:QA_PLAN_DAY.date,territoryId:QA_TERRITORY_ID};
+
 const QA_ACCESS:AccessContext={
   roles:[
     {roleKey:"MR",scopeOrgUnitId:QA_TERRITORY_ID},
@@ -106,15 +120,15 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
-  const [options, setOptions] = useState<StartOption[]>([]);
+  const [options, setOptions] = useState<StartOption[]>(FUNCTIONAL_QA_MODE?[QA_START_OPTION]:[]);
   const [visit, setVisit] = useState<FieldVisit | null>(null);
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plans, setPlans] = useState<Plan[]>(FUNCTIONAL_QA_MODE?[QA_PLAN]:[]);
   const [pending, setPending] = useState<Plan[]>([]);
   const [command, setCommand] = useState<ManagerCommand | null>(null);
   const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
   const [units, setUnits] = useState<OrgUnit[]>(FUNCTIONAL_QA_MODE?QA_UNITS:[]);
   const [masters, setMasters] = useState<Record<string, Master[]>>(FUNCTIONAL_QA_MODE?QA_MASTERS:{});
-  const [selectedOption, setSelectedOption] = useState("");
+  const [selectedOption, setSelectedOption] = useState(FUNCTIONAL_QA_MODE?QA_DAY_ID:"");
   const [stopId, setStopId] = useState("");
   const [gpsReason, setGpsReason] = useState("");
   const [callOutcome, setCallOutcome] = useState("");
@@ -142,20 +156,20 @@ export default function App() {
   const [ncaPlanningDate,setNcaPlanningDate] = useState("");
   const [activityPlanningKind,setActivityPlanningKind] = useState<"PLANNED_CALL"|"UNPLANNED_CALL"|"NON_CALL_ACTIVITY">("PLANNED_CALL");
   const [activityPlanningTerritory,setActivityPlanningTerritory] = useState("");
-  const [agendaDays,setAgendaDays] = useState<Record<string,PlanDay>>({});
+  const [agendaDays,setAgendaDays] = useState<Record<string,PlanDay>>(FUNCTIONAL_QA_MODE?{[QA_DAY_ID]:QA_PLAN_DAY}:{});
   const [fieldDcrs,setFieldDcrs] = useState<Array<{id:string;doctorName:string;doctorCode:string;callOutcome:string;submittedAt:string;doctorId:string}>>([]);
   const [attendanceRows,setAttendanceRows] = useState<Array<{workDate:string;status:string;workedMinutes:number|null;requiredMinutes:number|null}>>([]);
   const [customerRelationships,setCustomerRelationships] = useState<CustomerRelationship[]>([]);
 
   function resetTenantState() {
-    setProgress(null); setOptions([]); setVisit(null); setPlans([]); setPending([]);
+    setProgress(null); setOptions(FUNCTIONAL_QA_MODE?[QA_START_OPTION]:[]); setVisit(null); setPlans(FUNCTIONAL_QA_MODE?[QA_PLAN]:[]); setPending([]);
     setCommand(null); setAnalytics(null); setUnits(FUNCTIONAL_QA_MODE?QA_UNITS:[]); setMasters(FUNCTIONAL_QA_MODE?QA_MASTERS:{});
-    setSelectedOption(""); setStopId(""); setGpsReason(""); setCallOutcome("");
+    setSelectedOption(FUNCTIONAL_QA_MODE?QA_DAY_ID:""); setStopId(""); setGpsReason(""); setCallOutcome("");
     setCallRemarks(""); setShortDayReason("");
     setUnitParent(""); setAssignmentScope(""); setAssignmentUser(""); setReviewComment("");
     setFocusedCustomer(null); setNcaOptions({categories:[],towns:[]}); setNcaRecords([]);
     setOwnUnplanned([]);setPendingUnplanned([]);setUnplannedReviewComment("");
-    setAgendaDays({});setFieldDcrs([]);setAttendanceRows([]);setCustomerRelationships([]);setActivityPlanningKind("PLANNED_CALL");setActivityPlanningTerritory("");
+    setAgendaDays(FUNCTIONAL_QA_MODE?{[QA_DAY_ID]:QA_PLAN_DAY}:{});setFieldDcrs([]);setAttendanceRows([]);setCustomerRelationships([]);setActivityPlanningKind("PLANNED_CALL");setActivityPlanningTerritory("");
   }
 
   const connected = FUNCTIONAL_QA_MODE || Boolean(session && tenantId && access);
@@ -300,9 +314,38 @@ export default function App() {
   }
   function guarded(actionFn: () => Promise<unknown>, title: string) {
     if (!connected || busy) return;
+    if(FUNCTIONAL_QA_MODE){
+      if(title==="Workday started"){
+        setProgress({
+          executionId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",workDate:localDate(),territoryId:QA_TERRITORY_ID,
+          startedAt:new Date().toISOString(),serverNow:new Date().toISOString(),requiredMinutes:480,elapsedMinutes:60,remainingMinutes:420,
+          plannedCount:3,completedCount:0,inProgressCount:0,pendingCount:3,
+          stops:[
+            {planStopId:"cccccccc-cccc-4ccc-8ccc-ccccccccccc1",sequence:1,type:"doctor",targetId:QA_DOCTOR_ID,targetName:"Dr. Ananya Rao",status:"PENDING"},
+            {planStopId:"cccccccc-cccc-4ccc-8ccc-ccccccccccc2",sequence:2,type:"chemist",targetId:QA_CHEMIST_ID,targetName:"Central Care Pharmacy",status:"PENDING"},
+            {planStopId:"cccccccc-cccc-4ccc-8ccc-ccccccccccc3",sequence:3,type:"stockist",targetId:QA_STOCKIST_ID,targetName:"Metro Pharma Distributors",status:"PENDING"},
+          ]
+        });
+        setAttendanceRows([{workDate:localDate(),status:"PRESENT",workedMinutes:60,requiredMinutes:480}]);
+      }else if(title==="Field check-in saved"&&stopId&&progress){
+        const stop=progress.stops.find(x=>x.planStopId===stopId);
+        setVisit({id:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",executionId:progress.executionId,planStopId:stopId,territoryId:progress.territoryId,status:"CHECKED_IN",verification:"QA_VERIFIED",exceptionStatus:"NOT_REQUIRED",distanceMeters:8,geofenceRadiusMeters:100,checkinAt:new Date().toISOString(),checkoutAt:null});
+        if(stop)setProgress({...progress,inProgressCount:1,pendingCount:Math.max(0,progress.pendingCount-1),stops:progress.stops.map(x=>x.planStopId===stopId?{...x,status:"IN_PROGRESS"}:x)});
+      }else if((title==="Checked out; DCR generated"||title==="Checked out of field visit")&&visit&&progress){
+        const stop=progress.stops.find(x=>x.planStopId===visit.planStopId);
+        setProgress({...progress,completedCount:progress.completedCount+1,inProgressCount:0,stops:progress.stops.map(x=>x.planStopId===visit.planStopId?{...x,status:"COMPLETED"}:x)});
+        if(stop?.type==="doctor")setFieldDcrs(rows=>[{id:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",doctorName:stop.targetName,doctorCode:"DR-QA-01",callOutcome:callOutcome||"Detailed",submittedAt:new Date().toISOString(),doctorId:stop.targetId},...rows]);
+        setVisit(null);setStopId("");setCallOutcome("");setCallRemarks("");
+      }else if(title==="Workday submitted"){
+        setProgress(null);setVisit(null);setAttendanceRows([{workDate:localDate(),status:"SUBMITTED",workedMinutes:60,requiredMinutes:480}]);
+      }
+      setNotice({kind:"success",title,message:"Functional QA interaction completed locally. Authentication is intentionally not active."});
+      return;
+    }
     void action(actionFn, title);
   }
   function requireLocation(): Promise<{latitude: number; longitude:number; accuracyMeters:number}> {
+    if(FUNCTIONAL_QA_MODE)return Promise.resolve({latitude:17.385,longitude:78.4867,accuracyMeters:8});
     return freshPosition();
   }
   const viewName = NAV.find(n => n.id === view)!;
