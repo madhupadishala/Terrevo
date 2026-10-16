@@ -94,7 +94,7 @@ export function bookPob(s:QaState,lines:{productId:string;quantity:number}[],tok
 }
 export function requestLeave(s:QaState,input:Omit<LeaveRecord,"id"|"status">):QaState{
  const overlap=s.leaves.some(x=>x.repId===input.repId&&x.status!=="REJECTED"&&x.from<=input.to&&x.to>=input.from);if(overlap)throw new Error("Leave dates overlap an existing request.");
- return {...s,leaves:[...s.leaves,{...input,id:`leave-${s.leaves.length+1}`,status:"SUBMITTED"}]};
+ return {...s,leaves:[...s.leaves,{...input,id:`leave-${s.leaves.length+1}`,status:"PENDING"}]};
 }
 export function saveExpense(s:QaState,input:Omit<ExpenseRecord,"id"|"status">):QaState{
  ensureUnlocked(s,input.date);
@@ -124,7 +124,7 @@ export function submitDcr(s:QaState,repId="rep-hyd-01",date=QA_DATE):QaState{
 }
 export function managerMetrics(s:QaState){
  const planned=s.tourPlans.reduce((n,p)=>n+p.plannedVisitIds.length,0);
- return{teamMembers:s.reps.length,activeTours:new Set(s.visits.filter(v=>v.status==="CHECKED_IN").map(v=>v.repId)).size,submittedDays:s.dcrs.filter(d=>d.status==="SUBMITTED").length,plannedCalls:planned,completedCalls:s.visits.filter(v=>v.status==="COMPLETED").length,pendingDcrs:s.dcrs.filter(d=>d.status==="DRAFT").length,pendingTourPlans:s.tourPlans.filter(x=>x.status==="SUBMITTED").length,pendingGpsExceptions:s.gpsExceptions.filter(x=>x.status==="SUBMITTED").length,pendingNca:s.nca.filter(x=>x.status==="SUBMITTED").length,pendingExpenses:s.expenses.filter(x=>x.status==="SUBMITTED").length,pendingLeaves:s.leaves.filter(x=>x.status==="SUBMITTED").length};
+ return{teamMembers:s.reps.length,activeTours:new Set(s.visits.filter(v=>v.status==="CHECKED_IN").map(v=>v.repId)).size,submittedDays:s.dcrs.filter(d=>d.status==="SUBMITTED").length,plannedCalls:planned,completedCalls:s.visits.filter(v=>v.status==="COMPLETED").length,pendingDcrs:s.dcrs.filter(d=>d.status==="DRAFT").length,pendingTourPlans:s.tourPlans.filter(x=>x.status==="SUBMITTED").length,pendingGpsExceptions:s.gpsExceptions.filter(x=>x.status==="SUBMITTED").length,pendingNca:s.nca.filter(x=>x.status==="SUBMITTED").length,pendingExpenses:s.expenses.filter(x=>x.status==="SUBMITTED").length,pendingLeaves:s.leaves.filter(x=>x.status==="PENDING").length};
 }
 export function approvalQueue(s:QaState):ApprovalQueueItem[]{
  return[
@@ -132,7 +132,7 @@ export function approvalQueue(s:QaState):ApprovalQueueItem[]{
   ...s.gpsExceptions.filter(x=>x.status==="SUBMITTED").map(x=>({kind:"GPS_EXCEPTION" as const,id:x.id,repId:x.repId,label:"GPS variance · "+x.distanceMeters+"m",status:x.status})),
   ...s.nca.filter(x=>x.status==="SUBMITTED").map(x=>({kind:"NCA" as const,id:x.id,repId:x.repId,label:x.category+" · "+x.town,status:x.status})),
   ...s.expenses.filter(x=>x.status==="SUBMITTED").map(x=>({kind:"EXPENSE" as const,id:x.id,repId:x.repId,label:x.category+" · "+x.currency+" "+x.amount,status:x.status})),
-  ...s.leaves.filter(x=>x.status==="SUBMITTED").map(x=>({kind:"LEAVE" as const,id:x.id,repId:x.repId,label:x.type+" · "+x.from,status:x.status})),
+  ...s.leaves.filter(x=>x.status==="PENDING").map(x=>({kind:"LEAVE" as const,id:x.id,repId:x.repId,label:x.type+" · "+x.from,status:x.status})),
  ];
 }
 export function decideQueue(s:QaState,item:ApprovalQueueItem,approve:boolean,comment?:string):QaState{
