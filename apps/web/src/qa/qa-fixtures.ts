@@ -81,7 +81,7 @@ export function createBaseQaState():QaState{
    {id:"att-16",repId:"rep-hyd-01",date:QA_DATE,status:"FIELD_DAY",workedMinutes:120,requiredMinutes:480},
   ],
   leaves:[
-   {id:"leave-01",repId:"rep-hyd-03",from:"2026-10-20",to:"2026-10-20",type:"FULL_DAY",reason:"Personal",status:"SUBMITTED"},
+   {id:"leave-01",repId:"rep-hyd-03",from:"2026-10-20",to:"2026-10-20",type:"FULL_DAY",reason:"Personal",status:"PENDING"},
    {id:"leave-02",repId:"rep-hyd-01",from:"2026-10-03",to:"2026-10-03",type:"HALF_DAY",reason:"Appointment",status:"APPROVED"},
    {id:"leave-03",repId:"rep-hyd-04",from:"2026-10-07",to:"2026-10-07",type:"FULL_DAY",reason:"Personal",status:"REJECTED"},
   ],
