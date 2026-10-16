@@ -104,6 +104,30 @@ function Panel({ eyebrow, title, children }: { eyebrow: string; title?: string; 
 function Empty({ title, detail }: { title: string; detail: string }) {
   return <div className="tr-empty"><div className="tr-empty-icon" aria-hidden="true">⌖</div><strong>{title}</strong><p>{detail}</p></div>;
 }
+function PlatformQaPreview(){
+  const [name,setName]=useState("QA Pharma Organization");
+  const [slug,setSlug]=useState("qa-pharma");
+  const [status,setStatus]=useState("active");
+  return <div className="tr-grid-wide">
+    <Panel eyebrow="FUNCTIONAL QA / PLATFORM CONTROL" title="Organization lifecycle fields">
+      <p className="tr-detail">Authentication is intentionally deferred. These controls are local-only and never call the platform administration API.</p>
+      <div className="tr-form">
+        <TextInput id="qa-platform-name" labelText="Organization name" value={name} onChange={e=>setName(e.target.value)}/>
+        <TextInput id="qa-platform-slug" labelText="Organization code" value={slug} onChange={e=>setSlug(e.target.value.toLowerCase())}/>
+        <label className="tr-select-label" htmlFor="qa-platform-status">Organization status</label>
+        <select id="qa-platform-status" className="tr-select" value={status} onChange={e=>setStatus(e.target.value)}>
+          <option value="active">active</option><option value="inactive">inactive</option>
+        </select>
+        <Button disabled={!name.trim()||slug.trim().length<3} onClick={()=>void 0}>Validate organization fields</Button>
+      </div>
+    </Panel>
+    <Panel eyebrow="FUNCTIONAL QA / AUDIT" title="Administration audit fields">
+      <div className="tr-check-row"><span>Cross-tenant access</span><Tag type="blue">AUTH SPRINT DEFERRED</Tag></div>
+      <div className="tr-check-row"><span>Audit trail</span><Tag type="green">FIELD MODEL VISIBLE</Tag></div>
+      <div className="tr-check-row"><span>User provisioning</span><Tag type="gray">FINAL AUTH SPRINT</Tag></div>
+    </Panel>
+  </div>;
+}
 
 export default function App() {
   const [view, setView] = useState<Area>("overview");
@@ -763,8 +787,8 @@ export default function App() {
           <p className="tr-detail">{ncaOptions.categories.length} approved NCA categories · {ncaOptions.towns.length} authorized towns</p>
         </Panel>}
 
-        {view==="platform"&&<PlatformConsole api={api} authenticated={Boolean(session)}
-          isSuperAdmin={isPlatformAdmin} busy={busy} perform={(fn,title)=>action(fn,title,false)}/>}
+        {view==="platform"&&(FUNCTIONAL_QA_MODE?<PlatformQaPreview/>:<PlatformConsole api={api} authenticated={Boolean(session)}
+          isSuperAdmin={isPlatformAdmin} busy={busy} perform={(fn,title)=>action(fn,title,false)}/>)}
 
         {(connected||FUNCTIONAL_QA_MODE)&&<div className="tr-footer-actions"><div><strong>{selectedTenantName}</strong>
           <p>{access?.roles.map(r=>roles[r.roleKey]??r.roleKey).join(" · ")||"No assigned roles"}</p></div>
