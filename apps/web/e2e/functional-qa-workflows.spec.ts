@@ -7,7 +7,7 @@ async function chooseScenario(page:any,id:string){
 }
 
 test("provider-backed QA field lifecycle rolls CLM samples trade and DCR into one locked day",async({page})=>{
-  await page.goto("/");
+  await page.goto("/?qa=1");
   const consoleErrors:string[]=[];
   page.on("console",m=>{if(m.type()==="error")consoleErrors.push(m.text())});
 
@@ -60,7 +60,7 @@ test("provider-backed QA field lifecycle rolls CLM samples trade and DCR into on
 });
 
 test("NCA, workforce and manager approvals mutate the centralized provider",async({page})=>{
-  await page.goto("/");
+  await page.goto("/?qa=1");
   await page.getByTestId("nav-activities").click();
   await page.getByTestId("nca-kind").selectOption("NON_CALL_ACTIVITY");
   await page.getByTestId("nca-phase").selectOption("PLAN");
@@ -92,7 +92,7 @@ test("NCA, workforce and manager approvals mutate the centralized provider",asyn
 });
 
 test("all six deterministic scenarios are hot-swappable and edge states are enforced",async({page})=>{
-  await page.goto("/");
+  await page.goto("/?qa=1");
   for(const id of ["NORMAL_DAY","FULL_FIELD_DAY","MANAGER_QUEUE","VALIDATION_ERRORS","COMPLETED_DAY","EMPTY_TENANT"]){
     await chooseScenario(page,id);
     await expect(page.getByText("Scenario: "+id,{exact:true})).toBeVisible();
