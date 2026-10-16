@@ -7,7 +7,7 @@ async function scenario(page:any,id:string){
 }
 
 test("FULL_FIELD_DAY exercises detailing, sampling, chemist RCPA and POB through one provider state",async({page})=>{
-  await page.goto("/");
+  await page.goto("/?qa=1");
   await scenario(page,"FULL_FIELD_DAY");
 
   await page.getByTestId("nav-edetailing").click();
@@ -48,7 +48,7 @@ test("FULL_FIELD_DAY exercises detailing, sampling, chemist RCPA and POB through
 });
 
 test("VALIDATION_ERRORS exposes controlled failures rather than fabricated success",async({page})=>{
-  await page.goto("/");
+  await page.goto("/?qa=1");
   await scenario(page,"VALIDATION_ERRORS");
 
   await page.getByTestId("nav-trade").click();
@@ -66,7 +66,7 @@ test("VALIDATION_ERRORS exposes controlled failures rather than fabricated succe
 });
 
 test("MANAGER_QUEUE approvals derive from and mutate underlying rep records",async({page})=>{
-  await page.goto("/");
+  await page.goto("/?qa=1");
   await scenario(page,"MANAGER_QUEUE");
   await page.getByTestId("nav-manager").click();
   await expect(page.getByTestId("qa-manager-command")).toContainText("Pending DCRs");
@@ -79,7 +79,7 @@ test("MANAGER_QUEUE approvals derive from and mutate underlying rep records",asy
 });
 
 test("COMPLETED_DAY is locked and EMPTY_TENANT renders true zero states",async({page})=>{
-  await page.goto("/");
+  await page.goto("/?qa=1");
   await scenario(page,"COMPLETED_DAY");
   await page.getByTestId("nav-reports").click();
   await expect(page.getByTestId("dcr-submit")).toBeDisabled();
@@ -93,7 +93,7 @@ test("COMPLETED_DAY is locked and EMPTY_TENANT renders true zero states",async({
 });
 
 test("NORMAL_DAY supports NCA master selections and duration validation",async({page})=>{
-  await page.goto("/");
+  await page.goto("/?qa=1");
   await page.getByTestId("nav-activities").click();
   await page.getByTestId("nca-kind").selectOption("NON_CALL_ACTIVITY");
   await page.getByTestId("nca-phase").selectOption("PLAN");
