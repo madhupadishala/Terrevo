@@ -1034,7 +1034,9 @@ export function createSupabaseAdapter(
     phase:row.phase as NcaRecord["phase"],categoryCode:String(row.category_code),
     townId:row.town_id===null?null:String(row.town_id),reason:String(row.reason),remarks:String(row.remarks??""),
     durationMinutes:Number(row.duration_minutes),status:row.status as NcaRecord["status"],
-    createdAt:String(row.created_at),
+    createdAt:String(row.created_at),createdBy:String(row.created_by),
+    managerComment:row.manager_comment==null?null:String(row.manager_comment),
+    reviewedAt:row.reviewed_at==null?null:String(row.reviewed_at),
   });
   const nca:NcaRepository={
     async options(t,token){
@@ -1058,6 +1060,19 @@ export function createSupabaseAdapter(
       const r=await expectOk(await fetcher(`${base}/rest/v1/nca_records?${q}`,{headers:authHeaders(config,token)}));
       const row=(await r.json() as Array<Record<string,unknown>>)[0];
       return row?mapNca(row):null;
+    },
+    async listPending(t,token){
+      const q=new URLSearchParams({select:"*",tenant_id:"eq."+t,status:"eq.SUBMITTED",order:"work_date.asc",limit:"200"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/nca_records?${q}`,{headers:authHeaders(config,token)}));
+      return (await r.json() as Array<Record<string,unknown>>).map(mapNca);
+    },
+    async getVisible(t,id,token){
+      const q=new URLSearchParams({select:"*",tenant_id:"eq."+t,id:"eq."+id,limit:"1"});
+      const r=await expectOk(await fetcher(`${base}/rest/v1/nca_records?${q}`,{headers:authHeaders(config,token)}));
+      const row=(await r.json() as Array<Record<string,unknown>>)[0];return row?mapNca(row):null;
+    },
+    async decide(t,a,id,d,c){
+      await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_decide_nca`,{method:"POST",headers:adminHeaders(config),body:JSON.stringify({p_tenant_id:t,p_actor:a,p_id:id,p_decision:d,p_comment:c})}));
     },
     async create(t,u,v){
       const r=await expectOk(await fetcher(`${base}/rest/v1/rpc/admin_create_nca`,{
