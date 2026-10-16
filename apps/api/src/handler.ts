@@ -26,6 +26,7 @@ import { AnalyticsInputError, createAnalyticsService } from "../../../modules/an
 import {createCustomerNetworkService,CustomerNetworkInputError,CustomerNetworkNotFoundError,CustomerNetworkConflictError} from "../../../modules/customer-network/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 import { createPlatformAdminService, PlatformForbiddenError, PlatformValidationError, PlatformNotFoundError } from "./platform-admin.ts";
+import {createProvisioningService,ProvisioningInputError,ProvisioningConflictError} from "./provisioning.ts";
 import { readBoundedJsonObject, RequestBodyError } from "../../../modules/security/src/index.ts";
 
 export type ApiEnv = {
@@ -101,11 +102,11 @@ function mapError(error: unknown): Response {
   if (error instanceof AuthorizationError || error instanceof PlatformForbiddenError) return json(403, { error: "Permission denied" });
   if (error instanceof PlatformValidationError) return json(400, { error: error.message });
   if (error instanceof PlatformNotFoundError) return json(404, { error: error.message });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError || error instanceof NcaInputError || error instanceof UnplannedInputError || error instanceof ExpenseInputError || error instanceof JointWorkInputError || error instanceof AnalyticsInputError || error instanceof CustomerNetworkInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError || error instanceof NcaInputError || error instanceof UnplannedInputError || error instanceof ExpenseInputError || error instanceof JointWorkInputError || error instanceof AnalyticsInputError || error instanceof CustomerNetworkInputError || error instanceof ProvisioningInputError) {
     return json(400, { error: error.message });
   }
   if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError || error instanceof TradeCallNotFoundError || error instanceof RcpaNotFoundError || error instanceof OrderNotFoundError || error instanceof LeaveNotFoundError || error instanceof NcaNotFoundError || error instanceof UnplannedNotFoundError || error instanceof ExpenseNotFoundError || error instanceof JointWorkNotFoundError || error instanceof CustomerNetworkNotFoundError) return json(404, { error: error.message });
-  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError || error instanceof LeaveConflictError || error instanceof NcaConflictError || error instanceof UnplannedConflictError || error instanceof ExpenseConflictError || error instanceof JointWorkConflictError || error instanceof CustomerNetworkConflictError) return json(409, { error: error.message });
+  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError || error instanceof LeaveConflictError || error instanceof NcaConflictError || error instanceof UnplannedConflictError || error instanceof ExpenseConflictError || error instanceof JointWorkConflictError || error instanceof CustomerNetworkConflictError || error instanceof ProvisioningConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
     if (error.status === 400) return json(400, { error: "Provider rejected request" });
@@ -146,6 +147,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const analytics = createAnalyticsService(adapter.analytics);
   const customerNetwork = createCustomerNetworkService(adapter.customerNetwork,adapter.masters);
   const platform = createPlatformAdminService(requireConfig(env), deps.fetcher);
+  const provisioning = createProvisioningService(requireConfig(env),deps.fetcher);
 
   /** Authenticates the caller and resolves the active tenant context for a tenant-scoped request. */
   async function resolveTenantRequest(request: Request) {
@@ -204,6 +206,15 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         const user = await identity.authenticate(request.headers.get("authorization"));
         return json(200, { isSuperAdmin: await platform.isPlatformAdmin(user.id) });
       }
+      const platformProvision=/^\/v1\/platform\/tenants\/([^/]+)\/users$/.exec(path);
+      if(platformProvision&&request.method==="POST"){
+        const user=await identity.authenticate(request.headers.get("authorization"));
+        if(!(await platform.isPlatformAdmin(user.id)))throw new PlatformForbiddenError("Platform permission denied");
+        const body=await readJsonObject(request);
+        if(body.role!=="TENANT_ADMIN")throw new ProvisioningInputError("Platform provisioning may create TENANT_ADMIN only");
+        return json(201,{user:await provisioning.provision(platformProvision[1],body)});
+      }
+
       if (path === "/v1/platform/tenants" && request.method === "GET") {
         const user = await identity.authenticate(request.headers.get("authorization"));
         const offset = Number(new URL(request.url).searchParams.get("offset") ?? "0");
@@ -602,6 +613,15 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
           );
           return json(201, { item });
         }
+      }
+
+      if(request.method==="POST"&&path==="/v1/users/provision"){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        const body=await readJsonObject(request);
+        const orgUnitId=typeof body.orgUnitId==="string"?body.orgUnitId:null;
+        await rbac.authorize(context.tenantId,"RBAC_MANAGE",orgUnitId,accessToken);
+        if(body.role==="TENANT_ADMIN")throw new ProvisioningInputError("Tenant administrators may provision MANAGER or MR users only");
+        return json(201,{user:await provisioning.provision(context.tenantId,body)});
       }
 
       if (request.method === "POST" && path === "/v1/role-assignments") {
