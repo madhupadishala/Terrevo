@@ -5,7 +5,7 @@ export function FunctionalQaManagerCommand(){
  const data=useTerrevoData();const manager=useManagerCommand();const [comment,setComment]=useState("");const [message,setMessage]=useState("");
  const m=manager.metrics;const act=async(fn:()=>void|Promise<void>,ok:string)=>{setMessage("");try{await fn();setMessage(ok)}catch(e){setMessage(e instanceof Error?e.message:"Operation failed")}};
  return <div className="tr-grid-wide" data-testid="qa-manager-command">
-  <section className="tr-panel"><span className="tr-section-kicker">MANAGER COMMAND</span><h2>{data.state.manager.name} · 5-rep team</h2>
+  <section className="tr-panel"><span className="tr-section-kicker">MANAGER COMMAND</span><h2>{data.state.manager.name} · {m.teamMembers}-rep team</h2>
    <div className="tr-tour-stats">
     <div><span>TEAM</span><strong>{m.teamMembers}</strong></div><div><span>ACTIVE TOURS</span><strong>{m.activeTours}</strong></div><div><span>SUBMITTED DAYS</span><strong>{m.submittedDays}</strong></div>
     <div><span>PLANNED CALLS</span><strong>{m.plannedCalls}</strong></div><div><span>COMPLETED</span><strong>{m.completedCalls}</strong></div>
