@@ -48,7 +48,7 @@ test("MTP WTP DTP share one persisted plan, support sequencing and submitted pla
     return json({error:"Unexpected "+req.method()+" "+path},404);
   });
 
-  await page.goto("/");
+  await page.goto("/?auth-test=1");
   await page.locator("#account-email").fill("planner@example.invalid");
   await page.locator("#account-password").fill("pw");
   await page.getByRole("button",{name:"Connect to live workflows"}).click();
