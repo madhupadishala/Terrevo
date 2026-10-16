@@ -53,7 +53,7 @@ export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets
   setSaving(true);setMessage("");
   try{
     if(onSaveSessionDraft)await onSaveSessionDraft(draft);
-    if(viewing?.providerSessionId)qa.finish(viewing.providerSessionId,reaction,draft.slideVisits);
+    if(viewing?.providerSessionId)await qa.finish(viewing.providerSessionId,reaction,draft.slideVisits);
     if(epoch.current!==savingEpoch)return;
     setHandedOff(true);setMessage(onSaveSessionDraft?"Session recorded through the connected adapter.":"Functional QA detailing session recorded.");setReview(false);
   }catch(e){
@@ -82,7 +82,7 @@ export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets
  <p role="status">Slide {viewing.index+1} of {selected.slides.length}</p>
  <Button kind="secondary" data-testid="clm-prev-slide" disabled={review||viewing.index===0} onClick={()=>navigate(-1)}>Previous slide</Button>
  <Button data-testid="clm-next-slide" disabled={review||viewing.index===selected.slides.length-1} onClick={()=>navigate(1)}>Next slide</Button></div>
- {!review&&(viewing.mode==="REHEARSAL"?<Button kind="secondary" data-testid="clm-end-rehearsal" onClick={()=>{const dwell=visited(viewing,selected,Date.now());if(viewing.providerSessionId)qa.finish(viewing.providerSessionId,"NEUTRAL",dwell);setViewing(null);}}>End rehearsal</Button>:
+ {!review&&(viewing.mode==="REHEARSAL"?<Button kind="secondary" data-testid="clm-end-rehearsal" onClick={()=>{const dwell=visited(viewing,selected,Date.now());if(viewing.providerSessionId)void Promise.resolve(qa.finish(viewing.providerSessionId,"NEUTRAL",dwell));setViewing(null);}}>End rehearsal</Button>:
  !viewing.endedAt?<Button kind="tertiary" data-testid="clm-end-detailing" onClick={()=>{const now=Date.now();setViewing({...viewing,endedAt:new Date().toISOString(),visits:visited(viewing,selected,now)});}}>End detailing</Button>:
  <Button kind="tertiary" data-testid="clm-review-session" onClick={()=>setReview(true)}>Review ended session</Button>)}
  {review&&draft&&<>
