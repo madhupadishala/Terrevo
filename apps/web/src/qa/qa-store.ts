@@ -43,7 +43,7 @@ export function finishClm(s:QaState,sessionId:string,reaction:"POSITIVE"|"NEUTRA
 }
 export function saveNca(s:QaState,input:Omit<NcaRecord,"id"|"status">):QaState{
  ensureUnlocked(s,input.date);
- if(activeVisit(s))throw new Error("NCA cannot overlap an active customer check-in.");
+ const currentVisit=activeVisit(s);if(currentVisit&&currentVisit.plannedAt.slice(0,10)===input.date)throw new Error("NCA cannot overlap an active customer check-in.");
  if(input.durationMinutes<30||input.durationMinutes>600)throw new Error("NCA duration must be between 30 minutes and 10 hours.");
  if(!s.ncaCategories.some(x=>x.code===input.category&&x.active))throw new Error("Select an active NCA category.");
  const town=s.ncaTowns.find(x=>x.name===input.town&&x.active);
