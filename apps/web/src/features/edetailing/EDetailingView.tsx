@@ -82,14 +82,14 @@ export function EDetailingView({tenantId,contextKey,authorizedForTenantId,assets
  <p role="status">Slide {viewing.index+1} of {selected.slides.length}</p>
  <Button kind="secondary" data-testid="clm-prev-slide" disabled={review||viewing.index===0} onClick={()=>navigate(-1)}>Previous slide</Button>
  <Button data-testid="clm-next-slide" disabled={review||viewing.index===selected.slides.length-1} onClick={()=>navigate(1)}>Next slide</Button></div>
- {!review&&(viewing.mode==="REHEARSAL"?<Button kind="secondary" data-testid="clm-end-rehearsal" onClick={()=>{if(viewing.providerSessionId)qa.finish(viewing.providerSessionId,"NEUTRAL",viewing.visits);setViewing(null);}}>End rehearsal</Button>:
+ {!review&&(viewing.mode==="REHEARSAL"?<Button kind="secondary" data-testid="clm-end-rehearsal" onClick={()=>{const dwell=visited(viewing,selected,Date.now());if(viewing.providerSessionId)qa.finish(viewing.providerSessionId,"NEUTRAL",dwell);setViewing(null);}}>End rehearsal</Button>:
  !viewing.endedAt?<Button kind="tertiary" data-testid="clm-end-detailing" onClick={()=>{const now=Date.now();setViewing({...viewing,endedAt:new Date().toISOString(),visits:visited(viewing,selected,now)});}}>End detailing</Button>:
- <Button kind="tertiary" onClick={()=>setReview(true)}>Review ended session</Button>)}
+ <Button kind="tertiary" data-testid="clm-review-session" onClick={()=>setReview(true)}>Review ended session</Button>)}
  {review&&draft&&<>
  <h3>Session review</h3><p>Asset: {selected.title}</p><label htmlFor="detail-reaction">Doctor reaction</label><select id="detail-reaction" data-testid="clm-reaction" className="tr-select" value={reaction} onChange={e=>setReaction(e.target.value as typeof reaction)}><option value="POSITIVE">Positive</option><option value="NEUTRAL">Neutral</option><option value="NEGATIVE">Negative</option></select>
  <p>Slide engagement is an in-memory estimate, not a persisted audit record.</p>
  {draft?.slideVisits.map((v,i)=><p key={i}>Slide {v.slideId}: {Math.round(v.durationMs/1000)} seconds</p>)}
- <Button kind="secondary" disabled={saving} onClick={()=>setReview(false)}>Return to viewer</Button>
+ <Button kind="secondary" data-testid="clm-return-viewer" disabled={saving} onClick={()=>setReview(false)}>Return to viewer</Button>
  <Button data-testid="clm-save-session" disabled={saving||handedOff||(!onSaveSessionDraft&&!viewing.providerSessionId)} onClick={()=>void save()}>{saving?"Handing off…":handedOff?"Draft handed off":"Hand off session draft"}</Button>
  {!onSaveSessionDraft&&<p>No approved session recording API is connected. Draft cannot be saved.</p>}</>}
  {handedOff&&<p role="status">Draft handoff completed in this session. Start a new detailing session for another draft.</p>}
