@@ -45,7 +45,9 @@ export function saveNca(s:QaState,input:Omit<NcaRecord,"id"|"status">):QaState{
  ensureUnlocked(s,input.date);
  if(activeVisit(s))throw new Error("NCA cannot overlap an active customer check-in.");
  if(input.durationMinutes<30||input.durationMinutes>600)throw new Error("NCA duration must be between 30 minutes and 10 hours.");
- if(!["Hyderabad","Secunderabad","Kukatpally","Banjara Hills","Madhapur"].includes(input.town))throw new Error("Select an authorized town.");
+ if(!s.ncaCategories.some(x=>x.code===input.category&&x.active))throw new Error("Select an active NCA category.");
+ const town=s.ncaTowns.find(x=>x.name===input.town&&x.active);
+ if(!town||town.territoryId!==s.territory.id)throw new Error("Select an authorized town.");
  return {...s,nca:[...s.nca,{...input,id:`nca-${s.nca.length+1}`,status:"DRAFT"}]};
 }
 function moveStatus<T extends {id:string;status:WorkflowStatus;managerComment?:string}>(rows:T[],id:string,status:WorkflowStatus,comment?:string):T[]{
