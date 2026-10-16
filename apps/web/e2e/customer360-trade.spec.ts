@@ -62,7 +62,7 @@ test("Customer 360 links Doctor to Chemist to Stockist, shows verified history, 
     return json({error:"Unexpected "+req.method()+" "+path},404);
   });
 
-  await page.goto("/");
+  await page.goto("/?auth-test=1");
   await page.locator("#account-email").fill("mr@example.invalid");
   await page.locator("#account-password").fill("pw");
   await page.getByRole("button",{name:"Connect to live workflows"}).click();
