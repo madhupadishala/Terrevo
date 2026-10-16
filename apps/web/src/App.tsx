@@ -38,6 +38,9 @@ const roles: Record<string, string> = {
   TENANT_ADMIN: "Organization administrator", MANAGER: "Field manager", MR: "Field representative",
 };
 const MASTER_KINDS = ["employees", "doctors", "chemists", "stockists", "products", "samples", "gifts"];
+const FUNCTIONAL_QA_MODE = true;
+const QA_TENANT_ID = "qa-functional-tenant";
+const QA_CONTEXT_KEY = "qa-functional-context";
 const dateTime = (value: string | null | undefined) => value ? new Date(value).toLocaleString() : "—";
 const errText = (error: unknown) => error instanceof Error ? error.message : "The operation could not be completed.";
 const fmt = (v: number | string | null | undefined) => v == null ? "—" : String(v);
@@ -127,13 +130,13 @@ export default function App() {
     setAgendaDays({});setFieldDcrs([]);setAttendanceRows([]);setCustomerRelationships([]);setActivityPlanningKind("PLANNED_CALL");setActivityPlanningTerritory("");
   }
 
-  const connected = Boolean(session && tenantId && access);
+  const connected = FUNCTIONAL_QA_MODE || Boolean(session && tenantId && access);
   // Independent authorization/role/session epochs ensure feature-local state cannot cross accounts.
-  const contextKey = connected
+  const contextKey = FUNCTIONAL_QA_MODE ? QA_CONTEXT_KEY : connected
     ? [session!.user.id, tenantId, tenantGeneration.current,
        JSON.stringify(access!.roles), JSON.stringify(access!.permissions)].join("|")
     : "";
-  const authorizedForTenantId = connected && !loading ? tenantId : "";
+  const authorizedForTenantId = FUNCTIONAL_QA_MODE ? (tenantId||QA_TENANT_ID) : connected && !loading ? tenantId : "";
   const admin = access?.roles.some(r => r.roleKey === "TENANT_ADMIN") ?? false;
   const manager = admin || (access?.roles.some(r => r.roleKey === "MANAGER") ?? false);
   const activeStop = progress?.stops.find(s => s.planStopId === visit?.planStopId);
@@ -284,24 +287,24 @@ export default function App() {
       <nav className="tr-nav" aria-label="Primary">{NAV.map(n=>
         <button key={n.id} type="button" className={view===n.id?"tr-nav-item selected":"tr-nav-item"} aria-current={view===n.id?"page":undefined} onClick={()=>{if(n.id==="activities"){setNcaPlanningDate("");setActivityPlanningKind("PLANNED_CALL");setActivityPlanningTerritory("");}setView(n.id); setNotice(null);}}>
           <span className="tr-nav-glyph" aria-hidden="true">{n.icon}</span>{n.title}</button>)}</nav>
-      <div className="tr-sidebar-foot"><div className="tr-foot-pill"><span className="tr-foot-dot" /> {connected?"Server-connected":"No organization connected"}</div><p>Web · Carbon enterprise UI<br/>Live records only</p></div>
+      <div className="tr-sidebar-foot"><div className="tr-foot-pill"><span className="tr-foot-dot" /> {FUNCTIONAL_QA_MODE?"Functional QA mode":connected?"Server-connected":"No organization connected"}</div><p>Web · Carbon enterprise UI<br/>Live records only</p></div>
     </aside>
     <div className="tr-main">
       <header className="tr-topbar"><div className="tr-breadcrumb">TERREVO <span>/</span> OPERATIONS <span>/</span> <b>{viewName.title}</b></div>
         <div className="tr-header-right">
           {connected && <Button size="sm" kind="ghost" disabled={busy||loading} onClick={()=>void refresh(access)}>Refresh data</Button>}
-          <span className="tr-live"><span />{connected?"LIVE API":"SECURE CONNECTION"}</span>
+          <span className="tr-live"><span />{FUNCTIONAL_QA_MODE?"QA WORKSPACE":connected?"LIVE API":"SECURE CONNECTION"}</span>
           <span className="tr-avatar" aria-hidden="true">TR</span>
         </div></header>
       <main className="tr-content" id="main-content">
         <div className="tr-page-heading"><div><p className="tr-eyebrow">TERREVO / PHARMA FIELD OPERATIONS</p>
           <h1>{view==="overview"?"Operations, connected.":viewName.title}</h1><p className="tr-intro">{viewName.subtitle}. No simulated company, employee or transaction data.</p></div>
-          <Tag type={connected?"green":"blue"}>{connected?"AUTHORIZED WORKSPACE":"UI / API INTEGRATION"}</Tag>
+          <Tag type={connected?"green":"blue"}>{FUNCTIONAL_QA_MODE?"FUNCTIONAL QA":"AUTHORIZED WORKSPACE"}</Tag>
         </div>
         {notice && <div className="tr-notice" role="status"><InlineNotification lowContrast hideCloseButton kind={notice.kind} title={notice.title} subtitle={notice.message}/></div>}
         {loading && <p className="tr-loading" role="status">Loading authorized Terrevo records…</p>}
 
-        {!connected && <div className="tr-connect-grid">
+        {!FUNCTIONAL_QA_MODE && !connected && <div className="tr-connect-grid">
           <Panel eyebrow="ACCOUNT CONNECTION" title={session?"Choose your organization":"Connect an existing Terrevo account"}>
             <p className="tr-detail">You can explore every workspace without credentials. Live company data and mutations remain protected by the existing identity, RBAC and tenant services. No Super Admin email is required to develop the UI.</p>
             {!session ? <form className="tr-form" onSubmit={e=>{e.preventDefault();void connect();}}>
@@ -318,7 +321,7 @@ export default function App() {
             <div className="tr-check-row"><span>Server data source</span><Tag type="blue">Supabase API</Tag></div>
             <div className="tr-check-row"><span>Access requirements</span><Tag type="green">Enforced</Tag></div>
             <div className="tr-check-row"><span>Organization boundaries</span><Tag type="green">Existing RLS</Tag></div>
-            <div className="tr-check-row"><span>Super Admin role</span><Tag type="gray">Backend pending</Tag></div>
+            <div className="tr-check-row"><span>Super Admin role</span><Tag type="blue">Deferred to final auth sprint</Tag></div>
             <p className="tr-detail">This application never exposes a service-role token or impersonates an end user.</p>
           </Panel>
         </div>}
