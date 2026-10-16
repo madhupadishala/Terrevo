@@ -24,6 +24,7 @@ import { createJointWorkService, JointWorkConflictError, JointWorkInputError, Jo
 import { createManagerCommandService } from "../../../modules/manager-command/src/index.ts";
 import { AnalyticsInputError, createAnalyticsService } from "../../../modules/analytics/src/index.ts";
 import {createCustomerNetworkService,CustomerNetworkInputError,CustomerNetworkNotFoundError,CustomerNetworkConflictError} from "../../../modules/customer-network/src/index.ts";
+import {createClmService,ClmInputError,ClmNotFoundError,ClmConflictError} from "../../../modules/clm/src/index.ts";
 import { createSupabaseAdapter, ProviderError, type SupabaseConfig } from "./supabase-adapter.ts";
 import { createPlatformAdminService, PlatformForbiddenError, PlatformValidationError, PlatformNotFoundError } from "./platform-admin.ts";
 import {createProvisioningService,ProvisioningInputError,ProvisioningConflictError} from "./provisioning.ts";
@@ -102,11 +103,11 @@ function mapError(error: unknown): Response {
   if (error instanceof AuthorizationError || error instanceof PlatformForbiddenError) return json(403, { error: "Permission denied" });
   if (error instanceof PlatformValidationError) return json(400, { error: error.message });
   if (error instanceof PlatformNotFoundError) return json(404, { error: error.message });
-  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError || error instanceof NcaInputError || error instanceof UnplannedInputError || error instanceof ExpenseInputError || error instanceof JointWorkInputError || error instanceof AnalyticsInputError || error instanceof CustomerNetworkInputError || error instanceof ProvisioningInputError) {
+  if (error instanceof OrganizationInputError || error instanceof RbacInputError || error instanceof MasterInputError || error instanceof TourPlanInputError || error instanceof TourApprovalInputError || error instanceof TourExecutionInputError || error instanceof VisitInputError || error instanceof DoctorCallInputError || error instanceof InventoryInputError || error instanceof SubmitTourInputError || error instanceof DailyTimesheetInputError || error instanceof WeeklyTimesheetInputError || error instanceof TradeCallInputError || error instanceof RcpaInputError || error instanceof OrderInputError || error instanceof LeaveInputError || error instanceof NcaInputError || error instanceof UnplannedInputError || error instanceof ExpenseInputError || error instanceof JointWorkInputError || error instanceof AnalyticsInputError || error instanceof CustomerNetworkInputError || error instanceof ProvisioningInputError || error instanceof ClmInputError) {
     return json(400, { error: error.message });
   }
-  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError || error instanceof TradeCallNotFoundError || error instanceof RcpaNotFoundError || error instanceof OrderNotFoundError || error instanceof LeaveNotFoundError || error instanceof NcaNotFoundError || error instanceof UnplannedNotFoundError || error instanceof ExpenseNotFoundError || error instanceof JointWorkNotFoundError || error instanceof CustomerNetworkNotFoundError) return json(404, { error: error.message });
-  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError || error instanceof LeaveConflictError || error instanceof NcaConflictError || error instanceof UnplannedConflictError || error instanceof ExpenseConflictError || error instanceof JointWorkConflictError || error instanceof CustomerNetworkConflictError || error instanceof ProvisioningConflictError) return json(409, { error: error.message });
+  if (error instanceof TourPlanNotFoundError || error instanceof TourApprovalNotFoundError || error instanceof TourExecutionNotFoundError || error instanceof VisitNotFoundError || error instanceof DoctorCallNotFoundError || error instanceof InventoryNotFoundError || error instanceof DailyTimesheetNotFoundError || error instanceof WeeklyTimesheetNotFoundError || error instanceof TradeCallNotFoundError || error instanceof RcpaNotFoundError || error instanceof OrderNotFoundError || error instanceof LeaveNotFoundError || error instanceof NcaNotFoundError || error instanceof UnplannedNotFoundError || error instanceof ExpenseNotFoundError || error instanceof JointWorkNotFoundError || error instanceof CustomerNetworkNotFoundError || error instanceof ClmNotFoundError) return json(404, { error: error.message });
+  if (error instanceof TourPlanConflictError || error instanceof TourApprovalConflictError || error instanceof TourExecutionConflictError || error instanceof VisitConflictError || error instanceof DoctorCallConflictError || error instanceof SubmitTourConflictError || error instanceof DailyTimesheetConflictError || error instanceof WeeklyTimesheetConflictError || error instanceof TradeCallConflictError || error instanceof RcpaConflictError || error instanceof OrderConflictError || error instanceof LeaveConflictError || error instanceof NcaConflictError || error instanceof UnplannedConflictError || error instanceof ExpenseConflictError || error instanceof JointWorkConflictError || error instanceof CustomerNetworkConflictError || error instanceof ProvisioningConflictError || error instanceof ClmConflictError) return json(409, { error: error.message });
   if (error instanceof ProviderError) {
     if (error.status === 401 || error.status === 403) return json(401, { error: "Authentication failed" });
     if (error.status === 400) return json(400, { error: "Provider rejected request" });
@@ -146,6 +147,7 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
   const managerCommand = createManagerCommandService(adapter.managerCommand);
   const analytics = createAnalyticsService(adapter.analytics);
   const customerNetwork = createCustomerNetworkService(adapter.customerNetwork,adapter.masters);
+  const clm = createClmService(adapter.clm);
   const platform = createPlatformAdminService(requireConfig(env), deps.fetcher);
   const provisioning = createProvisioningService(requireConfig(env),deps.fetcher);
 
@@ -491,6 +493,20 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         const {accessToken,user,context}=await resolveTenantRequest(request);
         await visits.decideException(context.tenantId,user.id,accessToken,exceptionDecision[1],await readJsonObject(request));
         return new Response(null,{status:204});
+      }
+
+      if(request.method==="GET"&&path==="/v1/clm/assets"){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{assets:await clm.listApproved(context.tenantId,accessToken)});
+      }
+      const clmVisit=/^\/v1\/visits\/([^/]+)\/clm-sessions$/.exec(path);
+      if(clmVisit&&request.method==="GET"){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{sessions:await clm.listVisit(context.tenantId,accessToken,clmVisit[1])});
+      }
+      if(clmVisit&&request.method==="POST"){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(201,{session:await clm.finishDetailing(context.tenantId,user.id,accessToken,clmVisit[1],await readJsonObject(request,65536))});
       }
 
       if(request.method==="GET"&&path==="/v1/customer-relationships"){
