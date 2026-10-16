@@ -320,7 +320,7 @@ export class TerrevoWebApi {
     try { return (await this.raw("/v1/visits/" + encodeURIComponent(visitId) + "/order") as {order:{lines:Array<{productId:string;quantity:number;remarks:string|null}>}}).order; }
     catch (e) { if (e instanceof ApiFailure && e.status===404) return null; throw e; }
   }
-  async saveOrder(visitId:string,lines:Array<{sequence:number;productId:string;quantity:number;remarks:string|null}>,operationId=crypto.randomUUID()){
+  async saveOrder(visitId:string,lines:Array<{sequence:number;productId:string;quantity:number;remarks:string|null}>,operationId:string=crypto.randomUUID()){
     return this.raw("/v1/visits/"+encodeURIComponent(visitId)+"/order","PUT",{operationId,remarks:null,lines});
   }
   async inventory(): Promise<Array<{id:string;employeeId:string;itemType:"sample"|"gift";itemId:string;quantity:number}>> {
@@ -329,7 +329,7 @@ export class TerrevoWebApi {
   async distributions(visitId: string): Promise<Array<{id:string;itemType:"sample"|"gift";itemId:string;quantity:number}>> {
     return (await this.raw("/v1/visits/" + encodeURIComponent(visitId) + "/distributions") as {distributions:Array<{id:string;itemType:"sample"|"gift";itemId:string;quantity:number}>}).distributions;
   }
-  async distribute(visitId:string,items:Array<{itemType:"sample"|"gift";itemId:string;quantity:number}>,operationId=crypto.randomUUID()){
+  async distribute(visitId:string,items:Array<{itemType:"sample"|"gift";itemId:string;quantity:number}>,operationId:string=crypto.randomUUID()){
     return this.raw("/v1/visits/"+encodeURIComponent(visitId)+"/distributions","POST",{operationId,items});
   }
   async dailyTimesheets(): Promise<Array<{id:string;workDate:string;totalMinutes:number;visitMinutes:number;status:string;callCount:number}>> {
