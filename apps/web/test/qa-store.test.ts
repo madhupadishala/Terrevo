@@ -66,3 +66,25 @@ test("FULL_FIELD_DAY contains doctor detailing and sample evidence with linked t
  assert.equal(v?.customerType,"DOCTOR");assert.ok(v?.clmSessionIds.length);assert.ok(v?.sampleDistributionIds.length);
  assert.ok(s.visits.some(x=>x.customerType==="CHEMIST"&&x.status==="PLANNED"));assert.ok(s.links.some(x=>x.type==="CHEMIST_STOCKIST"));
 });
+
+
+test("NCA validation is driven by centralized masters and only conflicts on the active work date",()=>{
+ let s=buildScenario("NORMAL_DAY");
+ s=checkInVisit(s,"visit-doc-01");
+ assert.throws(()=>saveNca(s,{repId:"rep-hyd-01",category:"MEETING",town:"Hyderabad",date:"2026-10-16",durationMinutes:60,reason:"same-day",remarks:""}),/overlap/);
+ const future=saveNca(s,{repId:"rep-hyd-01",category:"TRAINING",town:"Madhapur",date:"2026-10-20",durationMinutes:60,reason:"future",remarks:""});
+ assert.equal(future.nca.at(-1)?.town,"Madhapur");
+ const noTown={...buildScenario("NORMAL_DAY"),ncaTowns:[]};
+ assert.throws(()=>saveNca(noTown,{repId:"rep-hyd-01",category:"MEETING",town:"Hyderabad",date:"2026-10-20",durationMinutes:60,reason:"x",remarks:""}),/authorized town/);
+});
+
+test("completed scenario DCR references only same-day approved NCA evidence",()=>{
+ const s=buildScenario("COMPLETED_DAY");
+ const d=s.dcrs[0];
+ assert.ok(d);
+ for(const id of d.ncaIds){
+   const n=s.nca.find(x=>x.id===id);
+   assert.equal(n?.date,d.date);
+   assert.equal(n?.status,"APPROVED");
+ }
+});
