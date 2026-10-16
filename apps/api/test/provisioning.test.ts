@@ -17,7 +17,7 @@ test("provisioning creates auth identity and tenant records without exposing pas
  const service=createProvisioningService({url:"https://example.supabase.co",anonKey:"anon",serviceRoleKey:"service"},async(input,init)=>{
   const url=String(input),body=typeof init?.body==="string"?init.body:null;calls.push({url,body});
   if(url.endsWith("/auth/v1/admin/users")&&init?.method==="POST")return new Response(JSON.stringify({id:user}),{status:200});
-  return new Response("",{status:204});
+  return new Response(null,{status:204});
  });
  const result=await service.provision(tenant,{email:"mr@example.invalid",temporaryPassword:"Temporary!123",name:"Test MR",role:"MR",employeeCode:"MR-01",orgUnitId:org});
  assert.equal(result.userId,user);assert.equal(result.role,"MR");
