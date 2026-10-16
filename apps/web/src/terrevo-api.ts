@@ -313,7 +313,7 @@ export class TerrevoWebApi {
     try { return (await this.raw("/v1/visits/" + encodeURIComponent(visitId) + "/rcpa") as {rcpa: {lines: Array<{sequence:number;productId:string|null;competitorBrand:string|null;prescriptionCount:number;stockQuantity:number;salesQuantity:number}>}}).rcpa; }
     catch (e) { if (e instanceof ApiFailure && e.status === 404) return null; throw e; }
   }
-  async saveRcpa(visitId:string,lines:Array<{sequence:number;productId:string|null;competitorBrand:string|null;prescriptionCount:number;stockQuantity:number;salesQuantity:number}>,operationId=crypto.randomUUID()){
+  async saveRcpa(visitId:string,lines:Array<{sequence:number;productId:string|null;competitorBrand:string|null;prescriptionCount:number;stockQuantity:number;salesQuantity:number}>,operationId:string=crypto.randomUUID()){
     return this.raw("/v1/visits/"+encodeURIComponent(visitId)+"/rcpa","PUT",{operationId,lines});
   }
   async order(visitId: string): Promise<{lines: Array<{productId:string;quantity:number;remarks:string|null}>} | null> {
