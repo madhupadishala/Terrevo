@@ -311,6 +311,15 @@ export function createHandler(env: ApiEnv, deps: Deps = {}) {
         const {accessToken,context}=await resolveTenantRequest(request);
         return json(200,{options:await nca.options(context.tenantId,accessToken)});
       }
+      if(request.method==="GET"&&path==="/v1/nca-approvals"){
+        const {accessToken,context}=await resolveTenantRequest(request);
+        return json(200,{records:await nca.listPending(context.tenantId,accessToken)});
+      }
+      const ncaDecision=/^\/v1\/nca-approvals\/([^/]+)\/decision$/.exec(path);
+      if(request.method==="POST"&&ncaDecision){
+        const {accessToken,user,context}=await resolveTenantRequest(request);
+        return json(200,{record:await nca.decide(context.tenantId,user.id,accessToken,ncaDecision[1],await readJsonObject(request))});
+      }
       if(request.method==="GET"&&path==="/v1/nca/own"){
         const {accessToken,user,context}=await resolveTenantRequest(request);
         return json(200,{records:await nca.listOwn(context.tenantId,user.id,accessToken)});
