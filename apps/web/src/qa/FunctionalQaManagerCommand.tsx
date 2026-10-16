@@ -3,7 +3,7 @@ import {Button,Tag,TextArea} from "@carbon/react";
 import {useManagerCommand,useTerrevoData} from "./TerrevoDataProvider";
 export function FunctionalQaManagerCommand(){
  const data=useTerrevoData();const manager=useManagerCommand();const [comment,setComment]=useState("");const [message,setMessage]=useState("");
- const m=manager.metrics;const act=(fn:()=>void,ok:string)=>{setMessage("");try{fn();setMessage(ok)}catch(e){setMessage(e instanceof Error?e.message:"Operation failed")}};
+ const m=manager.metrics;const act=async(fn:()=>void|Promise<void>,ok:string)=>{setMessage("");try{await fn();setMessage(ok)}catch(e){setMessage(e instanceof Error?e.message:"Operation failed")}};
  return <div className="tr-grid-wide" data-testid="qa-manager-command">
   <section className="tr-panel"><span className="tr-section-kicker">MANAGER COMMAND</span><h2>{data.state.manager.name} · 5-rep team</h2>
    <div className="tr-tour-stats">
@@ -17,7 +17,7 @@ export function FunctionalQaManagerCommand(){
    <div className="tr-check-row"><span>Leaves</span><strong>{m.pendingLeaves}</strong></div>
   </section>
   <section className="tr-panel"><span className="tr-section-kicker">APPROVAL QUEUES</span><h2>Pending decisions</h2>
-   {manager.queue.length?manager.queue.map(q=><div className="tr-history-row" key={q.kind+q.id} data-testid={"manager-queue-"+q.kind.toLowerCase()+"-"+q.id}><div><strong>{q.kind}</strong><p>{q.label} · {q.repId}</p></div><Tag type="blue">{q.status}</Tag><div className="tr-button-row"><Button size="sm" data-testid={"manager-approve-"+q.kind.toLowerCase()+"-"+q.id} onClick={()=>act(()=>manager.decide(q,true),"Approved")}>Approve</Button><Button kind="secondary" size="sm" data-testid={"manager-return-"+q.kind.toLowerCase()+"-"+q.id} disabled={!comment.trim()} onClick={()=>act(()=>manager.decide(q,false,comment),"Returned / rejected")}>Return / reject</Button></div></div>):<p className="tr-detail">No pending approvals.</p>}
+   {manager.queue.length?manager.queue.map(q=><div className="tr-history-row" key={q.kind+q.id} data-testid={"manager-queue-"+q.kind.toLowerCase()+"-"+q.id}><div><strong>{q.kind}</strong><p>{q.label} · {q.repId}</p></div><Tag type="blue">{q.status}</Tag><div className="tr-button-row"><Button size="sm" data-testid={"manager-approve-"+q.kind.toLowerCase()+"-"+q.id} onClick={()=>void act(()=>manager.decide(q,true),"Approved")}>Approve</Button><Button kind="secondary" size="sm" data-testid={"manager-return-"+q.kind.toLowerCase()+"-"+q.id} disabled={!comment.trim()} onClick={()=>void act(()=>manager.decide(q,false,comment),"Returned / rejected")}>Return / reject</Button></div></div>):<p className="tr-detail">No pending approvals.</p>}
    <TextArea id="approval-comment" data-testid="manager-command-comment" labelText="Return / rejection comment" value={comment} onChange={e=>setComment(e.target.value)}/>
    {message&&<p role="status">{message}</p>}
   </section>
