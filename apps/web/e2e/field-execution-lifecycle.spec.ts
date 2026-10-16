@@ -56,7 +56,7 @@ test("approved DTP drives Start My Day, agenda, planned call, automatic DCR and 
     return json({error:"Unexpected "+req.method()+" "+path},404);
   });
 
-  await page.goto("/");
+  await page.goto("/?auth-test=1");
   await page.locator("#account-email").fill("field@example.invalid");
   await page.locator("#account-password").fill("pw");
   await page.getByRole("button",{name:"Connect to live workflows"}).click();
@@ -128,7 +128,7 @@ test("manager command shows live field execution and submitted-day visibility wi
     if(path==="/api/v1/manager/analytics")return json({analytics:{period:{days:7,startDate:"2026-10-09",endDate:WORK_DATE},tours:{submitted:10,totalWorkedMinutes:4200},coverage:{plannedStops:40,completedVisits:32,doctorCalls:25,chemistCalls:5,stockistCalls:2}}});
     return json({error:"Unexpected "+path},404);
   });
-  await page.goto("/");
+  await page.goto("/?auth-test=1");
   await page.locator("#account-email").fill("manager@example.invalid");
   await page.locator("#account-password").fill("pw");
   await page.getByRole("button",{name:"Connect to live workflows"}).click();
