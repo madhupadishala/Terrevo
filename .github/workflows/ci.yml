@@ -108,6 +108,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/ci/customer360-trade-integration-tests.sql
       - name: Live provider CLM, sample, DCR, NCA and tenant-isolation acceptance
         run: psql -v ON_ERROR_STOP=1 -f database/ci/live-provider-cutover-tests.sql
+      - name: Pilot provisioning atomicity and reporting-tree acceptance
+        run: psql -v ON_ERROR_STOP=1 -f database/ci/pilot-provisioning-tests.sql
       - name: Apply all rollback migrations in reverse
         run: |
           set -euo pipefail
