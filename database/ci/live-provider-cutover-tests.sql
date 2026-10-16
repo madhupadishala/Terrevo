@@ -57,7 +57,7 @@ begin
  insert into public.clm_asset_products(tenant_id,asset_id,product_id) values(t,asset,product);
  insert into public.clm_slides(id,tenant_id,asset_id,sequence_no,title,body) values(slide,t,asset,1,'Slide 1','Approved content');
 
- perform public.admin_configure_nca_category(t,mgr,'MEETING','Meeting');
+ insert into public.nca_categories(tenant_id,code,label,active) values(t,'MEETING','Meeting',true);
  insert into public.nca_towns(id,tenant_id,territory_id,name,active) values(town,t,territory,'Hyderabad',true);
 
  v_plan:=public.admin_save_tour_plan(t,mr,null,monday,jsonb_build_array(jsonb_build_object(
