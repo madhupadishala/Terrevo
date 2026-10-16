@@ -1,5 +1,5 @@
 import {readFile,writeFile,chmod} from "node:fs/promises";
-import {randomBytes} from "node:crypto";
+import {randomInt} from "node:crypto";
 
 const args=process.argv.slice(2);
 const configPath=args.find(x=>!x.startsWith("--"));
@@ -65,8 +65,10 @@ async function tenantBySlug(slug){
 function generatePassword(policy){
   const symbols="!@#$%^&*()_+-=";const upper="ABCDEFGHJKLMNPQRSTUVWXYZ",lower="abcdefghijkmnopqrstuvwxyz",digits="23456789";
   let chars="";if(policy.requireUppercase)chars+=upper[0];if(policy.requireLowercase)chars+=lower[0];if(policy.requireDigit)chars+=digits[0];if(policy.requireSymbol)chars+=symbols[0];
-  const pool=upper+lower+digits+symbols;while(chars.length<policy.minLength)chars+=pool[randomBytes(1)[0]%pool.length];
-  return [...chars].sort(()=>Math.random()-.5).join("");
+  const pool=upper+lower+digits+symbols;while(chars.length<policy.minLength)chars+=pool[randomInt(pool.length)];
+  const out=[...chars];
+  for(let i=out.length-1;i>0;i--){const j=randomInt(i+1);[out[i],out[j]]=[out[j],out[i]]}
+  return out.join("");
 }
 function validatePassword(pw,policy){
   if(pw.length<policy.minLength)return false;
