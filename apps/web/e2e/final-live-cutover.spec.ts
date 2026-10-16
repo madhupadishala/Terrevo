@@ -3,11 +3,12 @@ import {test,expect,type Page,type Route} from "@playwright/test";
 const TENANT="a1000000-0000-4000-8000-000000000001";
 const USER="a1000000-0000-4000-8000-000000000002";
 const TERRITORY="a1000000-0000-4000-8000-000000000003";
+const COMPANY="a1000000-0000-4000-8000-000000000005";
 const MANAGER_EMP="a1000000-0000-4000-8000-000000000004";
 
 type BaselineOptions={platformAdmin?:boolean;permissions?:string[];refreshOnce?:boolean};
 async function installBaseline(page:Page,opts:BaselineOptions={}){
- let refreshed=false;let units:any[]=[{id:TERRITORY,parentId:null,type:"territory",code:"HYD-C",name:"Hyderabad Central Territory",status:"active"}];
+ let refreshed=false;let units:any[]=[{id:COMPANY,parentId:null,type:"company",code:"QA-PHARMA",name:"QA Pharma",status:"active"},{id:TERRITORY,parentId:COMPANY,type:"territory",code:"HYD-C",name:"Hyderabad Central Territory",status:"active"}];
  let employees:any[]=[{id:MANAGER_EMP,code:"MGR-01",name:"Meera Sharma",designation:"Manager",status:"active",orgUnitId:TERRITORY}];
  const mutations:Array<{path:string;body:any;auth?:string}>=[];
  await page.route("**/api/v1/**",async(route:Route)=>{
@@ -85,7 +86,7 @@ test("tenant admin creates hierarchy and provisions scoped Manager then MR throu
  await expect(page.getByTestId("live-org-admin")).toBeVisible();
 
  await page.getByTestId("live-unit-type").selectOption("division");
- await page.getByTestId("live-unit-parent").selectOption(TERRITORY);
+ await page.getByTestId("live-unit-parent").selectOption(COMPANY);
  await page.getByTestId("live-unit-code").fill("DIV-HYD");
  await page.getByTestId("live-unit-name").fill("Hyderabad Division");
  await page.getByTestId("live-unit-create").click();
