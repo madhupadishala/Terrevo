@@ -1,6 +1,6 @@
-import type {ApprovalQueueItem,ClmSession,Dcr,ExpenseRecord,LeaveRecord,NcaRecord,PobOrder,QaScenario,QaState,RcpaRecord,SampleDistribution,TimesheetRecord,WorkflowStatus} from "./types";
-import {buildScenario} from "./qa-scenarios";
-import {QA_DATE} from "./qa-fixtures";
+import type {ApprovalQueueItem,ClmSession,Dcr,ExpenseRecord,LeaveRecord,NcaRecord,PobOrder,QaScenario,QaState,RcpaRecord,SampleDistribution,TimesheetRecord,WorkflowStatus} from "./types.ts";
+import {buildScenario} from "./qa-scenarios.ts";
+import {QA_DATE} from "./qa-fixtures.ts";
 
 export type QaAction={type:"SET_SCENARIO";scenario:QaScenario}|{type:"REPLACE";state:QaState}|{type:"RESET"};
 export function qaReducer(state:QaState,action:QaAction):QaState{
