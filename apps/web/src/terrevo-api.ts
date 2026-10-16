@@ -11,7 +11,8 @@ export type NcaCategory = {code:string;label:string;active:boolean};
 export type NcaTown = {id:string;name:string;territoryId:string;active:boolean};
 export type NcaOptions = {categories:NcaCategory[];towns:NcaTown[]};
 export type NcaRecord = {id:string;workDate:string;territoryId:string;phase:"PLAN"|"REPORT";categoryCode:string;
-  townId:string|null;reason:string;remarks:string;durationMinutes:number;status:"DRAFT"|"SUBMITTED";createdAt:string};
+  townId:string|null;reason:string;remarks:string;durationMinutes:number;status:"DRAFT"|"SUBMITTED"|"APPROVED"|"REJECTED";createdAt:string;
+  managerComment?:string|null;reviewedAt?:string|null;createdBy?:string};
 export type Session = {
   accessToken: string;
   refreshToken: string;
@@ -202,6 +203,12 @@ export class TerrevoWebApi {
   }
   async ncaOptions():Promise<NcaOptions>{
     return (await this.raw("/v1/nca/options") as {options:NcaOptions}).options;
+  }
+  async pendingNcaRecords():Promise<NcaRecord[]>{
+    return (await this.raw("/v1/nca-approvals") as {records:NcaRecord[]}).records;
+  }
+  async decideNca(id:string,decision:"APPROVE"|"REJECT",comment:string|null):Promise<NcaRecord>{
+    return (await this.raw("/v1/nca-approvals/"+encodeURIComponent(id)+"/decision","POST",{decision,comment}) as {record:NcaRecord}).record;
   }
   async ownNcaRecords():Promise<NcaRecord[]>{
     return (await this.raw("/v1/nca/own") as {records:NcaRecord[]}).records;
