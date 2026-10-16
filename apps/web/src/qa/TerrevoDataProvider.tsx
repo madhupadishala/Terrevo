@@ -9,7 +9,7 @@ export type TerrevoDataContextValue={
  activeVisit:ReturnType<typeof activeVisit>;rcpaEligibility:ReturnType<typeof rcpaEligibility>;pobEligibility:ReturnType<typeof pobEligibility>;
  managerMetrics:ReturnType<typeof managerMetrics>;approvalQueue:ApprovalQueueItem[];
  visits:{checkIn:(id:string)=>void;close:(id:string,outcome:string)=>void};
- clm:{start:(assetId:string,mode:"REHEARSAL"|"DETAILING")=>void;finish:(sessionId:string,reaction:"POSITIVE"|"NEUTRAL"|"NEGATIVE",dwells:{slideId:string;durationMs:number}[])=>void};
+ clm:{start:(assetId:string,mode:"REHEARSAL"|"DETAILING")=>string;finish:(sessionId:string,reaction:"POSITIVE"|"NEUTRAL"|"NEGATIVE",dwells:{slideId:string;durationMs:number}[])=>void};
  inventory:{distribute:(inventoryId:string,qty:number)=>void};
  rcpa:{save:(input:{productId?:string;competitorBrand?:string;brandQty:number;competitorQty:number;rxCount:number})=>void};
  pob:{book:(lines:{productId:string;quantity:number}[],token:string)=>void};
@@ -28,7 +28,7 @@ export function FunctionalQaProvider({children}:{children:ReactNode}){
    mode:"FUNCTIONAL_QA",state,scenario:state.scenario,setScenario:s=>dispatch({type:"SET_SCENARIO",scenario:s}),resetScenario:()=>dispatch({type:"RESET"}),
    activeVisit:active,rcpaEligibility:rcpaEligibility(state),pobEligibility:pobEligibility(state),managerMetrics:managerMetrics(state),approvalQueue:approvalQueue(state),
    visits:{checkIn:id=>replace(checkInVisit(state,id)),close:(id,outcome)=>replace(closeVisit(state,id,outcome))},
-   clm:{start:(assetId,mode)=>replace(startClm(state,assetId,mode)),finish:(sessionId,reaction,dwells)=>replace(finishClm(state,sessionId,reaction,dwells))},
+   clm:{start:(assetId,mode)=>{const id=`clm-session-${state.clmSessions.length+1}`;replace(startClm(state,assetId,mode));return id;},finish:(sessionId,reaction,dwells)=>replace(finishClm(state,sessionId,reaction,dwells))},
    inventory:{distribute:(inventoryId,qty)=>replace(distributeInventory(state,inventoryId,qty))},
    rcpa:{save:input=>replace(saveRcpa(state,input))},
    pob:{book:(lines,token)=>replace(bookPob(state,lines,token))},
