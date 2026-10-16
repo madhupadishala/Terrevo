@@ -91,7 +91,7 @@ test("delegated screens render authorized records; empty NCA/CLM/AI contracts do
 });
 
 test("delegated feature panels cannot disclose records while not connected",async({page})=>{
-  await page.goto("/");
+  await page.goto("/?auth-test=1");
   for(const [button,title] of [
     ["Customer 360","Authorized customer directory"],
     ["NCA & activities","Planned, unplanned and non-call activity"],
