@@ -4,18 +4,17 @@ import type { Tenant, TerrevoWebApi } from "./terrevo-api";
 
 type Audit = { id:number;action:string;tenant_id:string;occurred_at:string;actor_user_id:string };
 type Props = {
-  api: TerrevoWebApi; authenticated: boolean; isSuperAdmin:boolean; functionalQa?:boolean;
+  api: TerrevoWebApi; authenticated: boolean; isSuperAdmin:boolean;
   busy:boolean; perform:(task:()=>Promise<unknown>, title:string)=>Promise<void>;
 };
-export function PlatformConsole({api,authenticated,isSuperAdmin,functionalQa=false,busy,perform}:Props) {
-  const [tenants,setTenants]=useState<Tenant[]>(functionalQa?[{id:"qa-functional-tenant",name:"QA Pharma Organization",slug:"qa-pharma",status:"active"}]:[]);
-  const [audit,setAudit]=useState<Audit[]>(functionalQa?[{id:1,action:"QA_WORKSPACE_READY",tenant_id:"qa-functional-tenant",occurred_at:new Date().toISOString(),actor_user_id:"qa-functional-user"}]:[]);
+export function PlatformConsole({api,authenticated,isSuperAdmin,busy,perform}:Props) {
+  const [tenants,setTenants]=useState<Tenant[]>([]);
+  const [audit,setAudit]=useState<Audit[]>([]);
   const [name,setName]=useState("");
   const [slug,setSlug]=useState("");
   const [error,setError]=useState("");
   const [revision,setRevision]=useState(0);
   useEffect(()=>{
-    if(functionalQa)return;
     if(!authenticated||!isSuperAdmin){setTenants([]);setAudit([]);return;}
     let current=true; setError("");
     void Promise.allSettled([api.platformTenants(),api.platformAudit()]).then(results=>{
@@ -25,26 +24,18 @@ export function PlatformConsole({api,authenticated,isSuperAdmin,functionalQa=fal
       if(results.some(x=>x.status==="rejected"))setError("One or more platform read requests failed. Check server migration and authorization.");
     });
     return ()=>{current=false;};
-  },[api,authenticated,isSuperAdmin,functionalQa,revision]);
+  },[api,authenticated,isSuperAdmin,revision]);
   async function update(fn:()=>Promise<unknown>,title:string) {
-    if(functionalQa){
-      if(title==="Platform tenant created"&&name.trim()&&slug.trim()){
-        setTenants(rows=>[...rows,{id:crypto.randomUUID(),name:name.trim(),slug:slug.trim(),status:"active"}]);
-        setAudit(rows=>[{id:Date.now(),action:"QA_TENANT_CREATED",tenant_id:"qa-functional-tenant",occurred_at:new Date().toISOString(),actor_user_id:"qa-functional-user"},...rows]);
-        setName("");setSlug("");
-      }
-      return;
-    }
     await perform(fn,title);
     setRevision(x=>x+1);
   }
-  if (!functionalQa && !authenticated) return <section className="tr-panel"><span className="tr-section-kicker">PLATFORM ACCESS</span>
+  if (!authenticated) return <section className="tr-panel"><span className="tr-section-kicker">PLATFORM ACCESS</span>
     <h2>Connect an existing authorized account</h2><p className="tr-detail">No platform administrator is preconfigured. The platform control plane requires a verified session and an active platform grant.</p></section>;
-  if (!functionalQa && !isSuperAdmin) return <section className="tr-panel"><span className="tr-section-kicker">PLATFORM ACCESS</span>
+  if (!isSuperAdmin) return <section className="tr-panel"><span className="tr-section-kicker">PLATFORM ACCESS</span>
     <h2>Platform permissions required</h2><p className="tr-detail">Organization admins and managers do not automatically receive cross-tenant authority. No initial Super Admin needs to be selected for UI development.</p></section>;
   return <div className="tr-grid-wide">
     <section className="tr-panel"><span className="tr-section-kicker">AUTHORIZED CONTROL PLANE</span><h2>Organizations</h2>
-      <p className="tr-detail">{functionalQa?"Functional QA mode: fields and controls are available without authentication; actions remain local.":"Only server-authorized Super Admins can create or activate organizations. Each mutation is written with an audit record."}</p>
+      <p className="tr-detail">Only server-authorized Super Admins can create or activate organizations. Each mutation is written with an audit record.</p>
       {error&&<p role="alert" className="tr-business-error">{error}</p>}
       <div className="tr-form"><TextInput id="platform-tenant-name" labelText="Organization name" value={name} maxLength={160} onChange={e=>setName(e.target.value)}/>
         <TextInput id="platform-tenant-slug" labelText="Unique organization code" value={slug} maxLength={50} onChange={e=>setSlug(e.target.value.toLowerCase())}/>
