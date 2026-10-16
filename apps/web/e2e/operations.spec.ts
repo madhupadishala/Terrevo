@@ -16,17 +16,17 @@ test("functional QA provider is interactive without login or server writes", asy
   await expect(page.locator("#account-email")).toHaveCount(0);
   await expect(page.getByText("QA DATA PROVIDER",{exact:true})).toBeVisible();
 
-  await page.getByRole("button",{name:"Field execution",exact:true}).click();
+  await page.getByTestId("nav-field").click();
   await page.getByTestId("visit-checkin-visit-doc-01").click();
   await expect(page.getByText("Checked in",{exact:true})).toBeVisible();
   await expect(page.getByTestId("visit-complete")).toBeVisible();
 
-  await page.getByRole("button",{name:"Manager command",exact:true}).click();
+  await page.getByTestId("nav-manager").click();
   await expect(page.getByTestId("qa-manager-command")).toBeVisible();
 
-  await page.getByRole("button",{name:"Organization admin",exact:true}).click();
+  await page.getByTestId("nav-admin").click();
   await expect(page.getByTestId("org-code")).toBeVisible();
-  await page.getByRole("button",{name:"Platform Super Admin",exact:true}).click();
+  await page.getByTestId("nav-platform").click();
   await expect(page.getByTestId("qa-platform-admin")).toBeVisible();
 
   expect(writes).toEqual([]);
