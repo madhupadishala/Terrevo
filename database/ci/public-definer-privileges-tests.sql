@@ -12,6 +12,16 @@ begin
  where ns.nspname='public' and p.prosecdef and p.proname like 'admin_%'
    and pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE');
  if n<>0 then raise exception 'Administrative mutation RPCs callable by authenticated clients: %',n;end if;
+ select count(*) into n from pg_catalog.pg_proc p
+ join pg_catalog.pg_namespace ns on ns.oid=p.pronamespace
+ where ns.nspname='public'
+   and p.prosecdef
+   and pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE')
+   and not (
+     coalesce(p.proconfig,'{}'::text[]) @> array['search_path=""']::text[]
+     or coalesce(p.proconfig,'{}'::text[]) @> array['search_path=pg_catalog']::text[]
+   );
+ if n<>0 then raise exception 'Authenticated SECURITY DEFINER helpers without pinned search_path: %',n;end if;
  if not pg_catalog.has_function_privilege('authenticated','public.has_permission(uuid,text,uuid)','EXECUTE')
    or not pg_catalog.has_function_privilege('authenticated','public.my_start_tour_options(uuid)','EXECUTE')
    or not pg_catalog.has_function_privilege('authenticated','public.manager_command_center(uuid)','EXECUTE') then
