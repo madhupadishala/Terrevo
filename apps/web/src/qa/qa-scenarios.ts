@@ -1,5 +1,5 @@
-import {createBaseQaState,QA_DATE} from "./qa-fixtures";
-import type {QaScenario,QaState} from "./types";
+import {createBaseQaState,QA_DATE} from "./qa-fixtures.ts";
+import type {QaScenario,QaState} from "./types.ts";
 export const QA_SCENARIOS:Array<{id:QaScenario;label:string;description:string}>=[
  {id:"NORMAL_DAY",label:"Normal Day",description:"Morning state with scheduled visits ready for check-in."},
  {id:"FULL_FIELD_DAY",label:"Full Field Day",description:"Doctor interaction in progress plus linked trade activity."},
