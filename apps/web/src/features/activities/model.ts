@@ -17,6 +17,7 @@ export function validateActivityDraft(d:ActivityDraft,ctx:ActivityValidationCont
  if(!/^\d{4}-\d{2}-\d{2}$/.test(d.workDate)||Number.isNaN(Date.parse(d.workDate+"T00:00:00"))||new Date(d.workDate+"T00:00:00Z").toISOString().slice(0,10)!==d.workDate)e.push("A valid activity date is required.");
  if(!ctx.territories.some(t=>t.id===d.territoryId))e.push("Select an authorized territory.");
  if(!Number.isInteger(d.durationMinutes)||d.durationMinutes<1||d.durationMinutes>1440)e.push("Duration must be 1–1440 minutes.");
+ if(d.kind==="NON_CALL_ACTIVITY"&&(d.durationMinutes<30||d.durationMinutes>600))e.push("NCA duration must be between 30 minutes and 10 hours.");
  if(!d.reason.trim()||d.reason.trim().length>500)e.push("Reason is required (max 500 characters).");
  if(d.remarks.length>2000)e.push("Remarks exceed 2000 characters.");
  if(d.kind==="NON_CALL_ACTIVITY"&&d.ncaPhase==="REPORT"&&!d.remarks.trim())e.push("NCA reporting remarks are required.");
