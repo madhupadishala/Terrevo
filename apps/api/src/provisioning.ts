@@ -13,10 +13,12 @@ function role(v:unknown):ProvisionRole{if(v!=="TENANT_ADMIN"&&v!=="MANAGER"&&v!=
 
 export function createProvisioningService(config:SupabaseConfig,fetcher:typeof fetch=fetch){
  const root=config.url.replace(/\/+$/,"");
- if(!config.serviceRoleKey)throw new ProviderError("Server provider key is not configured",500);
- const headers={"apikey":config.serviceRoleKey,"authorization":"Bearer "+config.serviceRoleKey,"content-type":"application/json"};
+ const headers=()=>{
+  if(!config.serviceRoleKey)throw new ProviderError("Server provider key is not configured",500);
+  return {"apikey":config.serviceRoleKey,"authorization":"Bearer "+config.serviceRoleKey,"content-type":"application/json"};
+ };
  async function call(url:string,init:RequestInit){
-  const r=await fetcher(url,{...init,headers:{...headers,...(init.headers||{})}});
+  const r=await fetcher(url,{...init,headers:{...headers(),...(init.headers||{})}});
   if(!r.ok){
    const body=await r.text().catch(()=>"");
    if(r.status===409||body.toLowerCase().includes("already"))throw new ProvisioningConflictError("User or employee already exists");
@@ -24,7 +26,7 @@ export function createProvisioningService(config:SupabaseConfig,fetcher:typeof f
   }
   return r.status===204?null:r.json();
  }
- async function deleteAuthUser(id:string){await fetcher(root+"/auth/v1/admin/users/"+encodeURIComponent(id),{method:"DELETE",headers}).catch(()=>undefined)}
+ async function deleteAuthUser(id:string){await fetcher(root+"/auth/v1/admin/users/"+encodeURIComponent(id),{method:"DELETE",headers:headers()}).catch(()=>undefined)}
  return{
   async provision(tenantId:string,value:Record<string,unknown>){
    if(!UUID.test(tenantId))throw new ProvisioningInputError("Invalid tenant");
