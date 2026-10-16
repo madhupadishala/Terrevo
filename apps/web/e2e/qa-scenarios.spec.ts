@@ -10,7 +10,7 @@ test("FULL_FIELD_DAY exercises detailing, sampling, chemist RCPA and POB through
   await page.goto("/");
   await scenario(page,"FULL_FIELD_DAY");
 
-  await page.getByRole("button",{name:"E-detailing / CLM",exact:true}).click();
+  await page.getByTestId("nav-edetailing").click();
   await expect(page.getByText("Core Brand Aid",{exact:true})).toBeVisible();
   await page.getByTestId("clm-detail-CLM-001").click();
   await expect(page.getByRole("heading",{name:"Core Brand Aid"})).toBeVisible();
@@ -21,20 +21,20 @@ test("FULL_FIELD_DAY exercises detailing, sampling, chemist RCPA and POB through
   await page.getByTestId("clm-save-session").click();
   await expect(page.getByText("Functional QA detailing session recorded.")).toBeVisible();
 
-  await page.getByRole("button",{name:"Samples & inventory",exact:true}).click();
+  await page.getByTestId("nav-inventory").click();
   await page.getByTestId("inventory-item").selectOption("SMP-01");
   await page.getByTestId("inventory-qty").fill("2");
   await page.getByTestId("inventory-distribute").click();
   await expect(page.getByText("Distribution recorded",{exact:true})).toBeVisible();
   await expect(page.getByTestId("inventory-row-SMP-01")).toContainText("Available 74");
 
-  await page.getByRole("button",{name:"Field execution",exact:true}).click();
+  await page.getByTestId("nav-field").click();
   await page.getByTestId("visit-outcome").fill("Detailed and sampled");
   await page.getByTestId("visit-complete").click();
   await page.getByTestId("visit-checkin-visit-chem-01").click();
   await expect(page.getByText("Checked in",{exact:true})).toBeVisible();
 
-  await page.getByRole("button",{name:"RCPA & orders",exact:true}).click();
+  await page.getByTestId("nav-trade").click();
   await expect(page.getByTestId("rcpa-save")).toBeEnabled();
   await page.getByTestId("rcpa-brand-qty").fill("60");
   await page.getByTestId("rcpa-competitor-qty").fill("40");
@@ -51,16 +51,16 @@ test("VALIDATION_ERRORS exposes controlled failures rather than fabricated succe
   await page.goto("/");
   await scenario(page,"VALIDATION_ERRORS");
 
-  await page.getByRole("button",{name:"RCPA & orders",exact:true}).click();
+  await page.getByTestId("nav-trade").click();
   await expect(page.getByTestId("rcpa-save")).toBeDisabled();
   await expect(page.getByTestId("rcpa-disabled-reason")).toContainText("authorized doctor");
   await expect(page.getByTestId("pob-book")).toBeDisabled();
   await expect(page.getByTestId("pob-disabled-reason")).toContainText("authorized stockist");
 
-  await page.getByRole("button",{name:"Samples & inventory",exact:true}).click();
+  await page.getByTestId("nav-inventory").click();
   await expect(page.getByTestId("inventory-row-SMP-01")).toContainText("Available 0");
 
-  await page.getByRole("button",{name:"E-detailing / CLM",exact:true}).click();
+  await page.getByTestId("nav-edetailing").click();
   await expect(page.getByText("Legacy Aid",{exact:true})).toHaveCount(0);
   await expect(page.getByText("Safety Alert",{exact:true})).toHaveCount(0);
 });
@@ -68,7 +68,7 @@ test("VALIDATION_ERRORS exposes controlled failures rather than fabricated succe
 test("MANAGER_QUEUE approvals derive from and mutate underlying rep records",async({page})=>{
   await page.goto("/");
   await scenario(page,"MANAGER_QUEUE");
-  await page.getByRole("button",{name:"Manager command",exact:true}).click();
+  await page.getByTestId("nav-manager").click();
   await expect(page.getByTestId("qa-manager-command")).toContainText("Pending DCRs");
   const first=page.locator('[data-testid^="manager-queue-"]').first();
   await expect(first).toBeVisible();
@@ -81,20 +81,20 @@ test("MANAGER_QUEUE approvals derive from and mutate underlying rep records",asy
 test("COMPLETED_DAY is locked and EMPTY_TENANT renders true zero states",async({page})=>{
   await page.goto("/");
   await scenario(page,"COMPLETED_DAY");
-  await page.getByRole("button",{name:"Daily call reports",exact:true}).click();
+  await page.getByTestId("nav-reports").click();
   await expect(page.getByTestId("dcr-submit")).toBeDisabled();
   await expect(page.getByText("SUBMITTED",{exact:true})).toBeVisible();
 
   await scenario(page,"EMPTY_TENANT");
-  await page.getByRole("button",{name:"Customer 360",exact:true}).click();
+  await page.getByTestId("nav-customers").click();
   await expect(page.getByText("No matching authorized customers.")).toBeVisible();
-  await page.getByRole("button",{name:"Samples & inventory",exact:true}).click();
+  await page.getByTestId("nav-inventory").click();
   await expect(page.getByText("No inventory allocated.")).toBeVisible();
 });
 
 test("NORMAL_DAY supports NCA master selections and duration validation",async({page})=>{
   await page.goto("/");
-  await page.getByRole("button",{name:"NCA & activities",exact:true}).click();
+  await page.getByTestId("nav-activities").click();
   await page.getByTestId("nca-kind").selectOption("NON_CALL_ACTIVITY");
   await page.getByTestId("nca-phase").selectOption("PLAN");
   await expect(page.getByTestId("nca-category")).toContainText("MEETING");
