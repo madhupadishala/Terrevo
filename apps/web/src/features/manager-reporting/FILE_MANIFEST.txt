@@ -1,0 +1,7 @@
+Exclusive S14 paths, issue #58.
+apps/web/src/features/manager-reporting/model.ts
+apps/web/src/features/manager-reporting/ManagerReportingView.tsx
+apps/web/test/manager-reporting.model.test.ts
+apps/web/src/features/manager-reporting/README.md
+apps/web/src/features/manager-reporting/INTEGRATION_REQUEST.md
+apps/web/src/features/manager-reporting/FILE_MANIFEST.txt
